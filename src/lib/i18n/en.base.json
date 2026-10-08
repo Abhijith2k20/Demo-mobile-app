@@ -1,0 +1,40 @@
+{
+  "errors": {
+    "UNKNOWN": "Something went wrong. Please try again.",
+    "OFFLINE": "You're offline. This will send when you're back online.",
+    "TIMEOUT": "The network is slow. We'll keep trying.",
+    "DEPENDENCY_FAILED": "A photo couldn't be uploaded, so this wasn't sent.",
+    "OTP_INVALID": "That code isn't right. Check it and try again.",
+    "OTP_EXPIRED": "That code has expired. Ask for a new one.",
+    "OTP_TOO_MANY_ATTEMPTS": "Too many wrong codes. Ask for a new code.",
+    "AUTH_EXPIRED": "Please sign in again.",
+    "FORBIDDEN": "You don't have permission to do that.",
+    "NOT_FOUND": "This is no longer available.",
+    "VALIDATION_FAILED": "Some details aren't right. Check and try again.",
+    "TASK_BASELINE_LOCKED": "The baseline is locked. Re-baseline with a reason.",
+    "MESSAGE_EDIT_WINDOW_PASSED": "It's too late to change this message.",
+    "CHANNEL_READ_ONLY": "Only admins can post here.",
+    "RATE_LIMITED": "Too many requests. Wait a moment and try again.",
+    "INTERNAL_ERROR": "Something went wrong on our side. We'll try again.",
+    "SERVICE_UNAVAILABLE": "The service is busy. We'll try again shortly.",
+    "sessionEnded": "You were signed out. Please sign in again.",
+    "removedFromProject": "You no longer have access to {{name}}.",
+    "taskNotSaved": "Couldn't save your change to {{name}}: {{reason}}"
+  },
+  "issue": {
+    "preset": {
+      "Material not arrived": "Material not arrived",
+      "Waiting for design": "Waiting for design",
+      "Labour short": "Labour short",
+      "Damage": "Damage",
+      "Other": "Other"
+    }
+  },
+  "jobTitle": {
+    "Project Manager": "Project Manager",
+    "Designer": "Designer",
+    "QS": "QS",
+    "Supervisor": "Supervisor",
+    "Worker": "Worker"
+  }
+}

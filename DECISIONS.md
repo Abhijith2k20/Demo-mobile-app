@@ -1,0 +1,128 @@
+# Decisions and deviations from the spec
+
+`SITELINE_DEMO_SPEC.md` is the source of truth. This file records every place where the build
+differs from it, or where the spec left a choice open. Built against **Expo SDK 57**
+(React Native 0.86, React 19.2, Reanimated 4.5).
+
+## Libraries
+
+| Spec | What was done | Why |
+|---|---|---|
+| `@gorhom/bottom-sheet` for sheets | **Own `Sheet` component** (`src/components/Sheet.tsx`) built from React Native `Modal` + Reanimated + gesture-handler. The library is not installed. | On SDK 57 in Expo Go, `BottomSheetModal.present()` was called but the sheet never animated in (5.2.14, tested on an Android 16 emulator). Every sheet in the app goes through `Sheet`, so switching back later means changing one file. |
+| FlashList "inverted" for chat | FlashList 2 with `maintainVisibleContentPosition={{ startRenderingFromBottom: true }}`, data oldest → newest, older pages loaded with `onStartReached`. | FlashList 2 removed the `inverted` prop; this is its documented replacement for chat lists. |
+| Date pickers | Small inline month calendar (`DateField` in `src/components/form.tsx`). | No native date picker is in the allowed stack. |
+| Progress ring | Drawn with plain views (two rotating half discs). | No SVG library is in the allowed stack. |
+| Voice note, File | **Simulated.** The mic "records" a timer and posts a voice message with that length; File posts a sample PDF chip. | No audio or document-picker library is in the allowed stack. Camera and gallery are real (`expo-image-picker`). |
+| ESLint | `eslint@9` + `eslint-config-expo`, with `legacy-peer-deps=true` in `.npmrc`. | ESLint 10 crashes `eslint-plugin-react`; npm's strict peer resolution fails on a `react-dom` peer range inside Expo's own dependencies. |
+
+## Navigation
+
+- Tab files are `app/(app)/index.tsx`, `tasks.tsx`, `activity.tsx`, `you.tsx` instead of
+  `(home)/index.tsx`, `(tasks)/index.tsx`, … Four `index` routes in sibling groups all map to the
+  URL `/`, which Expo Router cannot tell apart.
+- For Owner/Admin the `tasks` tab is retitled **Dashboard** and renders the dashboard.
+  `app/dashboard.tsx` also exists as a stack screen, as listed in the spec.
+- Task detail is a transparent modal screen styled as a full-height sheet.
+- The Members tab on the project page and `project/[id]/members.tsx` render the same
+  `MembersManager`; managers get the add/edit/remove controls in both.
+
+## Data model additions
+
+- `Activity` type + local `activity` table; the server sends them in `/sync` (`activities`) and as
+  an `activity.new` event. The spec describes the Activity screen and batching but not its storage.
+  "Seen" state is kept on the phone only.
+- `Attachment` type for photos inside `message.data.attachments`.
+- `User.online` (optional) for the presence dot.
+- `CheckinAnswer.kind` also allows `'not_started'`, so the "Not started" button does not have to
+  pretend the task was started. It changes nothing on the task.
+- `/sync` response also has `cursor` (paging), `activities`, and `removed.projects`.
+- Message `data` flags used by the app: `edited`, `pinned`, `mentions`, `alsoToChannel`.
+- Outbox kinds `create_dm` and `create_project` (see next section).
+- Theme: extra colour tokens `execution`, `executionSoft`, `onAccent`, `headerField`, `scrim`,
+  `shadow`; extra type styles `metaStrong` and `button`.
+
+## Mock server
+
+- Extra endpoints: `POST /dms` (open a DM, needed for "New message") and `POST /projects`
+  (needed for "New project"). Both are idempotent by client id.
+- Uploads: `POST /uploads {clientId}` → `{uploadId, uploadUrl}`, then `PUT /uploads/:id/content`.
+  The mock keeps the local file URI, so a real photo is only viewable on the phone that took it.
+- A photo message is rejected (422) until its uploads have finished, which is what makes the
+  "upload first, then message" ordering observable.
+- Memberships (`projectMembers`, `channelMembers`) are sent **in full** on every sync, not as
+  changes: they are small, and it makes access changes simple and reliable.
+- "Inject on next request" applies to the next **change** the app sends. Sync, auth and
+  read-marker requests are skipped so the injected error always lands on the action being shown.
+- The project's planned finish is recomputed from its latest task finish.
+- Tasks created after the baseline is locked have no baseline of their own (new scope).
+- A project must keep at least one manager (422 otherwise).
+- Files beyond the spec's list: `http.ts` (routing/validation helpers), `notify.ts` (activity +
+  10 s batching), `bot.ts` (check-ins, reminders, escalation). Check-ins, uploads, dashboard and
+  directory routes share `routes/misc.ts` rather than one file each.
+- The scripted "Amit shifts 5 tasks" alternates one day later / one day earlier, so a long demo
+  does not push the whole schedule out.
+- Demo timings: reminder 60 s, escalation 60 s later, task-change batching 10 s, request timeout 8 s.
+
+## Client behaviour
+
+- **Local database is dropped on every app launch.** The mock server lives in memory and is gone
+  after a reload, so data from the previous run would be orphaned. Outbox rule 5 (`sending` →
+  `pending` on start) is implemented in `initDb()` and runs first; with a real backend, delete the
+  `dropAll()` call there and it takes effect.
+- Session (tokens, user), language, theme and collapsed sections are in memory (zustand) and
+  reset on reload, as the spec allows for tokens.
+- Optimistic local changes do not touch `updatedAt`; only server values do. "Newer wins" therefore
+  always compares server clocks, and pending changes are re-applied on top (rule 6).
+- Background housekeeping (`mark_read`, reactions) is dropped silently if the server refuses it for
+  good, and read markers are not counted in "N waiting".
+- For changes that touch many rows (baseline lock, member add/update/remove) a permanent failure
+  triggers a full re-sync instead of a field-by-field rollback.
+- The message row shows a clock for both `pending` and `sending`.
+- Replies that arrive after a logout or user switch are discarded (session guard in sync and
+  outbox), so one user's data can never land in another user's local database.
+- Wipes use `DELETE … WHERE 1`: a bare `DELETE FROM table` skips SQLite's change hook and live
+  queries would keep showing old rows.
+
+## Product choices the spec left open
+
+- **Tasks tab:** Owner/Admin → Dashboard; anyone who manages at least one project → schedule list
+  (managed projects first in the switcher); everyone else → "My tasks".
+- Non-managers do not see baseline or variance in task detail either (the spec says this for
+  "My tasks").
+- Home project rows expand/collapse on tap; "Project overview" is a row inside the expanded
+  project.
+- Quick add targets the phase currently being worked on; the chip next to the input changes it.
+- "Problem" on My tasks sets the task to Blocked and posts an issue card in the task's channel.
+- Removal copy reads "Ravi will lose access to this project. **Their** messages stay." (the spec
+  says "His"; the app does not know anyone's gender).
+- The Demo pill sits a little higher than "just above the tab bar" so it does not cover composers
+  and the quick-add bar. It can be dragged and hidden (You → "Show the Demo button" brings it back).
+- Channel search (header icon) is a stub, as the spec permits.
+
+## Translations
+
+- English strings live next to their keys in code (`t('home.jumpTo', 'Jump to…')`) and
+  `npm run i18n` generates `en.json` from them (dynamic keys are in `en.base.json`).
+- Kannada and Hindi cover the worker flow: tabs, Home, chat basics, bot cards, My tasks, You,
+  offline/unsent and all error messages (163 of 282 keys each). They are **demo translations**
+  and need review by a native speaker. Everything else falls back to English.
+- Manager/admin-only screens (schedule, task detail, project, members, dashboard) and the Demo
+  panel use plain English text and are not yet routed through `t()`.
+- Dates are formatted in English in all languages.
+
+## What was verified, and how
+
+Run in Expo Go on an Android 16 emulator (1080 × 2400), with `tsc --noEmit` and `expo lint` clean.
+
+Checked end to end on the emulator: scenarios **1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 15** of
+§14, **16** (dark mode) on Home, My tasks, login and the Demo panel only, plus owner view of scenario 8, threads, the long-press menu, "create task from message", the
+real gallery picker → upload → message chain, and cold restart.
+
+Not exercised on a device:
+- **4 (lanes)** — the runner and the upload slot are covered by scenario 3's upload-then-message
+  run, but the "text in another channel overtakes the photo" race was not timed by hand.
+- **8** for Ravi/Rohan in full (Ravi's missing `#qs` and manager controls were seen; Rohan's `#qs`
+  relies on the seed and server filter).
+- **14** (logout warning sheet) — code path only.
+- Camera capture (the emulator has no real camera), Hindi screens, iOS, a physical low-end phone,
+  and the 60 fps / 500-message target in §16.

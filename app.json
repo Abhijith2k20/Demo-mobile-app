@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "siteline-tmp",
-    "slug": "siteline-tmp",
+    "name": "Siteline",
+    "slug": "siteline",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#16262B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +20,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-image",
+      "expo-font",
+      "expo-splash-screen"
+    ],
+    "scheme": "siteline",
+    "experiments": {
+      "typedRoutes": false
     }
   }
 }
