@@ -10,7 +10,7 @@ function DashboardScreen() {
   const me = useMe();
   return (
     <Screen>
-      <Header title="Dashboard" subtitle="Aanya Interiors" />
+      <Header title="Dashboard" subtitle="Paliath Interiors" />
       {isCompanyAdmin(me) ? (
         <Dashboard />
       ) : (

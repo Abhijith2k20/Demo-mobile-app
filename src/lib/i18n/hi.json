@@ -1,5 +1,11 @@
 {
-  "tabs": { "home": "होम", "tasks": "काम", "activity": "गतिविधि", "you": "आप", "dashboard": "डैशबोर्ड" },
+  "tabs": {
+    "home": "होम",
+    "tasks": "काम",
+    "activity": "गतिविधि",
+    "you": "आप",
+    "dashboard": "डैशबोर्ड"
+  },
   "common": {
     "back": "वापस",
     "cancel": "रद्द करें",
@@ -12,7 +18,10 @@
     "search": "खोजें",
     "clear": "हटाएँ"
   },
-  "offline": { "banner": "आप ऑफ़लाइन हैं। बदलाव अपने आप भेज दिए जाएँगे।", "waiting": "{{count}} बाकी" },
+  "offline": {
+    "banner": "आप ऑफ़लाइन हैं। बदलाव अपने आप भेज दिए जाएँगे।",
+    "waiting": "{{count}} बाकी"
+  },
   "home": {
     "projects": "प्रोजेक्ट",
     "company": "कंपनी",
@@ -23,7 +32,12 @@
     "noProjects": "आप अभी किसी प्रोजेक्ट में नहीं हैं। मैनेजर आपको जोड़ सकते हैं।",
     "searchPeople": "लोगों को खोजें"
   },
-  "channel": { "botSubtitle": "चेक-इन और रिमाइंडर", "dm": "सीधा संदेश", "members": "{{count}} सदस्य", "online": "ऑनलाइन" },
+  "channel": {
+    "botSubtitle": "चेक-इन और रिमाइंडर",
+    "dm": "सीधा संदेश",
+    "members": "{{count}} सदस्य",
+    "online": "ऑनलाइन"
+  },
   "chat": {
     "bot": "बॉट",
     "botReadOnly": "जवाब देने के लिए कार्ड का बटन दबाएँ।",
@@ -63,16 +77,26 @@
     "whatProblem": "क्या समस्या है?",
     "addPhoto": "फ़ोटो जोड़ें",
     "photoAdded": "फ़ोटो जोड़ दी",
-    "voiceAdded": "वॉइस नोट जोड़ दिया",
     "photoQuestion": "पूरे हुए काम की फ़ोटो जोड़ें?",
     "skip": "छोड़ें",
     "you": "आप",
     "due": "आख़िरी दिन {{date}}",
     "reminder": "रिमाइंडर",
     "yourTask": "आपका काम",
-    "loading": "चेक-इन लोड हो रहा है…"
+    "loading": "चेक-इन लोड हो रहा है…",
+    "notes": "नोट (वैकल्पिक)",
+    "notePlaceholder": "नोट लिखें या रिकॉर्ड करें",
+    "recordNote": "वॉइस नोट रिकॉर्ड करें",
+    "stopRecording": "रिकॉर्डिंग रोकें",
+    "removeVoice": "वॉइस नोट हटाएँ",
+    "withPhoto": "फ़ोटो जोड़ी गई"
   },
-  "bot": { "morning": "सुप्रभात {{name}}। आज के आपके काम:", "noTasks": "अभी आपके पास कोई बाकी काम नहीं है। आराम करें।" },
+  "bot": {
+    "morning": "सुप्रभात {{name}}। आज के आपके काम:",
+    "noTasks": "अभी आपके पास कोई बाकी काम नहीं है।",
+    "intro": "आपके {{count}} काम बाकी हैं। कृपया नीचे हर एक की स्थिति अपडेट करें।",
+    "introOne": "आपका 1 काम बाकी है। कृपया नीचे उसकी स्थिति अपडेट करें।"
+  },
   "my": {
     "morning": "सुप्रभात, {{name}}",
     "afternoon": "नमस्ते, {{name}}",
@@ -97,7 +121,14 @@
     "noUpdate": "अभी कोई अपडेट नहीं",
     "escalation": "{{name}} ने {{task}} अपडेट नहीं किया है।"
   },
-  "stage": { "design": "डिज़ाइन", "approval": "मंज़ूरी", "procurement": "ख़रीद", "execution": "काम", "finishing": "फ़िनिशिंग", "handover": "हैंडओवर" },
+  "stage": {
+    "design": "डिज़ाइन",
+    "approval": "मंज़ूरी",
+    "procurement": "ख़रीद",
+    "execution": "काम",
+    "finishing": "फ़िनिशिंग",
+    "handover": "हैंडओवर"
+  },
   "issue": {
     "card": "समस्या",
     "urgent": "ज़रूरी",
@@ -110,8 +141,18 @@
       "Other": "अन्य"
     }
   },
-  "plus": { "camera": "कैमरा", "gallery": "गैलरी", "file": "फ़ाइल" },
-  "jobTitle": { "Project Manager": "प्रोजेक्ट मैनेजर", "Designer": "डिज़ाइनर", "QS": "QS", "Supervisor": "सुपरवाइज़र", "Worker": "कामगार" },
+  "plus": {
+    "camera": "कैमरा",
+    "gallery": "गैलरी",
+    "file": "फ़ाइल"
+  },
+  "jobTitle": {
+    "Project Manager": "प्रोजेक्ट मैनेजर",
+    "Designer": "डिज़ाइनर",
+    "QS": "QS",
+    "Supervisor": "सुपरवाइज़र",
+    "Worker": "कामगार"
+  },
   "you": {
     "language": "भाषा",
     "theme": "थीम",
@@ -135,7 +176,11 @@
     "logoutAnyway": "फिर भी लॉग आउट करें",
     "stay": "लॉग इन रहें"
   },
-  "unsent": { "title": "न भेजे गए आइटम", "retry": "फिर कोशिश करें", "discard": "हटा दें" },
+  "unsent": {
+    "title": "न भेजे गए आइटम",
+    "retry": "फिर कोशिश करें",
+    "discard": "हटा दें"
+  },
   "errors": {
     "UNKNOWN": "कुछ गड़बड़ हुई। फिर कोशिश करें।",
     "OFFLINE": "आप ऑफ़लाइन हैं। ऑनलाइन होते ही यह भेज दिया जाएगा।",

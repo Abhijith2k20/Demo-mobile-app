@@ -71,6 +71,7 @@ export const checkinAnswerSchema = z.object({
   percent: z.number().int().min(0).max(100).optional(),
   reason: z.string().max(200).optional(),
   note: z.string().max(500).optional(),
+  voiceSec: z.number().int().min(1).max(600).optional(),
   hasPhoto: z.boolean().optional(),
 });
 

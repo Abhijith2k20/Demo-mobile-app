@@ -53,7 +53,7 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
         <View style={{ paddingTop: insets.top + space.lg, paddingHorizontal: space.lg, paddingBottom: space.md, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border }}>
           <T variant="title">Dashboard</T>
           <T variant="meta" color="textMuted">
-            Aanya Interiors · {format(new Date(), 'EEE d MMM')}
+            Paliath Interiors · {format(new Date(), 'EEE d MMM')}
           </T>
         </View>
       ) : null}

@@ -1,7 +1,7 @@
 # Siteline — demo app
 
 A clickable demo of an internal project-communication app for an interior design company
-(fictional: **Aanya Interiors**). It runs entirely on the phone against an in-process mock
+(fictional: **Paliath Interiors**). It runs entirely on the phone against an in-process mock
 backend. Spec: [`SITELINE_DEMO_SPEC.md`](SITELINE_DEMO_SPEC.md). Deviations and open points:
 [`DECISIONS.md`](DECISIONS.md).
 

@@ -7,7 +7,7 @@ import { isDone, projectDelayDays, todayIso } from '@/shared/taskRules';
 import type { Attachment, Checkin, DashboardResponse, ID, Stage } from '@/types/models';
 import { STAGES } from '@/types/models';
 import { humans, store, type StoredCheckin } from '../db';
-import { applyCheckinAnswer } from '../bot';
+import { applyCheckinAnswer, askAboutOpenTasks } from '../bot';
 import { publish } from '../events';
 import { forbidden, notFound, parse, route, type RouteDef } from '../http';
 import { firstName, shortProject } from '../notify';
@@ -31,6 +31,9 @@ export const miscRoutes: RouteDef[] = [
     }
     return publicCheckin(c);
   }),
+
+  // Demo addition: the app calls this when the bot conversation is opened.
+  route('POST', '/bot/checkins', ({ user }) => ({ asked: askAboutOpenTasks(user.id) })),
 
   route('POST', '/uploads', ({ user, body }) => {
     const s = store();

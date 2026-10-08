@@ -19,8 +19,18 @@ export function MorningSummary({ message }: { message: Message }) {
   const me = useMe();
   const ids = (message.data?.taskIds as ID[] | undefined) ?? [];
   const tasks = useTasksByIds(ids);
+  if (message.data?.kind === 'checkin_intro') {
+    const count = Number(message.data.count ?? 0);
+    return (
+      <T variant="body">
+        {count === 1
+          ? t('bot.introOne', 'You have 1 open task. Please update its status below.')
+          : t('bot.intro', 'You have {{count}} open tasks. Please update the status of each one below.', { count })}
+      </T>
+    );
+  }
   if (message.data?.kind === 'no_open_tasks' || ids.length === 0) {
-    return <T variant="body">{t('bot.noTasks', 'You have no open tasks right now. Enjoy the calm.')}</T>;
+    return <T variant="body">{t('bot.noTasks', 'You have no open tasks at the moment.')}</T>;
   }
   return (
     <Card accent={c.info} style={{ maxWidth: 360, marginTop: 2 }}>

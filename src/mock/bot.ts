@@ -1,5 +1,6 @@
 // Siteline Bot (§8): check-ins, reminders, escalation, morning summary.
 import { uuidv7 } from 'uuidv7';
+import { isCompanyAdmin } from '@/shared/permissions';
 import { isDone } from '@/shared/taskRules';
 import type { CheckinAnswer, ID, Task } from '@/types/models';
 import {
@@ -105,16 +106,11 @@ export function sendMorningSummary(userId: ID): void {
   });
 }
 
-export function sendEveningCheckin(userId: ID): void {
+/** Creates one check-in and its card in the user's bot DM. */
+function createCheckin(userId: ID, task: Task, withReminder: boolean): void {
   const s = store();
   const ch = botChannelFor(userId);
   if (!ch) return;
-  const open = new Set([...s.checkins.values()].filter((c) => c.userId === userId && !c.answer).map((c) => c.taskId));
-  const task = openTasksFor(userId).find((t) => !open.has(t.id));
-  if (!task) {
-    postMessage(ch, s.botId, { type: 'text', body: null, data: { kind: 'no_open_tasks' } });
-    return;
-  }
   const ts = nowIso();
   const id = uuidv7();
   const message = postMessage(ch, s.botId, { type: 'checkin', body: null, data: { checkinId: id, taskId: task.id } });
@@ -132,7 +128,47 @@ export function sendEveningCheckin(userId: ID): void {
   s.checkins.set(id, checkin);
   const { messageId: _m, updatedAt: _u, remindedAt: _r, escalatedAt: _e, ...pub } = checkin;
   publish({ type: 'checkin.new', checkin: pub }, [userId]);
-  schedule(checkin);
+  if (withReminder) schedule(checkin);
+}
+
+export function sendEveningCheckin(userId: ID): void {
+  const s = store();
+  const ch = botChannelFor(userId);
+  if (!ch) return;
+  const open = new Set([...s.checkins.values()].filter((c) => c.userId === userId && !c.answer).map((c) => c.taskId));
+  const task = openTasksFor(userId).find((t) => !open.has(t.id));
+  if (!task) {
+    postMessage(ch, s.botId, { type: 'text', body: null, data: { kind: 'no_open_tasks' } });
+    return;
+  }
+  createCheckin(userId, task, true);
+}
+
+const RECENTLY_ASKED_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Opening the bot conversation: ask for the status of every open task the user owns.
+ * Tasks already asked about in the last 12 hours are skipped, so reopening does not repeat them.
+ * These cards carry no reminder timer, to keep a batch from flooding the project channel.
+ */
+export function askAboutOpenTasks(userId: ID): number {
+  const s = store();
+  const ch = botChannelFor(userId);
+  if (!ch) return 0;
+  const cutoff = Date.now() - RECENTLY_ASKED_MS;
+  const recent = new Set(
+    [...s.checkins.values()].filter((c) => c.userId === userId && Date.parse(c.askedAt) > cutoff).map((c) => c.taskId),
+  );
+  const tasks = openTasksFor(userId).filter((t) => !recent.has(t.id));
+  if (tasks.length === 0) {
+    // Say so once, rather than leaving an owner with no tasks looking at a silent chat.
+    const hasAny = recent.size > 0 || [...s.messages.values()].some((m) => m.channelId === ch.id && m.data?.kind === 'no_open_tasks');
+    if (!hasAny) postMessage(ch, s.botId, { type: 'text', body: null, data: { kind: 'no_open_tasks' } });
+    return 0;
+  }
+  postMessage(ch, s.botId, { type: 'text', body: null, data: { kind: 'checkin_intro', count: tasks.length } });
+  for (const task of tasks) createCheckin(userId, task, false);
+  return tasks.length;
 }
 
 /** Demo panel: escalate the user's oldest unanswered check-in right now. */
@@ -151,7 +187,8 @@ export function applyCheckinAnswer(c: StoredCheckin, answer: CheckinAnswer): voi
   c.updatedAt = nowIso();
   const task = s.tasks.get(c.taskId);
   if (!task) return;
-  const isManager = projectManagers(task.projectId).includes(c.userId);
+  const who = s.users.get(c.userId);
+  const isManager = projectManagers(task.projectId).includes(c.userId) || (!!who && isCompanyAdmin(who));
   if (answer.kind === 'progress') {
     applyTaskChanges(c.userId, task, { percent: answer.percent ?? task.percent, status: 'in_progress' }, 'checkin', isManager);
   } else if (answer.kind === 'started') {

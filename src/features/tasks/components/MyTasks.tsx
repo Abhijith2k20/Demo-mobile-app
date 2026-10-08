@@ -181,7 +181,7 @@ export function MyTasks() {
               key={p}
               large
               selected={percentFor?.percent === p}
-              label={p === 100 ? `✅ ${t('checkin.done', 'Done')}` : `${p}%`}
+              label={p === 100 ? t('checkin.done', 'Done') : `${p}%`}
               onPress={() => {
                 if (percentFor) updateTask(percentFor, { percent: p }, false);
                 setPercentFor(null);

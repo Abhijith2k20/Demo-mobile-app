@@ -57,7 +57,7 @@ function YouScreen() {
             <T variant="meta" color="textMuted">
               +91 {formatPhone(me.phone)}
             </T>
-            <Pill label={`Aanya Interiors · ${roleLabel}`} bg={c.surfaceAlt} fg={c.textMuted} />
+            <Pill label={`Paliath Interiors · ${roleLabel}`} bg={c.surfaceAlt} fg={c.textMuted} />
           </View>
         </View>
 

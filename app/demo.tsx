@@ -270,7 +270,7 @@ function DemoPanel() {
             label="Rohan posts in #qs now"
             onPress={() => {
               rohanPostsQs();
-              toast('Posted in Sharma #qs (visible to QS, Managers, Owner and Admin only).');
+              toast('Posted in Villa 99 #qs (visible to QS, Managers, Owner and Admin only).');
             }}
           />
         </Section>

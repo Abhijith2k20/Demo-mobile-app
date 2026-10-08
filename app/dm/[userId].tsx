@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { EmptyState } from '@/components/basics';
 import { appScreen, Header, Screen } from '@/components/chrome';
 import { Conversation } from '@/features/chat/components/Conversation';
+import { useAskOnOpen } from '@/features/bot/hooks';
 import { useDmChannelId } from '@/features/chat/hooks';
 
 /** Direct message with a person, or with the Siteline Bot (`/dm/bot`). */
@@ -11,6 +12,7 @@ function DmScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const { t } = useTranslation();
   const channelId = useDmChannelId(userId);
+  useAskOnOpen(userId === 'bot');
   if (!channelId) {
     return (
       <Screen>

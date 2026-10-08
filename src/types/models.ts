@@ -135,6 +135,8 @@ export interface CheckinAnswer {
   percent?: number;
   reason?: string;
   note?: string;
+  /** Length of an attached voice note, in seconds. */
+  voiceSec?: number;
   hasPhoto?: boolean;
   at?: string;
 }

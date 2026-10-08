@@ -92,7 +92,7 @@ function HomeScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <CompanyTile size={36} />
           <T variant="title" style={{ color: c.onHeader, flexShrink: 1 }} numberOfLines={1}>
-            Aanya Interiors
+            Paliath Interiors
           </T>
           <Feather name="chevron-down" size={18} color={c.onHeader} style={{ opacity: 0.7 }} />
         </View>

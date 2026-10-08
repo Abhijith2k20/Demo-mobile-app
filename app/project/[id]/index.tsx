@@ -196,7 +196,7 @@ function Overview({ project }: { project: Project }) {
                   <View style={{ flex: 1 }}>
                     <T variant="body" numberOfLines={2}>
                       <T variant="bodyStrong">{firstName(who?.name)}</T> · {String(d.taskName ?? '')} → <T variant="bodyStrong">{what}</T>
-                      {d.hasPhoto ? ' 📷' : ''}
+                      {d.hasPhoto ? ' · photo attached' : ''}
                     </T>
                     <T variant="meta" color="textMuted">
                       {format(parseISO(m.createdAt), 'EEE d MMM, h:mm a')}

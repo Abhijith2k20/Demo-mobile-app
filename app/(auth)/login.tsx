@@ -49,7 +49,7 @@ function LoginScreen() {
           contentContainerStyle={{ padding: space.xl, paddingTop: insets.top + space.xxl, paddingBottom: insets.bottom + space.xl }}>
           <CompanyTile />
           <T variant="title" style={{ marginTop: space.lg }}>
-            {t('auth.title', 'Sign in to Aanya Interiors')}
+            {t('auth.title', 'Sign in to Paliath Interiors')}
           </T>
           <T variant="meta" color="textMuted" style={{ marginTop: 4, marginBottom: space.xl }}>
             {t('auth.subtitle', 'Siteline keeps your projects, site updates and tasks in one place.')}

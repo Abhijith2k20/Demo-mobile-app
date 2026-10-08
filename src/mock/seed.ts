@@ -180,9 +180,9 @@ function build(): MockStore {
   };
 
   const sharma = addProject(
-    'Sharma Residence – Whitefield',
-    'Mr & Mrs Sharma',
-    'Prestige Lakeside Habitat, Whitefield, Bengaluru',
+    'Villa 99',
+    'Villa 99 owners',
+    'Bengaluru',
     'execution',
     -45,
     [
@@ -196,9 +196,9 @@ function build(): MockStore {
     ],
   );
   const mehta = addProject(
-    'Mehta Villa – Koramangala',
-    'Mr Dev Mehta',
-    '4th Block, Koramangala, Bengaluru',
+    'RV University',
+    'RV University',
+    'Bengaluru',
     'design',
     -12,
     [
@@ -207,9 +207,9 @@ function build(): MockStore {
     ],
   );
   const cafe = addProject(
-    'Café Brew Fit-out – Indiranagar',
-    'Brew Hospitality LLP',
-    '12th Main, Indiranagar, Bengaluru',
+    'OITH',
+    'OITH',
+    'Bengaluru',
     'finishing',
     -50,
     [
@@ -314,7 +314,7 @@ function build(): MockStore {
       ['Finishing', 'Soft furnishings', 21, 23, 'not_started', 0, 'kavya', 4],
       ['Finishing', 'Deep cleaning', 23, 24, 'not_started', 0, 'suresh', 4],
       ['Handover', 'Snag list walkthrough', 24, 25, 'not_started', 0, 'amit', 4],
-      ['Handover', 'Client handover', 26, 26, 'not_started', 0, 'amit', 4],
+      ['Handover', 'Client handover', 26, 26, 'not_started', 0, 'arjun', 4],
     ],
     true,
   );
@@ -325,14 +325,14 @@ function build(): MockStore {
       ['Design', 'Client brief & moodboard', -11, -8, 'done', 100, 'kavya'],
       ['Design', 'Concept layout options', -8, -5, 'done', 100, 'kavya'],
       ['Design', 'Concept presentation', -4, -3, 'done', 100, 'kavya'],
-      ['Design', '3D renders – living & dining', -2, 3, 'in_progress', 50, 'kavya'],
-      ['Design', '3D renders – bedrooms', 3, 7, 'not_started', 0, 'kavya'],
+      ['Design', '3D renders – lobby & cafeteria', -2, 3, 'in_progress', 50, 'kavya'],
+      ['Design', '3D renders – classrooms', 3, 7, 'not_started', 0, 'kavya'],
       ['Design', 'Material board', -1, 5, 'in_progress', 25, 'kavya'],
       ['Design', 'Lighting plan', 5, 8, 'not_started', 0, 'kavya'],
-      ['Design', 'Kitchen detailed drawings', 7, 11, 'not_started', 0, 'kavya'],
+      ['Design', 'Cafeteria detailed drawings', 7, 11, 'not_started', 0, 'kavya'],
       ['Design', 'BOQ & estimate', 8, 12, 'not_started', 0, 'rohan'],
-      ['Design', 'Client approval – design', 12, 14, 'not_started', 0, 'kavya'],
-      ['Design', 'Sign-off & advance', 14, 15, 'not_started', 0, 'rohan'],
+      ['Design', 'Client approval – design', 12, 14, 'not_started', 0, 'arjun'],
+      ['Design', 'Sign-off & advance', 14, 15, 'not_started', 0, 'meera'],
     ],
     false,
   );
@@ -405,7 +405,7 @@ function build(): MockStore {
     data: { kind: 'checkin', userId: U[user], taskId: T[taskName], taskName, answer, hasPhoto },
   });
 
-  // Sharma — #site-work
+  // Villa 99 — #site-work
   const sw = sharma.ch['site-work'];
   say(sw, at(9, 9, 10), 'suresh', 'Good morning team. Electrical and plumbing are closed out. False ceiling starts today in the living room.');
   say(sw, at(9, 9, 25), 'amit', 'Thanks Suresh. Ravi, Manjunath — please start with the framing grid. Drawings are in #design.');
@@ -473,7 +473,7 @@ function build(): MockStore {
   say(sw, at(3, 18, 2), 'bot', null, status('ravi', 'False ceiling – living room', { kind: 'progress', percent: 50 }, true));
   say(sw, at(2, 9, 30), 'suresh', 'Electrician coming at 3 pm for cove light points. Ravi, keep the channel open on the window side.');
   say(sw, at(2, 9, 41), 'ravi', 'Ok sir');
-  say(sw, at(2, 15, 10), 'amit', 'Latest false ceiling layout for site.', file('Sharma_FC_layout_revC.pdf', 842));
+  say(sw, at(2, 15, 10), 'amit', 'Latest false ceiling layout for site.', file('Villa99_FC_layout_revC.pdf', 842));
   say(sw, at(2, 18, 2), 'suresh', 'Site closed for the day. 6 workers today.');
   say(sw, at(1, 9, 12), 'suresh', 'Boards for master bedroom still not here. Following up.');
   say(sw, at(1, 11, 47), 'amit', '@Suresh vendor confirmed dispatch at 2 pm today.', { data: { mentions: [U.suresh] } });
@@ -487,7 +487,7 @@ function build(): MockStore {
   say(sw, ago(40), 'suresh', 'Boards arrived just now. 24 nos. Unloading.');
   say(sw, ago(22), 'amit', 'Finally. Thanks for chasing, Suresh.');
 
-  // Sharma — #design
+  // Villa 99 — #design
   const ds = sharma.ch.design;
   say(ds, at(9, 10, 0), 'kavya', 'Sharing the final false ceiling layout for living + dining.');
   say(ds, at(9, 10, 2), 'kavya', null, photos(img('tile', 'Living room ceiling'), img('sage', 'Dining cove detail')));
@@ -520,7 +520,7 @@ function build(): MockStore {
   say(ds, ago(60), 'kavya', 'Foyer detail — two options.', photos(img('plywood', 'Foyer option A'), img('tile', 'Foyer option B')));
   say(ds, ago(35), 'amit', 'Option A. Simpler to build.');
 
-  // Sharma — #qs (private)
+  // Villa 99 — #qs (private)
   const qs = sharma.ch.qs;
   say(qs, at(8, 10, 5), 'rohan', 'Rate for Italian marble came in at ₹420/sq ft, ₹35 above budget');
   say(qs, at(8, 10, 20), 'amit', 'Can we get a second quote?');
@@ -535,9 +535,9 @@ function build(): MockStore {
   say(qs, at(1, 10, 30), 'rohan', 'Gypsum vendor penalty: asking for a 2% credit for the late delivery.');
   say(qs, ago(75), 'rohan', 'Carpentry labour bill for week 1 submitted: ₹38,400.');
 
-  // Sharma — #general
+  // Villa 99 — #general
   const sg = sharma.ch.general;
-  say(sg, at(9, 8, 50), 'amit', 'Welcome to Sharma Residence. Site address and client contact are on the project page.');
+  say(sg, at(9, 8, 50), 'amit', 'Welcome to Villa 99. Site address and client contact are on the project page.');
   say(sg, at(9, 8, 55), 'bot', 'Project moved to Execution', { type: 'system' });
   say(sg, at(8, 9, 0), 'meera', 'Reminder: site entry only with ID cards. Society rule.');
   say(sg, at(6, 12, 0), 'amit', 'Client visit this Saturday 11 am.');
@@ -548,24 +548,24 @@ function build(): MockStore {
   say(sg, ago(110), 'amit', "We are 4 days behind baseline, mainly the gypsum delay. Let's recover it in carpentry.");
   say(sg, ago(50), 'suresh', 'Will add two carpenters from Monday.');
 
-  // Mehta Villa
+  // RV University
   const md = mehta.ch.design;
-  say(md, at(6, 11, 0), 'kavya', 'Site measurement done. Villa is 3,400 sq ft across two floors.', photos(img('concrete', 'Ground floor – living')));
+  say(md, at(6, 11, 0), 'kavya', 'Site measurement done. The block is 3,400 sq ft across two floors.', photos(img('concrete', 'Ground floor – lobby')));
   say(md, at(5, 15, 0), 'kavya', 'Moodboard v1 — warm modern, lots of teak.', photos(img('plywood', 'Moodboard – teak'), img('sage', 'Moodboard – soft greens')));
-  say(md, at(5, 16, 30), 'arjun', 'Like the direction. Mr Mehta prefers lighter wood, keep an oak option.');
+  say(md, at(5, 16, 30), 'arjun', 'Like the direction. The client prefers lighter wood, keep an oak option.');
   say(md, at(4, 10, 15), 'kavya', 'Adding an oak option.');
   say(md, at(3, 12, 0), 'kavya', 'Concept layouts A and B shared with the client.');
-  say(md, at(2, 17, 45), 'kavya', 'Client picked layout B with a bigger pooja room.');
-  say(md, at(1, 10, 0), 'kavya', 'Starting 3D renders for living and dining.');
+  say(md, at(2, 17, 45), 'kavya', 'Client picked layout B with a bigger reception area.');
+  say(md, at(1, 10, 0), 'kavya', 'Starting 3D renders for the lobby and cafeteria.');
   say(md, ago(140), 'kavya', 'First render draft by tomorrow evening.');
-  say(mehta.ch.general, at(6, 9, 30), 'kavya', 'Mehta Villa kicked off. Design stage runs about two weeks.');
+  say(mehta.ch.general, at(6, 9, 30), 'kavya', 'RV University kicked off. Design stage runs about two weeks.');
   say(mehta.ch.general, at(2, 18, 0), 'meera', 'Agreement signed copy received from client.');
   say(mehta.ch.general, ago(170), 'rohan', 'I will start the BOQ once layout B drawings are frozen.');
   say(mehta.ch.qs, at(3, 16, 0), 'rohan', 'Rough budget from client: ₹48 lakh all-in.');
   say(mehta.ch.qs, at(2, 11, 0), 'kavya', 'Keep 8% contingency in the estimate.');
   say(mehta.ch.qs, ago(160), 'rohan', 'Noted. First estimate by next Wednesday.');
 
-  // Café Brew
+  // OITH
   const cs = cafe.ch['site-work'];
   say(cs, at(5, 10, 0), 'suresh', 'Counter stone fixed. Polishing tomorrow.');
   say(cs, at(4, 11, 20), 'prakash', null, photos(img('tile', 'Bar counter – stone fixed')));
@@ -580,19 +580,19 @@ function build(): MockStore {
   say(cafe.ch.general, at(3, 10, 0), 'meera', 'Fire NOC inspection is booked for Thursday.');
   say(cafe.ch.general, at(1, 12, 0), 'suresh', 'Deep cleaning team booked.');
   say(cafe.ch.general, ago(120), 'amit', 'Signage vendor confirmed install for day after tomorrow.');
-  say(cafe.ch.design, at(4, 14, 0), 'amit', 'Signage artwork final from client attached.', file('CafeBrew_signage_final.pdf', 1240));
+  say(cafe.ch.design, at(4, 14, 0), 'amit', 'Signage artwork final from client attached.', file('OITH_signage_final.pdf', 1240));
   say(cafe.ch.qs, at(2, 15, 0), 'amit', 'Pendant lights invoice: ₹1,12,000. Within budget.');
 
   // Company channels
   say(announcements, at(8, 9, 0), 'arjun', 'Welcome to Siteline. From today all project updates go here, not on WhatsApp.');
   say(announcements, at(5, 10, 0), 'meera', 'Diwali holidays: sites closed 20–22 Oct. Plan deliveries accordingly.');
-  say(announcements, at(1, 18, 30), 'arjun', 'We won the Mehta Villa project. Kavya leads it. 🎉', { reactions: { '🎉': ['amit', 'kavya', 'suresh'] } });
+  say(announcements, at(1, 18, 30), 'arjun', 'We won the RV University project. Kavya leads it. 🎉', { reactions: { '🎉': ['amit', 'kavya', 'suresh'] } });
   say(companyGeneral, at(7, 10, 0), 'meera', 'ID cards are ready. Collect from the office.');
-  say(companyGeneral, at(6, 11, 0), 'suresh', 'Collected for the Sharma team.');
+  say(companyGeneral, at(6, 11, 0), 'suresh', 'Collected for the Villa 99 team.');
   say(companyGeneral, at(3, 9, 30), 'kavya', 'Anyone has the Asian Paints fan deck? Need it for Saturday.');
   say(companyGeneral, at(3, 9, 50), 'amit', "It's in my car. Will drop it at the studio.");
   say(companyGeneral, at(1, 16, 0), 'meera', 'Timesheets due Friday.');
-  say(companyGeneral, ago(200), 'arjun', 'Good work on Café Brew, team. One day ahead.');
+  say(companyGeneral, ago(200), 'arjun', 'Good work on OITH, team. One day ahead.');
 
   // DMs
   say(dmAmitRavi, at(2, 8, 30), 'amit', 'Ravi, are you coming to site tomorrow?');
@@ -603,7 +603,7 @@ function build(): MockStore {
   say(dmAmitSuresh, at(3, 20, 15), 'suresh', 'Possible with two more carpenters. I will check with Imran.');
   say(dmAmitSuresh, at(1, 8, 10), 'suresh', 'Imran can bring two people from Monday.');
   say(dmAmitSuresh, ago(100), 'amit', 'Please go ahead. I will inform the client.');
-  say(dmArjunAmit, at(4, 18, 0), 'arjun', 'How is Sharma looking?');
+  say(dmArjunAmit, at(4, 18, 0), 'arjun', 'How is Villa 99 looking?');
   say(dmArjunAmit, at(4, 18, 20), 'amit', '4 days behind because of gypsum boards. Recovery plan in carpentry.');
   say(dmArjunAmit, at(4, 18, 25), 'arjun', 'Ok. Keep the client informed.');
   say(dmArjunAmit, ago(90), 'arjun', 'Send me the revised finish date today please.');
@@ -649,7 +649,7 @@ function build(): MockStore {
   hist('Kitchen carcass', 'imran', 'status', 'not_started', 'in_progress', at(3, 10, 5));
   hist('Kitchen carcass', 'suresh', 'percent', '0', '25', at(1, 18, 5));
   hist('Pendant lights', 'suresh', 'percent', '0', '50', ago(80));
-  hist('3D renders – living & dining', 'kavya', 'status', 'not_started', 'in_progress', at(1, 10, 0));
+  hist('3D renders – lobby & cafeteria', 'kavya', 'status', 'not_started', 'in_progress', at(1, 10, 0));
 
   // ---- Activity ----
   const mentionRavi = [...s.messages.values()].find((m) => m.body?.startsWith('@Ravi'));

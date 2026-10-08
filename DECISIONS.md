@@ -99,6 +99,23 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   and the quick-add bar. It can be dragged and hidden (You → "Show the Demo button" brings it back).
 - Channel search (header icon) is a stub, as the spec permits.
 
+## Changes requested after the first build
+
+- Company renamed to **Paliath Interiors**; projects renamed to **Villa 99** (was Sharma Residence),
+  **RV University** (was Mehta Villa) and **OITH** (was Café Brew Fit-out). Clients and addresses
+  are placeholders.
+- **Opening the Siteline Bot conversation asks about every open task the user owns**
+  (`POST /bot/checkins`, a demo endpoint). Tasks asked about in the last 12 hours are skipped, and
+  these cards carry no reminder/escalation timer. The owner and the admin were given tasks of their
+  own in the seed so this works for every sign-in.
+- **No emoji in bot cards.** Buttons use line icons instead of the emoji in §8, and a photo is
+  shown as the words "photo attached".
+
+- **Notes on check-in cards.** Every card has an optional note: type it, or tap the microphone to
+  record a voice note (or both). The note is sent with the answer (`note`, `voiceSec`) and shown
+  in the card's summary and in the status card posted to the project channel. As with voice notes
+  in chat, **recording is simulated** (a timer; no audio is captured or played back).
+
 ## Translations
 
 - English strings live next to their keys in code (`t('home.jumpTo', 'Jump to…')`) and

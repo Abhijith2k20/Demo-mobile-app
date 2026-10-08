@@ -11,7 +11,7 @@ import { shortDate } from '@/shared/taskRules';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Attachment, CheckinAnswer, ID, Message, MessageType } from '@/types/models';
-import { CheckinCard } from '../../bot/CheckinCard';
+import { CheckinCard, VoiceChip } from '../../bot/CheckinCard';
 import { MorningSummary } from '../../bot/MorningSummary';
 import { firstName } from '../../shared';
 import { useTask } from '../../tasks/hooks';
@@ -53,7 +53,8 @@ function Edited({ message }: Props) {
 }
 
 function TextMessage({ message }: Props) {
-  if (message.data?.kind === 'morning_summary' || message.data?.kind === 'no_open_tasks') return <MorningSummary message={message} />;
+  const kind = message.data?.kind;
+  if (kind === 'morning_summary' || kind === 'no_open_tasks' || kind === 'checkin_intro') return <MorningSummary message={message} />;
   return (
     <View>
       <RichText text={message.body ?? ''} />
@@ -276,8 +277,8 @@ function DailyReportCard({ message }: Props) {
 export function answerSummary(a: CheckinAnswer | undefined, t: (k: string, d: string, o?: Record<string, unknown>) => string): string {
   if (!a) return '';
   if (a.kind === 'progress') return `${a.percent}%`;
-  if (a.kind === 'problem') return `⛔ ${t('checkin.problem', 'Problem')}${a.reason ? ` · ${t(`issue.preset.${a.reason}`, a.reason)}` : ''}`;
-  if (a.kind === 'done') return `✅ ${t('checkin.done', 'Done')}`;
+  if (a.kind === 'problem') return `${t('checkin.problem', 'Problem')}${a.reason ? ` · ${t(`issue.preset.${a.reason}`, a.reason)}` : ''}`;
+  if (a.kind === 'done') return t('checkin.done', 'Done');
   if (a.kind === 'not_started') return t('checkin.notStarted', 'Not started');
   return t('checkin.started', 'Started');
 }
@@ -289,6 +290,7 @@ function StatusCard({ message }: Props) {
   const d = message.data ?? {};
   const user = users.get(d.userId as ID);
   const escalation = d.kind === 'escalation';
+  const answer = d.answer as CheckinAnswer | undefined;
   const tone = escalation ? c.warning : c.accent;
   return (
     <Pressable onPress={() => d.taskId && router.push(`/task/${String(d.taskId)}`)} style={{ maxWidth: 340, marginTop: 2 }}>
@@ -306,9 +308,19 @@ function StatusCard({ message }: Props) {
           <T variant="body">
             <T variant="bodyStrong">{firstName(user?.name)}</T> · {String(d.taskName ?? '')} →{' '}
             <T variant="bodyStrong">{answerSummary(d.answer as CheckinAnswer | undefined, t as never)}</T>
-            {d.hasPhoto ? ' 📷' : ''}
+            {d.hasPhoto ? ` · ${t('checkin.withPhoto', 'photo attached')}` : ''}
           </T>
         )}
+        {!escalation && answer?.note ? (
+          <T variant="body" color="textMuted" style={{ marginTop: 4 }}>
+            “{answer.note}”
+          </T>
+        ) : null}
+        {!escalation && answer?.voiceSec ? (
+          <View style={{ marginTop: space.sm }}>
+            <VoiceChip seconds={answer.voiceSec} />
+          </View>
+        ) : null}
       </Card>
     </Pressable>
   );

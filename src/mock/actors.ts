@@ -49,7 +49,7 @@ export function kavyaPostsDesign(): void {
   const n = step;
   post(
     'Kavya',
-    'Sharma',
+    'Villa 99',
     'design',
     pick(['Updated wardrobe shutter detail.', 'Revised the foyer panel joinery.', 'Kitchen upper unit heights adjusted.'], n),
     [img('plywood', pick(['Shutter detail', 'Foyer joinery', 'Upper unit section'], n)), img('tile', pick(['Elevation', 'Plan view', 'Side elevation'], n))],
@@ -58,7 +58,7 @@ export function kavyaPostsDesign(): void {
 
 export function sureshPostsSite(): void {
   const n = step;
-  post('Suresh', 'Sharma', 'site-work', pick(['Site photos from this hour.', 'Progress update from site.', 'Carpentry moving well today.'], n), [
+  post('Suresh', 'Villa 99', 'site-work', pick(['Site photos from this hour.', 'Progress update from site.', 'Carpentry moving well today.'], n), [
     img('concrete', pick(['Master bedroom ceiling', 'Living room cove', 'Kids bedroom grid'], n)),
     img('plywood', pick(['Kitchen uppers', 'Wardrobe carcass', 'TV unit base'], n)),
   ]);
@@ -72,7 +72,7 @@ export function sureshPostsSite(): void {
 export function rohanPostsQs(): void {
   post(
     'Rohan',
-    'Sharma',
+    'Villa 99',
     'qs',
     pick(
       [
@@ -87,7 +87,7 @@ export function rohanPostsQs(): void {
 
 export function amitShiftsTasks(): void {
   const userId = userByName('Amit');
-  const projectId = projectByName('Sharma');
+  const projectId = projectByName('Villa 99');
   if (!userId || !projectId) return;
   const candidates: Task[] = [...store().tasks.values()]
     .filter((t) => t.projectId === projectId && t.status === 'not_started' && !t.deletedAt)
