@@ -4,6 +4,7 @@ import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AppState } from 'react-native';
 import { db } from '@/lib/db/client';
 import { channelMembers, channels, messages, projectMembers, users } from '@/lib/db/schema';
 import { canPost } from '@/shared/permissions';
@@ -195,12 +196,17 @@ export function useChannelMessages(channelId: ID) {
 
   // Mark read up to the newest message while the channel is open.
   const newest = ordered.length ? ordered[ordered.length - 1] : null;
-  // Only while this screen is on top: a channel left open underneath a task or thread must not
-  // swallow new messages.
+  // Only while the user can actually see it: not when a task or thread is on top of this
+  // channel, and not while the app is in the background.
   const focused = useIsFocused();
+  const [appActive, setAppActive] = useState(() => AppState.currentState === 'active');
   useEffect(() => {
-    if (focused && newest && newest.status === 'sent') markRead(channelId, newest.id);
-  }, [channelId, newest, focused]);
+    const sub = AppState.addEventListener('change', (state) => setAppActive(state === 'active'));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (focused && appActive && newest && newest.status === 'sent') markRead(channelId, newest.id);
+  }, [channelId, newest, focused, appActive]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder || ordered.length === 0) return;

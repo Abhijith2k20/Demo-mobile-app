@@ -10,6 +10,7 @@ import { lanes } from '@/lib/outbox/lanes';
 import { editUnsentMessage, enqueueMerged, removeUnsentMessage } from '@/lib/outbox/merge';
 import { applyIncoming, LOCAL_ONLY, withReaction } from '@/lib/sync/applyIncoming';
 import { useSession } from '@/stores/session';
+import { useUi } from '@/stores/ui';
 import type { Attachment, ID, Message, MessageType, User } from '@/types/models';
 
 function meId(): ID {
@@ -117,8 +118,10 @@ function ensureDmCreated(tx: Tx, channelId: ID, me: ID): void {
   if (other) enqueue(tx, 'create_dm', lanes.channel(channelId), channelId, { channelId, userId: other.userId });
 }
 
-/** Leaving a brand-new conversation without writing anything removes it again. */
+/** Leaving a brand-new conversation without writing or typing anything removes it again. */
 export function discardEmptyDm(channelId: ID): void {
+  // Half-typed text is saved under this conversation's id: keep the conversation so it survives.
+  if (useUi.getState().drafts[`channel:${channelId}`]?.trim()) return;
   db.transaction((tx) => {
     const ch = tx.select().from(channels).where(eq(channels.id, channelId)).get();
     if (!ch || ch.kind !== 'dm' || ch.updatedAt !== LOCAL_ONLY) return;
