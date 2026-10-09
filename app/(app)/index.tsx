@@ -84,6 +84,67 @@ function HomeScreen() {
     };
   }, [q, home.projects, home.company, users.list, me.id, t]);
 
+  const active = home.projects.filter((p) => !p.project.archivedAt);
+  const archived = home.projects.filter((p) => p.project.archivedAt);
+  // Collapsed unless the user opens it.
+  const showArchived = !(collapsed.archived ?? true);
+
+  const projectRow = ({ project, channels, unread }: (typeof home.projects)[number]) => {
+                const key = `project:${project.id}`;
+                const open = !(collapsed[key] ?? false);
+                const delay = projectDelayDays(project);
+                return (
+                  <View key={project.id}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: open }}
+                      onPress={() => toggle(key)}
+                      style={({ pressed }) => ({
+                        minHeight: touch.min,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: space.sm,
+                        paddingHorizontal: space.lg,
+                        backgroundColor: pressed ? c.surfaceAlt : 'transparent',
+                      })}>
+                      <Feather name={open ? 'chevron-down' : 'chevron-right'} size={16} color={c.textMuted} />
+                      <T variant={unread > 0 ? 'bodyStrong' : 'body'} numberOfLines={1} style={{ flexShrink: 1 }}>
+                        {shortProjectName(project.name)}
+                      </T>
+                      <StagePill stage={project.stage} label={stageLabel(project.stage)} />
+                      {delay > 0 ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('home.daysBehind', '{{count}} days behind', { count: delay })}>
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.danger }} />
+                          <T variant="metaStrong" color="danger">
+                            {delay}d
+                          </T>
+                        </View>
+                      ) : null}
+                      <View style={{ flex: 1 }} />
+                      {open ? null : <Badge count={unread} />}
+                    </Pressable>
+                    {open ? (
+                      <>
+                        {channels.map((ch) => (
+                          <ChannelRow key={ch.id} channel={ch} unread={home.unread.get(ch.id) ?? 0} indent={space.xl} />
+                        ))}
+                        <Row
+                          indent={space.xl}
+                          left={
+                            <View style={{ width: 20, alignItems: 'center' }}>
+                              <Feather name="layout" size={15} color={c.textMuted} />
+                            </View>
+                          }
+                          title={t('home.projectOverview', 'Project overview')}
+                          muted
+                          onPress={() => router.push(`/project/${project.id}`)}
+                        />
+                      </>
+                    ) : null}
+                  </View>
+                );
+              };
+
   return (
     <Screen>
       {focused ? <StatusBar style="light" /> : null}
@@ -158,61 +219,25 @@ function HomeScreen() {
                 {t('home.noProjects', "You're not on any project yet. A manager can add you.")}
               </T>
             ) : (
-              home.projects.map(({ project, channels, unread }) => {
-                const key = `project:${project.id}`;
-                const open = !(collapsed[key] ?? false);
-                const delay = projectDelayDays(project);
-                return (
-                  <View key={project.id}>
+              <>
+                {active.map(projectRow)}
+                {archived.length > 0 ? (
+                  <>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityState={{ expanded: open }}
-                      onPress={() => toggle(key)}
-                      style={({ pressed }) => ({
-                        minHeight: touch.min,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: space.sm,
-                        paddingHorizontal: space.lg,
-                        backgroundColor: pressed ? c.surfaceAlt : 'transparent',
-                      })}>
-                      <Feather name={open ? 'chevron-down' : 'chevron-right'} size={16} color={c.textMuted} />
-                      <T variant={unread > 0 ? 'bodyStrong' : 'body'} numberOfLines={1} style={{ flexShrink: 1 }}>
-                        {shortProjectName(project.name)}
+                      accessibilityState={{ expanded: showArchived }}
+                      onPress={() => toggle('archived', true)}
+                      style={{ minHeight: touch.min, flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg }}>
+                      <Feather name={showArchived ? 'chevron-down' : 'chevron-right'} size={16} color={c.textFaint} />
+                      <Feather name="archive" size={14} color={c.textFaint} />
+                      <T variant="meta" color="textMuted">
+                        {t('home.archived', 'Archived ({{count}})', { count: archived.length })}
                       </T>
-                      <StagePill stage={project.stage} label={stageLabel(project.stage)} />
-                      {delay > 0 ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('home.daysBehind', '{{count}} days behind', { count: delay })}>
-                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.danger }} />
-                          <T variant="metaStrong" color="danger">
-                            {delay}d
-                          </T>
-                        </View>
-                      ) : null}
-                      <View style={{ flex: 1 }} />
-                      {open ? null : <Badge count={unread} />}
                     </Pressable>
-                    {open ? (
-                      <>
-                        {channels.map((ch) => (
-                          <ChannelRow key={ch.id} channel={ch} unread={home.unread.get(ch.id) ?? 0} indent={space.xl} />
-                        ))}
-                        <Row
-                          indent={space.xl}
-                          left={
-                            <View style={{ width: 20, alignItems: 'center' }}>
-                              <Feather name="layout" size={15} color={c.textMuted} />
-                            </View>
-                          }
-                          title={t('home.projectOverview', 'Project overview')}
-                          muted
-                          onPress={() => router.push(`/project/${project.id}`)}
-                        />
-                      </>
-                    ) : null}
-                  </View>
-                );
-              })
+                    {showArchived ? archived.map(projectRow) : null}
+                  </>
+                ) : null}
+              </>
             )}
 
             <SectionHeader title={t('home.company', 'Company')} collapsed={collapsed.company} onToggle={() => toggle('company')} />

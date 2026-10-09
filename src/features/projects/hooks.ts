@@ -6,10 +6,13 @@ import { channelMembers, channels, messages } from '@/lib/db/schema';
 import type { Attachment, Channel, ID, Message } from '@/types/models';
 
 const ORDER = ['general', 'design', 'site-work', 'qs'];
+const rank = (name: string) => (ORDER.includes(name) ? ORDER.indexOf(name) : ORDER.length);
+/** The four standard channels first, then custom ones by name. */
+export const byChannelOrder = (a: Channel, b: Channel): number => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name);
 
 export function useProjectChannels(projectId: ID | null | undefined): Channel[] {
   const q = useLiveQuery(db.select().from(channels).where(eq(channels.projectId, projectId ?? '')), [projectId]);
-  return useMemo(() => [...q.data].sort((a, b) => ORDER.indexOf(a.name) - ORDER.indexOf(b.name)), [q.data]);
+  return useMemo(() => [...q.data].sort(byChannelOrder), [q.data]);
 }
 
 /** Which of the project's channels each person is in. */

@@ -3,13 +3,14 @@ import { router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, View } from 'react-native';
-import { Avatar, Divider, EmptyState, IconButton, Row, Skeleton } from '@/components/basics';
+import { Avatar, Button, Divider, EmptyState, IconButton, Row, Skeleton } from '@/components/basics';
 import { Header, OfflineBanner, Screen } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
 import type { ID, Message } from '@/types/models';
+import { leaveChannel } from '../../projects/api';
 import { StageBanner } from '../../projects/components/StageBanner';
 import { firstName, useMe, useProject, useProjectAccess, useUnsentCount, useUsers } from '../../shared';
 import { ChatContext, type ChatContextValue } from '../context';
@@ -114,7 +115,7 @@ export function Conversation({ channelId }: { channelId: ID }) {
               />
             )}
           </View>
-          {info.canPost ? (
+          {info.canPost && !access.archived ? (
             <Composer
               channelId={channelId}
               projectId={projectId}
@@ -129,7 +130,15 @@ export function Conversation({ channelId }: { channelId: ID }) {
               }}
             />
           ) : info.channel ? (
-            <ReadOnlyBar text={info.isBot ? t('chat.botReadOnly', 'Tap a button on a card to answer.') : t('chat.readOnly', 'Only admins can post here.')} />
+            <ReadOnlyBar
+              text={
+                info.isBot
+                  ? t('chat.botReadOnly', 'Tap a button on a card to answer.')
+                  : access.archived
+                    ? t('chat.archived', 'This project is archived. It is read-only.')
+                    : t('chat.readOnly', 'Only admins can post here.')
+              }
+            />
           ) : null}
         </KeyboardAvoidingView>
 
@@ -168,6 +177,39 @@ export function Conversation({ channelId }: { channelId: ID }) {
                 </View>
               ))}
               <Divider />
+            </View>
+          ) : null}
+          {info.channel?.kind === 'project' && project ? (
+            <View style={{ marginBottom: space.lg, gap: space.sm }}>
+              {access.can('channel.manage') ? (
+                <Button
+                  kind="secondary"
+                  icon="settings"
+                  label={t('channel.settings', 'Channel settings')}
+                  onPress={() => {
+                    setDetails(false);
+                    router.push(`/project/${project.id}/settings?channel=${channelId}`);
+                  }}
+                />
+              ) : null}
+              {!access.can('channel.manage') && !access.archived && info.channel.name !== 'general' && access.role ? (
+                <Button
+                  kind="secondary"
+                  icon="log-out"
+                  label={t('channel.leave', 'Leave channel')}
+                  onPress={() => {
+                    const ch = info.channel;
+                    setDetails(false);
+                    if (router.canGoBack()) router.back();
+                    if (ch) leaveChannel(ch);
+                  }}
+                />
+              ) : null}
+              <T variant="meta" color="textMuted">
+                {info.channel.isPrivate
+                  ? t('channel.privateHint', 'Private: only the people listed here can see this channel.')
+                  : t('channel.publicHint', 'Public: anyone on the project can find and join this channel.')}
+              </T>
             </View>
           ) : null}
           <T variant="label" color="textMuted" style={{ marginBottom: space.xs }}>

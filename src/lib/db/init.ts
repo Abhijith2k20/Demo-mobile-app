@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY NOT NULL, company_id TEXT NOT NULL, name TEXT NOT NULL, client TEXT NOT NULL,
   address TEXT NOT NULL, stage TEXT NOT NULL, start_date TEXT NOT NULL, planned_finish TEXT NOT NULL,
-  baseline_finish TEXT, baseline_locked INTEGER NOT NULL, updated_at TEXT NOT NULL
+  baseline_finish TEXT, baseline_locked INTEGER NOT NULL, archived_at TEXT, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS project_members (
   project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, job_title TEXT NOT NULL,

@@ -35,6 +35,7 @@ export const projects = sqliteTable('projects', {
   plannedFinish: text('planned_finish').notNull(),
   baselineFinish: text('baseline_finish'),
   baselineLocked: integer('baseline_locked', { mode: 'boolean' }).notNull(),
+  archivedAt: text('archived_at'),
   updatedAt: text('updated_at').notNull(),
 });
 

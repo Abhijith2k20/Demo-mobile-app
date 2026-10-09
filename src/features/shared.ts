@@ -47,6 +47,10 @@ export interface ProjectAccess {
   jobTitle: JobTitle | null;
   isManager: boolean;
   isAdmin: boolean;
+  /** The project is archived (read-only). */
+  archived: boolean;
+  /** May archive / unarchive this project (works on an archived project too). */
+  canArchive: boolean;
   can: (action: string) => boolean;
 }
 
@@ -56,12 +60,17 @@ export function useProjectAccess(projectId: ID | null | undefined): ProjectAcces
   const { data } = useLiveQuery(db.select().from(projectMembers).where(eq(projectMembers.userId, me.id)), [me.id]);
   const mine = data.find((m) => m.projectId === projectId);
   const role = mine?.role ?? null;
-  const can = useCallback((action: string) => canDo(me, action, { projectRole: role }), [me, role]);
+  const project = useProject(projectId);
+  const archived = !!project?.archivedAt;
+  // An archived project is read-only: every control that changes it is hidden.
+  const can = useCallback((action: string) => !archived && canDo(me, action, { projectRole: role }), [me, role, archived]);
   return {
     role,
     jobTitle: mine?.jobTitle ?? null,
     isAdmin: isCompanyAdmin(me),
     isManager: can('task.edit_any'),
+    archived,
+    canArchive: canDo(me, 'project.edit', { projectRole: role }),
     can,
   };
 }

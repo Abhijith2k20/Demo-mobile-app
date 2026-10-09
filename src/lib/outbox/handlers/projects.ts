@@ -72,6 +72,73 @@ export const memberRemove: Handler<'member_remove'> = {
   onPermanentFailure: (_p, _item, error) => resyncAfterFailure(error),
 };
 
+export const updateProject: Handler<'update_project'> = {
+  async send(p) {
+    const saved = await api<Project>('PATCH', `/projects/${p.projectId}`, p.changes);
+    return () => applyIncoming({ projects: [saved] });
+  },
+  onPermanentFailure(p, _item, error) {
+    db.update(projects).set(p.prev).where(eq(projects.id, p.projectId)).run();
+    toast(errorText(error), 'danger');
+  },
+};
+
+export const archiveProject: Handler<'archive_project'> = {
+  async send(p) {
+    const saved = await api<Project>('PATCH', `/projects/${p.projectId}`, { archived: p.archived });
+    return () => applyIncoming({ projects: [saved] });
+  },
+  onPermanentFailure(p, _item, error) {
+    db.update(projects)
+      .set({ archivedAt: p.archived ? null : new Date().toISOString() })
+      .where(eq(projects.id, p.projectId))
+      .run();
+    toast(errorText(error), 'danger');
+  },
+};
+
+export const deleteProject: Handler<'delete_project'> = {
+  async send(p) {
+    await api('DELETE', `/projects/${p.projectId}`);
+    return () => void catchUp();
+  },
+  // The project was already removed from the phone; bring the server's copy back.
+  onPermanentFailure: (_p, _item, error) => resyncAfterFailure(error),
+};
+
+export const createChannel: Handler<'create_channel'> = {
+  async send(p) {
+    await api('POST', `/projects/${p.projectId}/channels`, { id: p.id, name: p.name, isPrivate: p.isPrivate, memberIds: p.memberIds });
+    return () => void catchUp();
+  },
+  onPermanentFailure: (_p, _item, error) => resyncAfterFailure(error),
+};
+
+export const updateChannel: Handler<'update_channel'> = {
+  async send(p) {
+    await api('PATCH', `/channels/${p.channelId}`, { name: p.name, isPrivate: p.isPrivate, memberIds: p.memberIds });
+    return () => void catchUp();
+  },
+  onPermanentFailure: (_p, _item, error) => resyncAfterFailure(error),
+};
+
+export const deleteChannel: Handler<'delete_channel'> = {
+  async send(p) {
+    await api('DELETE', `/channels/${p.channelId}`);
+    return () => void catchUp();
+  },
+  onPermanentFailure: (_p, _item, error) => resyncAfterFailure(error),
+};
+
+export const joinChannel: Handler<'join_channel'> = {
+  async send(p) {
+    await api('POST', `/channels/${p.channelId}/${p.on ? 'join' : 'leave'}`);
+    // Joining brings the channel's recent history with the next sync.
+    return () => void catchUp();
+  },
+  onPermanentFailure: (_p, _item, error) => resyncAfterFailure(error),
+};
+
 export const createProject: Handler<'create_project'> = {
   async send(p) {
     const res = await api<{ project: Project }>('POST', '/projects', p);

@@ -8,6 +8,7 @@ import { catchUp } from '@/lib/sync/catchup';
 import { useUi } from '@/stores/ui';
 import { activity, channelMembers, channels, messages } from '@/lib/db/schema';
 import type { Channel, ID, Project, User } from '@/types/models';
+import { byChannelOrder } from '../projects/hooks';
 import { useChannels, useMe, useProjects, useUsers } from '../shared';
 
 /** Unread message count per channel for the signed-in user. */
@@ -37,7 +38,6 @@ export function useUnreadActivityCount(): number {
   return q.data[0]?.count ?? 0;
 }
 
-const CHANNEL_ORDER = ['general', 'design', 'site-work', 'qs'];
 
 export interface HomeProject {
   project: Project;
@@ -69,7 +69,7 @@ export function useHome() {
     const byProject: HomeProject[] = projects.list.map((project) => {
       const chs = list
         .filter((c) => c.projectId === project.id)
-        .sort((a, b) => CHANNEL_ORDER.indexOf(a.name) - CHANNEL_ORDER.indexOf(b.name));
+        .sort(byChannelOrder);
       return { project, channels: chs, unread: chs.reduce((n, c) => n + (unread.get(c.id) ?? 0), 0) };
     });
     const company = list.filter((c) => c.kind === 'company').sort((a) => (a.name === 'announcements' ? -1 : 1));

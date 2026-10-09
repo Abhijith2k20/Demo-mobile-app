@@ -5,6 +5,7 @@ import type { Channel, ID, Project } from '@/types/models';
 import { uuidv7 } from 'uuidv7';
 import {
   admins,
+  assertProjectActive,
   canSeeProject,
   channelAudience,
   logRemoval,
@@ -67,11 +68,33 @@ function setMemberChannels(projectId: ID, userId: ID, channelIds: ID[]): void {
 export const projectRoutes: RouteDef[] = [
   route('PATCH', '/projects/:id', ({ user, params, body }) => {
     const project = visibleProject(user, params.id);
-    const { stage } = parse(projectPatchSchema, body);
-    if (!can(user, 'project.stage', { projectRole: projectRole(user.id, project.id) })) {
+    const input = parse(projectPatchSchema, body);
+    const role = projectRole(user.id, project.id);
+    const { stage, archived, ...details } = input;
+    if (archived !== undefined && archived !== !!project.archivedAt) {
+      if (!can(user, 'project.edit', { projectRole: role })) throw forbidden('Only managers can archive a project.');
+      project.archivedAt = archived ? nowIso() : null;
+      project.updatedAt = nowIso();
+      publish({ type: 'project.updated', project }, projectAudience(project.id));
+      const home = projectChannel(project.id, 'general');
+      if (home) {
+        postMessage(home, store().botId, {
+          type: 'system',
+          body: `${firstName(user.id)} ${archived ? 'archived' : 'unarchived'} this project`,
+        });
+      }
+    }
+    if (project.archivedAt && (stage || Object.keys(details).length > 0)) assertProjectActive(project.id);
+    if (Object.keys(details).length > 0) {
+      if (!can(user, 'project.edit', { projectRole: role })) throw forbidden('Only managers can edit project details.');
+      Object.assign(project, details);
+      project.updatedAt = nowIso();
+      if (!stage || stage === project.stage) publish({ type: 'project.updated', project }, projectAudience(project.id));
+    }
+    if (!stage || project.stage === stage) return project;
+    if (!can(user, 'project.stage', { projectRole: role })) {
       throw forbidden('Only managers can move the project stage.');
     }
-    if (project.stage === stage) return project;
     project.stage = stage;
     project.updatedAt = nowIso();
     publish({ type: 'project.updated', project }, projectAudience(project.id));
@@ -83,6 +106,34 @@ export const projectRoutes: RouteDef[] = [
       });
     }
     return project;
+  }),
+
+  // Owner/Admin only: removes the project and everything in it, for everyone.
+  route('DELETE', '/projects/:id', ({ user, params }) => {
+    const s = store();
+    const project = s.projects.get(params.id);
+    if (!project) return { deleted: true }; // already gone: safe to repeat
+    if (!canSeeProject(user, project.id)) throw notFound('Project');
+    if (!isCompanyAdmin(user)) throw forbidden('Only the owner or an admin can delete a project.');
+    const audience = projectAudience(project.id);
+    const channelIds = new Set(projectChannels(project.id).map((c) => c.id));
+    const taskIds = new Set([...s.tasks.values()].filter((t) => t.projectId === project.id).map((t) => t.id));
+    for (const m of [...s.messages.values()]) if (channelIds.has(m.channelId)) s.messages.delete(m.id);
+    for (const id of channelIds) s.channels.delete(id);
+    s.channelMembers = s.channelMembers.filter((m) => !channelIds.has(m.channelId));
+    for (const id of taskIds) s.tasks.delete(id);
+    s.taskHistory = s.taskHistory.filter((h) => !taskIds.has(h.taskId));
+    for (const c of [...s.checkins.values()]) if (taskIds.has(c.taskId)) s.checkins.delete(c.id);
+    s.projectMembers = s.projectMembers.filter((m) => m.projectId !== project.id);
+    s.projects.delete(project.id);
+    for (const userId of audience) {
+      logRemoval(userId, 'projects', project.id);
+      for (const id of channelIds) logRemoval(userId, 'channels', id);
+    }
+    // No dedicated event for this in the planned API: a membership event makes everyone re-sync.
+    const first = [...channelIds][0] ?? project.id;
+    for (const userId of audience) publish({ type: 'channel.member_removed', channelId: first, userId }, [userId]);
+    return { deleted: true };
   }),
 
   // Demo addition: Owner/Admin create a project with its four channels.
@@ -104,6 +155,7 @@ export const projectRoutes: RouteDef[] = [
       plannedFinish: todayIso(),
       baselineFinish: null,
       baselineLocked: false,
+      archivedAt: null,
       updatedAt: ts,
     };
     s.projects.set(project.id, project);
@@ -165,6 +217,8 @@ export const projectRoutes: RouteDef[] = [
         .filter((c) => names.includes(c.name))
         .map((c) => c.id);
     }
+    // Managers are in every channel of the project.
+    if (input.role === 'manager') channelIds = valid;
     setMemberChannels(project.id, target.id, channelIds);
     project.updatedAt = nowIso();
     publish({ type: 'project.updated', project }, projectAudience(project.id));
@@ -188,7 +242,11 @@ export const projectRoutes: RouteDef[] = [
     }
     if (input.role) member.role = input.role;
     if (input.jobTitle) member.jobTitle = input.jobTitle;
-    if (input.channelIds) setMemberChannels(project.id, member.userId, input.channelIds);
+    if (member.role === 'manager') {
+      setMemberChannels(project.id, member.userId, projectChannels(project.id).map((c) => c.id));
+    } else if (input.channelIds) {
+      setMemberChannels(project.id, member.userId, input.channelIds);
+    }
     project.updatedAt = nowIso();
     publish({ type: 'project.updated', project }, projectAudience(project.id));
     return { projectId: project.id, userId: member.userId, role: member.role, jobTitle: member.jobTitle };

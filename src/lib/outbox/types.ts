@@ -3,6 +3,12 @@ import type { MessageCreate, TaskCreate } from '@/shared/schemas';
 import type { TaskChanges } from '@/shared/taskRules';
 import type { CheckinAnswer, ID, JobTitle, OutboxItem, OutboxKind, ProjectRole, Stage } from '@/types/models';
 
+export interface ProjectDetails {
+  name: string;
+  client: string;
+  address: string;
+}
+
 export interface Payloads {
   send_message: { channelId: ID; message: MessageCreate };
   edit_message: { messageId: ID; body?: string; prevBody: string | null; pinned?: boolean };
@@ -30,6 +36,13 @@ export interface Payloads {
   member_remove: { projectId: ID; userId: ID };
   create_dm: { channelId: ID; userId: ID };
   create_project: { id: ID; name: string; client: string; address: string };
+  update_project: { projectId: ID; changes: ProjectDetails; prev: ProjectDetails };
+  create_channel: { projectId: ID; id: ID; name: string; isPrivate: boolean; memberIds: ID[] };
+  update_channel: { projectId: ID; channelId: ID; name?: string; isPrivate?: boolean; memberIds?: ID[] };
+  delete_channel: { projectId: ID; channelId: ID };
+  join_channel: { channelId: ID; on: boolean };
+  archive_project: { projectId: ID; archived: boolean };
+  delete_project: { projectId: ID; name: string };
 }
 
 export interface Handler<K extends OutboxKind> {

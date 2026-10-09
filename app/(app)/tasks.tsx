@@ -43,7 +43,9 @@ function ManagerSchedule() {
   // Projects the user manages come first; that is where they do schedule work.
   const ordered = useMemo(() => {
     const managed = new Set(memberships.filter((m) => m.userId === me.id && m.role === 'manager').map((m) => m.projectId));
-    return [...projects.list].sort((a, b) => Number(managed.has(b.id)) - Number(managed.has(a.id)));
+    return [...projects.list].sort(
+      (a, b) => Number(!!a.archivedAt) - Number(!!b.archivedAt) || Number(managed.has(b.id)) - Number(managed.has(a.id)),
+    );
   }, [projects.list, memberships, me.id]);
   const current = ordered.find((p) => p.id === picked) ?? ordered[0];
 

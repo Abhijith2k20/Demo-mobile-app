@@ -4,6 +4,7 @@ import { can, canPost, DELETE_WINDOW_MS, EDIT_WINDOW_MS, isCompanyAdmin } from '
 import { messageCreateSchema, messagePatchSchema } from '@/shared/schemas';
 import type { Channel, ID, Message, MessageType } from '@/types/models';
 import {
+  assertProjectActive,
   canSeeChannel,
   channelAudience,
   ensureChannelMember,
@@ -135,6 +136,7 @@ export const messageRoutes: RouteDef[] = [
     const input = parse(messageCreateSchema, body);
     const existing = s.messages.get(input.id);
     if (existing) return existing; // idempotent create: no second event
+    assertProjectActive(ch.projectId);
     if (!canPost(user, ch) || ch.kind === 'bot') {
       throw new MockError('CHANNEL_READ_ONLY', 'Only admins can post here.');
     }

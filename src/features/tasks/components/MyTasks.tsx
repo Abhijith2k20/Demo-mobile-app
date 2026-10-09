@@ -57,8 +57,11 @@ export function MyTasks() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const me = useMe();
-  const my = useMyTasks();
+  const all = useMyTasks();
   const projects = useProjects();
+  // Work in archived projects is parked, so it is not on anyone's list.
+  const live = (t: Task) => !projects.byId.get(t.projectId)?.archivedAt;
+  const my = { ...all, today: all.today.filter(live), week: all.week.filter(live), done: all.done.filter(live) };
   const unsent = useUnsentCount();
   const statusLabel = useStatusLabel();
   const { refreshing, refresh } = useRefresh();

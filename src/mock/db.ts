@@ -1,5 +1,6 @@
 // In-memory store for the mock server. Resets on reload or "Reset demo".
 import { isCompanyAdmin } from '@/shared/permissions';
+import { MockError } from './http';
 import type {
   Activity,
   Channel,
@@ -144,6 +145,14 @@ export function ensureChannelMember(userId: ID, channelId: ID): StoredChannelMem
     s.channelMembers.push(row);
   }
   return row;
+}
+
+/** Archived projects are read-only: no new messages, no task changes. */
+export function assertProjectActive(projectId: ID | null | undefined): void {
+  if (!projectId) return;
+  if (store().projects.get(projectId)?.archivedAt) {
+    throw new MockError('PROJECT_ARCHIVED', 'This project is archived. Unarchive it to make changes.');
+  }
 }
 
 export function logRemoval(userId: ID, kind: RemovalKind, id: ID): void {

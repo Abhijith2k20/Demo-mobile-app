@@ -4,7 +4,7 @@
 // that library mounts but never opens on Expo SDK 57 (see DECISIONS.md). Everything goes through
 // this one component, so swapping the implementation later touches only this file.
 import { useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, TextInput, useWindowDimensions, View, type TextInputProps } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, TextInput, useWindowDimensions, View, type TextInputProps } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,12 +19,28 @@ interface Props {
   subtitle?: string;
   /** Tall sheet (forms, pickers with long lists). Otherwise the sheet hugs its content. */
   full?: boolean;
+  /** Small action shown beside the title (always visible, no scrolling). */
+  headerRight?: ReactNode;
   children: ReactNode;
 }
 
 const DISMISS_DISTANCE = 90;
 
-export function Sheet({ visible, onClose, title, subtitle, full, children }: Props) {
+/** Height of the on-screen keyboard (0 when hidden). */
+function useKeyboardHeight(): number {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setH(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setH(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return h;
+}
+
+export function Sheet({ visible, onClose, title, subtitle, full, headerRight, children }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -57,7 +73,9 @@ export function Sheet({ visible, onClose, title, subtitle, full, children }: Pro
 
   const scrimStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - progress.value) * height + drag.value }] }));
-  const maxHeight = height - insets.top - space.lg;
+  // The sheet shrinks while the keyboard is up, so its top never slides off the screen.
+  const keyboard = useKeyboardHeight();
+  const maxHeight = height - insets.top - space.lg - keyboard;
 
   if (!mounted) return null;
 
@@ -93,15 +111,18 @@ export function Sheet({ visible, onClose, title, subtitle, full, children }: Pro
             <ScrollView
               keyboardShouldPersistTaps="handled"
               style={{ flexGrow: 0, flexShrink: 1 }}
-              contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: insets.bottom + space.xl }}>
+              contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: (keyboard ? 0 : insets.bottom) + space.xl }}>
               {title ? (
-                <View style={{ marginBottom: space.md }}>
-                  <T variant="heading">{title}</T>
-                  {subtitle ? (
-                    <T variant="meta" color="textMuted">
-                      {subtitle}
-                    </T>
-                  ) : null}
+                <View style={{ marginBottom: space.md, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+                  <View style={{ flex: 1 }}>
+                    <T variant="heading">{title}</T>
+                    {subtitle ? (
+                      <T variant="meta" color="textMuted">
+                        {subtitle}
+                      </T>
+                    ) : null}
+                  </View>
+                  {headerRight}
                 </View>
               ) : null}
               {children}

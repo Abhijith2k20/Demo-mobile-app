@@ -116,6 +116,37 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   in the card's summary and in the status card posted to the project channel. As with voice notes
   in chat, **recording is simulated** (a timer; no audio is captured or played back).
 
+- **Project settings** (`project/[id]/settings.tsx`; Managers, Owner, Admin). The spec gives
+  managers `project.edit` and `channel.manage` but describes no screen for them. Added:
+  - edit project name, client and site address (`PATCH /projects/:id` now accepts these);
+  - channels: create, rename, public/private, choose who is in it, delete
+    (`GET/POST /projects/:id/channels`, `PATCH/DELETE /channels/:id`);
+  - a link to the existing Members screen.
+  Reached from the gear in the project header, "Add or manage channels" on the overview, and
+  "Channel settings" in a channel's details sheet.
+- **What public and private mean.** Public: anyone on the project can find the channel under
+  "Browse channels" and join it (`POST /channels/:id/join`), and can leave again. Private: only
+  the people a manager ticks can see it. Rules chosen to keep this simple:
+  - **Managers are in every channel of their project** and cannot be unticked or leave (this
+    follows §9.3 and means a manager can always manage a channel);
+  - Owner/Admin see every project channel, private or not;
+  - `#general` cannot be renamed, made private, deleted or left;
+  - deleting a channel deletes its messages for everyone (no archive in the demo).
+- **Archive / unarchive a project** (Managers, Owner, Admin; `PATCH /projects/:id {archived}`,
+  new field `Project.archivedAt`). An archived project is read-only for everyone: the server
+  rejects new messages and task changes with `PROJECT_ARCHIVED`, the app hides every editing
+  control, it moves to a collapsed "Archived" group on Home, and it is left out of the dashboard,
+  "My tasks" and bot check-ins. Nothing is deleted.
+- **Delete a project** (Owner/Admin only; `DELETE /projects/:id`). Removes the project, its
+  channels, messages, tasks and memberships for everyone. The app asks the user to type the
+  project name first.
+- **Deleting a channel has one home:** the "Delete" action beside the title in the channel's
+  editor (Project settings → tap the channel, or "Channel settings" from inside the channel).
+- Deliberately **not** added: changing project dates by hand
+  (they come from the tasks), per-channel "only admins can post", and notification settings per
+  channel.
+- Sheets now shrink above the keyboard, so a tall form's first field stays on screen while typing.
+
 ## Translations
 
 - English strings live next to their keys in code (`t('home.jumpTo', 'Jump to…')`) and

@@ -83,9 +83,42 @@ export const memberAddSchema = z.object({
 });
 export const memberPatchSchema = memberAddSchema.omit({ userId: true }).partial();
 
-export const projectPatchSchema = z.object({
-  stage: z.enum(['design', 'approval', 'procurement', 'execution', 'finishing', 'handover']),
+export const projectPatchSchema = z
+  .object({
+    stage: z.enum(['design', 'approval', 'procurement', 'execution', 'finishing', 'handover']),
+    name: z.string().trim().min(2, 'Give the project a name').max(80),
+    client: z.string().trim().min(1, 'Who is the client?').max(80),
+    address: z.string().trim().max(160),
+    archived: z.boolean(),
+  })
+  .partial();
+export const projectDetailsSchema = projectPatchSchema.required({ name: true, client: true, address: true }).omit({ stage: true, archived: true });
+
+/** Channel names look like "site-work": lowercase letters, numbers and hyphens. */
+export function normalizeChannelName(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/^#+/, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+const channelName = z
+  .string()
+  .min(2, 'Use at least 2 letters')
+  .max(30, 'Keep it under 30 characters')
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Use lowercase letters, numbers and hyphens');
+export const channelCreateSchema = z.object({
+  id,
+  name: channelName,
+  isPrivate: z.boolean(),
+  memberIds: z.array(id),
 });
+export const channelPatchSchema = z
+  .object({ name: channelName, isPrivate: z.boolean(), memberIds: z.array(id) })
+  .partial();
 export const projectCreateSchema = z.object({
   id,
   name: z.string().trim().min(2, 'Give the project a name').max(80),

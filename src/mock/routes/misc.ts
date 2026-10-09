@@ -58,8 +58,10 @@ export const miscRoutes: RouteDef[] = [
   route('GET', '/dashboard', ({ user }): DashboardResponse => {
     if (!isCompanyAdmin(user)) throw forbidden('The dashboard is for the owner and admins.');
     const s = store();
-    const projects = [...s.projects.values()];
-    const tasks = [...s.tasks.values()].filter((t) => !t.deletedAt);
+    // Archived projects are out of the picture for the dashboard.
+    const projects = [...s.projects.values()].filter((p) => !p.archivedAt);
+    const live = new Set(projects.map((p) => p.id));
+    const tasks = [...s.tasks.values()].filter((t) => !t.deletedAt && live.has(t.projectId));
     const today = todayIso();
     const weekEnd = format(addDays(new Date(), 7), 'yyyy-MM-dd');
     const delayed = projects

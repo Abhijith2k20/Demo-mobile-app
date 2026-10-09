@@ -163,6 +163,7 @@ function build(): MockStore {
       plannedFinish: day(startOffset),
       baselineFinish: null,
       baselineLocked: false,
+      archivedAt: null,
       updatedAt: iso(epoch),
     };
     s.projects.set(id, project);

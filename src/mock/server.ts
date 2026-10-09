@@ -10,6 +10,7 @@ import { matchRoute, MockError, type RouteDef } from './http';
 import { getNetwork, latencyMs, resetNetwork, rollFlakyTimeout, sleep, takeInjection, TIMEOUT_MS } from './network';
 import { resetNotify } from './notify';
 import { authRoutes } from './routes/auth';
+import { channelRoutes } from './routes/channels';
 import { messageRoutes } from './routes/messages';
 import { miscRoutes } from './routes/misc';
 import { projectRoutes } from './routes/projects';
@@ -40,6 +41,7 @@ const routes: RouteDef[] = [
   ...messageRoutes,
   ...taskRoutes,
   ...projectRoutes,
+  ...channelRoutes,
   ...miscRoutes,
 ];
 

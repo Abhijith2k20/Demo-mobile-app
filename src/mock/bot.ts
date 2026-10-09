@@ -29,7 +29,7 @@ function clearTimer(checkinId: ID): void {
 
 function openTasksFor(userId: ID): Task[] {
   return [...store().tasks.values()]
-    .filter((t) => t.ownerId === userId && !t.deletedAt && !isDone(t.status))
+    .filter((t) => t.ownerId === userId && !t.deletedAt && !isDone(t.status) && !store().projects.get(t.projectId)?.archivedAt)
     .sort((a, b) => (a.plannedFinish < b.plannedFinish ? -1 : 1));
 }
 

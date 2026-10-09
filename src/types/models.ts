@@ -40,6 +40,8 @@ export interface Project {
   plannedFinish: string;
   baselineFinish: string | null;
   baselineLocked: boolean;
+  /** Set when the project is archived: everything in it becomes read-only. */
+  archivedAt: string | null;
   updatedAt: string;
 }
 
@@ -205,7 +207,15 @@ export type OutboxKind =
   | 'member_remove'
   // demo additions, see DECISIONS.md
   | 'create_dm'
-  | 'create_project';
+  | 'create_project'
+  // project settings
+  | 'update_project'
+  | 'create_channel'
+  | 'update_channel'
+  | 'delete_channel'
+  | 'join_channel'
+  | 'archive_project'
+  | 'delete_project';
 
 export interface OutboxItem {
   id: ID;

@@ -26,6 +26,7 @@ interface Draft {
 }
 
 function defaultsFor(channels: Channel[], role: ProjectRole, jobTitle: JobTitle): ID[] {
+  if (role === 'manager') return channels.map((c) => c.id); // managers are in every channel
   const names = defaultChannelNames(role, jobTitle);
   return channels.filter((c) => names.includes(c.name)).map((c) => c.id);
 }

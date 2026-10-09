@@ -4,13 +4,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Button, Card, EmptyState, Row, Segmented, Skeleton, StagePill } from '@/components/basics';
+import { Avatar, Banner, Button, Card, EmptyState, IconButton, Row, Segmented, Skeleton, StagePill } from '@/components/basics';
 import { appScreen, Header, OfflineBanner, Screen } from '@/components/chrome';
 import { PhotoTile } from '@/components/PhotoGrid';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { useUnreadCounts } from '@/features/home/hooks';
 import { MembersManager } from '@/features/members/MembersManager';
+import { BrowseChannels } from '@/features/projects/components/BrowseChannels';
 import { useDelayText } from '@/features/projects/components/StageBanner';
 import { useProjectChannels, useProjectFiles, useRecentUpdates } from '@/features/projects/hooks';
 import { firstName, useProject, useProjectAccess, useStageLabel, useUnsentCount, useUsers } from '@/features/shared';
@@ -90,6 +91,7 @@ function Overview({ project }: { project: Project }) {
   const updates = useRecentUpdates(project.id);
   const delay = useDelayText()(project);
   const [confirm, setConfirm] = useState(false);
+  const [browse, setBrowse] = useState(false);
   const next = STAGES[STAGES.indexOf(project.stage) + 1];
   const percent = useMemo(() => (tasks.length ? Math.round((tasks.filter((t) => t.status === 'done').length / tasks.length) * 100) : 0), [tasks]);
 
@@ -156,8 +158,34 @@ function Overview({ project }: { project: Project }) {
               />
             </View>
           ))}
+          <View style={{ borderTopWidth: 1, borderTopColor: c.border }}>
+            <Row
+              left={<Feather name="compass" size={15} color={c.textMuted} />}
+              title="Browse channels"
+              muted
+              right={<Feather name="chevron-right" size={18} color={c.textFaint} />}
+              onPress={() => setBrowse(true)}
+            />
+          </View>
+          {access.canArchive || access.isAdmin || access.can('channel.manage') ? (
+            <View style={{ borderTopWidth: 1, borderTopColor: c.border }}>
+              <Row
+                left={<Feather name="settings" size={15} color={c.textMuted} />}
+                title="Project settings"
+                muted
+                right={<Feather name="chevron-right" size={18} color={c.textFaint} />}
+                onPress={() => router.push(`/project/${project.id}/settings`)}
+              />
+            </View>
+          ) : null}
         </Card>
       </View>
+      <BrowseChannels projectId={project.id} visible={browse} onClose={() => setBrowse(false)} />
+      {access.canArchive || access.isAdmin || access.can('channel.manage') ? (
+        <T variant="meta" color="textFaint" style={{ marginTop: -space.sm }}>
+          Project settings: edit details, add or delete channels, make them private, manage members, archive or delete the project.
+        </T>
+      ) : null}
 
       <View>
         <T variant="label" color="textMuted" style={{ marginBottom: space.xs }}>
@@ -265,13 +293,24 @@ function ProjectScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const project = useProject(id);
+  const access = useProjectAccess(id);
+  const canManage = access.canArchive || access.isAdmin || access.can('channel.manage') || access.can('project.members');
   const unsent = useUnsentCount();
   const [tab, setTab] = useState<Tab>('overview');
 
   return (
     <Screen>
-      <Header title={project ? project.name.split(' – ')[0] : 'Project'} subtitle={project?.name.split(' – ')[1]} />
+      <Header
+        title={project ? project.name.split(' – ')[0] : 'Project'}
+        subtitle={project?.name.split(' – ')[1]}
+        right={
+          project && canManage ? (
+            <IconButton icon="settings" label="Project settings" onPress={() => router.push(`/project/${project.id}/settings`)} />
+          ) : undefined
+        }
+      />
       <OfflineBanner waiting={unsent.waiting} />
+      {project?.archivedAt ? <Banner icon="archive" text="This project is archived. It is read-only." /> : null}
       <View style={{ paddingHorizontal: space.lg, paddingVertical: space.sm, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border }}>
         <Segmented
           value={tab}

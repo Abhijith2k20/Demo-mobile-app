@@ -3,7 +3,7 @@ import { can } from '@/shared/permissions';
 import { rebaselineSchema, taskCreateSchema, taskPatchSchema } from '@/shared/schemas';
 import { MEMBER_EDITABLE, normalizeTaskChange, shortDate, type TaskChanges } from '@/shared/taskRules';
 import type { ID, Project, Task, TaskHistory } from '@/types/models';
-import { canSeeProject, nowIso, projectAudience, projectChannel, projectRole, store, type StoredUser } from '../db';
+import { assertProjectActive, canSeeProject, nowIso, projectAudience, projectChannel, projectRole, store, type StoredUser } from '../db';
 import { publish } from '../events';
 import { forbidden, MockError, notFound, parse, route, type RouteDef } from '../http';
 import { addActivity, firstName, queueTaskChange, type ChangeKind } from '../notify';
@@ -147,6 +147,7 @@ export const taskRoutes: RouteDef[] = [
     const input = parse(taskCreateSchema, body);
     const existing = s.tasks.get(input.id);
     if (existing) return existing;
+    assertProjectActive(project.id);
     if (!can(user, 'task.create', { projectRole: projectRole(user.id, project.id) })) throw forbidden();
     if (input.ownerId && !s.projectMembers.some((m) => m.projectId === project.id && m.userId === input.ownerId)) {
       throw new MockError('VALIDATION_FAILED', 'Some fields need attention.', {
@@ -207,6 +208,7 @@ export const taskRoutes: RouteDef[] = [
   route('PATCH', '/tasks/:id', ({ user, params, body }) => {
     const task = visibleTask(user, params.id);
     const input = parse(taskPatchSchema, body);
+    assertProjectActive(task.projectId);
     const role = projectRole(user.id, task.projectId);
     const isManager = can(user, 'task.edit_any', { projectRole: role });
     if (!isManager) {

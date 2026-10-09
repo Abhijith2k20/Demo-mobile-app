@@ -89,6 +89,21 @@ export function useUnsentItems(): { failed: UnsentRow[]; stale: UnsentRow[]; wai
         case 'create_project':
           title = t('unsent.project', 'New project');
           break;
+        case 'update_project':
+        case 'archive_project':
+          title = t('unsent.projectDetails', 'Project details change');
+          break;
+        case 'delete_project':
+          title = t('unsent.deleteProject', 'Deleting project: {{name}}', { name: readPayload<'delete_project'>(item).name });
+          break;
+        case 'create_channel':
+          title = t('unsent.newChannel', 'New channel: #{{name}}', { name: readPayload<'create_channel'>(item).name });
+          break;
+        case 'update_channel':
+        case 'delete_channel':
+        case 'join_channel':
+          title = t('unsent.channelChange', 'Channel change');
+          break;
         default:
           break;
       }
