@@ -2,29 +2,23 @@
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, EmptyState, Skeleton } from '@/components/basics';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { isDone, taskVarianceDays } from '@/shared/taskRules';
+import { isDone, todayIso } from '@/shared/taskRules';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { PHASES, type Project, type Task } from '@/types/models';
 import { useMe, useProjectAccess, useUsers } from '../../shared';
 import { confirmTask, createTask, quickAddDefaults, shiftTask, updateTask } from '../api';
-import { orderedPhases, useProjectTasks } from '../hooks';
-import { BaselineControl, RebaselineSheet } from './Baseline';
+import { matchesFilters, NO_FILTERS, type TaskFilters } from '../filters';
+import { orderedPhases, useProjectMembers, useProjectTasks } from '../hooks';
+import { ScheduleMenu } from './Baseline';
+import { FilterSheet } from './FilterSheet';
+import { ScheduleToolbar } from './ScheduleToolbar';
 import { dateRange, TaskRow } from './TaskRow';
-
-type Filter = 'all' | 'mine' | 'delayed' | 'blocked' | 'done';
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'Mine' },
-  { value: 'delayed', label: 'Delayed' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'done', label: 'Done' },
-];
 
 type Item = { kind: 'phase'; key: string; phase: string; done: number; total: number } | { kind: 'task'; key: string; task: Task };
 
@@ -35,12 +29,14 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
   const users = useUsers();
   const access = useProjectAccess(project.id);
   const { tasks, loading } = useProjectTasks(project.id);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filters, setFilters] = useState<TaskFilters>(NO_FILTERS);
+  const [filterSheet, setFilterSheet] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const members = useProjectMembers(project.id);
   const [shift, setShift] = useState<Task | null>(null);
   const [quick, setQuick] = useState('');
   const [phase, setPhase] = useState<string | null>(null);
   const [phaseSheet, setPhaseSheet] = useState(false);
-  const [rebaseline, setRebaseline] = useState(false);
 
   const phases = useMemo(() => orderedPhases(tasks), [tasks]);
   // Quick add targets the phase that is being worked on now, unless the user picked one.
@@ -57,13 +53,10 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
     return { from, to };
   }, [tasks, project.plannedFinish, project.startDate]);
 
-  const { items, sticky } = useMemo(() => {
-    const match = (t: Task) =>
-      filter === 'all' ||
-      (filter === 'mine' && t.ownerId === me.id) ||
-      (filter === 'delayed' && (taskVarianceDays(t) ?? 0) > 0 && !isDone(t.status)) ||
-      (filter === 'blocked' && t.status === 'blocked') ||
-      (filter === 'done' && isDone(t.status));
+  const { items, sticky, shown } = useMemo(() => {
+    const today = todayIso();
+    const match = (t: Task) => matchesFilters(t, filters, me.id, today);
+    let count = 0;
     const out: Item[] = [];
     const stickyIdx: number[] = [];
     for (const p of phases) {
@@ -73,9 +66,10 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
       stickyIdx.push(out.length);
       out.push({ kind: 'phase', key: `phase-${p}`, phase: p, done: all.filter((t) => t.status === 'done').length, total: all.length });
       for (const t of shown) out.push({ kind: 'task', key: t.id, task: t });
+      count += shown.length;
     }
-    return { items: out, sticky: stickyIdx };
-  }, [tasks, phases, filter, me.id]);
+    return { items: out, sticky: stickyIdx, shown: count };
+  }, [tasks, phases, filters, me.id]);
 
   const onDone = (t: Task) => {
     if (t.status === 'done_pending_confirmation' && access.can('task.confirm')) confirmTask(t);
@@ -100,14 +94,14 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       {header}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: space.md }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.sm }} style={{ flex: 1 }}>
-          {FILTERS.map((f) => (
-            <Chip key={f.value} label={f.label} selected={filter === f.value} onPress={() => setFilter(f.value)} />
-          ))}
-        </ScrollView>
-        <BaselineControl project={project} access={access} onRebaseline={() => setRebaseline(true)} />
-      </View>
+      <ScheduleToolbar
+        filters={filters}
+        onChange={setFilters}
+        shown={shown}
+        total={tasks.length}
+        onOpenFilters={() => setFilterSheet(true)}
+        onOpenMenu={access.can('task.baseline') ? () => setMenu(true) : undefined}
+      />
 
       <View style={{ flex: 1 }}>
         {loading ? (
@@ -116,7 +110,8 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
           <EmptyState
             icon="check-square"
             title={tasks.length === 0 ? 'No tasks yet' : 'Nothing here'}
-            hint={tasks.length === 0 ? 'Add the first task below to start the schedule.' : 'No tasks match this filter.'}
+            hint={tasks.length === 0 ? 'Add the first task below to start the schedule.' : 'No tasks match these filters.'}
+            action={tasks.length > 0 ? <Button small full={false} kind="secondary" label="Clear filters" onPress={() => setFilters(NO_FILTERS)} /> : undefined}
           />
         ) : (
           <FlashList
@@ -239,7 +234,17 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
         </View>
       </Sheet>
 
-      <RebaselineSheet project={project} visible={rebaseline} onClose={() => setRebaseline(false)} />
+      <FilterSheet
+        visible={filterSheet}
+        onClose={() => setFilterSheet(false)}
+        filters={filters}
+        onChange={setFilters}
+        members={members}
+        phases={phases}
+        hasBaseline={project.baselineLocked}
+        shown={shown}
+      />
+      <ScheduleMenu project={project} visible={menu} onClose={() => setMenu(false)} />
     </KeyboardAvoidingView>
   );
 }

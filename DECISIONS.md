@@ -160,6 +160,13 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   with a preview, time and unread count. "New message" lives there. Home's badge now counts
   channels only, and Home's action button is "New project" for Owner/Admin only.
 
+- **Task list toolbar.** The five filter chips of §5.7 (All · Mine · Delayed · Blocked · Done)
+  became two quick chips (**Mine**, **Pending**) plus a **Filters** sheet with status, owner, due
+  date, "behind baseline" and phase. Filters combine with AND; a line under the bar shows
+  "Showing N of M" with Clear. Filters reset when the screen is left.
+- **Baseline actions moved into a three-dot menu** on that bar (Lock baseline / Re-baseline,
+  with the current baseline state). The menu is hidden for people who cannot change the baseline.
+
 ## Fixes after the code audit
 
 - **Read markers:** a channel only marks messages read while its screen is on top, and the
