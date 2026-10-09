@@ -166,7 +166,6 @@ export function askAboutOpenTasks(userId: ID): number {
     if (!hasAny) postMessage(ch, s.botId, { type: 'text', body: null, data: { kind: 'no_open_tasks' } });
     return 0;
   }
-  postMessage(ch, s.botId, { type: 'text', body: null, data: { kind: 'checkin_intro', count: tasks.length } });
   for (const task of tasks) createCheckin(userId, task, false);
   return tasks.length;
 }

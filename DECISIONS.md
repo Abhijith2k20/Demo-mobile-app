@@ -167,6 +167,17 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
 - **Baseline actions moved into a three-dot menu** on that bar (Lock baseline / Re-baseline,
   with the current baseline state). The menu is hidden for people who cannot change the baseline.
 
+- **Bot conversation redesigned** (replaces the stacked full-width buttons of §8):
+  - one check-in is open at a time; the others are one-line rows ("Update") and the next one
+    opens by itself after an answer;
+  - three main replies in one row (Done · In progress · Problem) with short labels; "Not started
+    yet" and "Add a note" are small links underneath;
+  - the open card shows the project, the due date (red when overdue) and current progress;
+  - an answered card collapses to a single line; a reminder is a single line, not a second card;
+  - a bar under the header shows "N tasks need an update · X of Y done";
+  - check-in cards are full width with no sender header. The "You have N open tasks" message was
+    removed because the bar says the same.
+
 ## Fixes after the code audit
 
 - **Read markers:** a channel only marks messages read while its screen is on top, and the

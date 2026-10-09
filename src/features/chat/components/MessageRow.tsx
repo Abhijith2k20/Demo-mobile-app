@@ -93,6 +93,15 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
     );
   }
 
+  // Check-in cards are the content of the bot conversation: full width, no sender header.
+  if (m.type === 'checkin' && !m.deletedAt) {
+    return (
+      <View style={{ paddingHorizontal: space.lg, paddingVertical: 4 }}>
+        <Renderer message={m} />
+      </View>
+    );
+  }
+
   const jobTitle = chat.jobTitles.get(m.senderId);
   const chip = bot ? t('chat.bot', 'Bot') : (jobTitle ?? (sender?.companyRole === 'owner' ? 'Owner' : sender?.companyRole === 'admin' ? 'Admin' : null));
 

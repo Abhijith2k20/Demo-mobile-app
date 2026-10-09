@@ -1,6 +1,6 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, View } from 'react-native';
 import { Avatar, Button, Divider, EmptyState, IconButton, Row, Skeleton } from '@/components/basics';
@@ -10,6 +10,8 @@ import { T } from '@/components/T';
 import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
 import type { ID, Message } from '@/types/models';
+import { BotProgress } from '../../bot/BotProgress';
+import { CheckinQueueProvider } from '../../bot/queue';
 import { leaveChannel } from '../../projects/api';
 import { StageBanner } from '../../projects/components/StageBanner';
 import { firstName, useMe, useProject, useProjectAccess, useUnsentCount, useUsers } from '../../shared';
@@ -58,12 +60,15 @@ export function Conversation({ channelId }: { channelId: ID }) {
     [me, users.byId, info.jobTitles, info.members, onOpenThread],
   );
 
+  // The bot conversation shows one open check-in at a time.
+  const Queue = info.isBot ? CheckinQueueProvider : Fragment;
   const projectId = info.channel?.projectId ?? null;
   const canCreateTask = !!projectId && access.can('task.create');
   const placeholder = info.channel?.kind === 'dm' ? t('chat.messagePerson', 'Message {{name}}', { name: firstName(info.peer?.name) }) : t('chat.messageChannel', 'Message {{name}}', { name: info.title });
 
   return (
     <ChatContext.Provider value={ctx}>
+      <Queue>
       <Screen>
         <Header
           title={info.title}
@@ -78,6 +83,7 @@ export function Conversation({ channelId }: { channelId: ID }) {
         />
         <OfflineBanner waiting={unsent.waiting} />
         {project && info.channel?.kind === 'project' ? <StageBanner project={project} /> : null}
+        {info.isBot ? <BotProgress /> : null}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <View style={{ flex: 1 }}>
             {loading || info.loading ? (
@@ -228,6 +234,7 @@ export function Conversation({ channelId }: { channelId: ID }) {
           </View>
         </Sheet>
       </Screen>
+      </Queue>
     </ChatContext.Provider>
   );
 }

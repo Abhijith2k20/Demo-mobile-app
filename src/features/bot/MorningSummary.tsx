@@ -5,7 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Card } from '@/components/basics';
 import { T } from '@/components/T';
 import { shortDate } from '@/shared/taskRules';
-import { space, touch } from '@/theme/spacing';
+import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { ID, Message } from '@/types/models';
 import { firstName, useMe } from '../shared';
@@ -34,7 +34,7 @@ export function MorningSummary({ message }: { message: Message }) {
   }
   return (
     <Card accent={c.info} style={{ maxWidth: 360, marginTop: 2 }}>
-      <T variant="bodyStrong">{t('bot.morning', 'Good morning {{name}}. Your tasks today:', { name: firstName(me.name) })}</T>
+      <T variant="metaStrong">{t('bot.morning', 'Good morning {{name}}. Your tasks today:', { name: firstName(me.name) })}</T>
       <View style={{ marginTop: space.xs }}>
         {ids.map((id) => {
           const task = tasks.find((x) => x.id === id);
@@ -44,16 +44,14 @@ export function MorningSummary({ message }: { message: Message }) {
               key={id}
               accessibilityRole="link"
               onPress={() => router.push(`/task/${id}`)}
-              style={{ minHeight: touch.min, flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+              style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
               <StatusDot status={task.status} />
-              <View style={{ flex: 1 }}>
-                <T variant="body" style={{ color: c.accent }} numberOfLines={1}>
-                  {task.name}
-                </T>
-                <T variant="meta" color="textMuted">
-                  {t('checkin.due', 'due {{date}}', { date: shortDate(task.plannedFinish) })} · {task.percent}%
-                </T>
-              </View>
+              <T variant="metaStrong" style={{ color: c.accent, fontSize: 14, flex: 1 }} numberOfLines={1}>
+                {task.name}
+              </T>
+              <T variant="meta" color="textMuted">
+                {shortDate(task.plannedFinish)} · {task.percent}%
+              </T>
               <Feather name="chevron-right" size={16} color={c.textFaint} />
             </Pressable>
           );
