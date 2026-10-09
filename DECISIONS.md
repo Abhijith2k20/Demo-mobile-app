@@ -10,7 +10,7 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
 |---|---|---|
 | `@gorhom/bottom-sheet` for sheets | **Own `Sheet` component** (`src/components/Sheet.tsx`) built from React Native `Modal` + Reanimated + gesture-handler. The library is not installed. | On SDK 57 in Expo Go, `BottomSheetModal.present()` was called but the sheet never animated in (5.2.14, tested on an Android 16 emulator). Every sheet in the app goes through `Sheet`, so switching back later means changing one file. |
 | FlashList "inverted" for chat | FlashList 2 with `maintainVisibleContentPosition={{ startRenderingFromBottom: true }}`, data oldest → newest, older pages loaded with `onStartReached`. | FlashList 2 removed the `inverted` prop; this is its documented replacement for chat lists. |
-| Date pickers | Small inline month calendar (`DateField` in `src/components/form.tsx`). | No native date picker is in the allowed stack. |
+| Date pickers | Month calendar in a sheet with Today / Tomorrow / In a week shortcuts (`DateField` in `src/components/form.tsx`). | No native date picker is in the allowed stack. |
 | Progress ring | Drawn with plain views (two rotating half discs). | No SVG library is in the allowed stack. |
 | Voice note, File | **Simulated.** The mic "records" a timer and posts a voice message with that length; File posts a sample PDF chip. | No audio or document-picker library is in the allowed stack. Camera and gallery are real (`expo-image-picker`). |
 | ESLint | `eslint@9` + `eslint-config-expo`, with `legacy-peer-deps=true` in `.npmrc`. | ESLint 10 crashes `eslint-plugin-react`; npm's strict peer resolution fails on a `react-dom` peer range inside Expo's own dependencies. |

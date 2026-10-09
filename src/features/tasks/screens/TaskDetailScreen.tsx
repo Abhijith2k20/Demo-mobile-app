@@ -277,6 +277,7 @@ function TaskDetail({ taskId: id }: { taskId: string }) {
                   </T>
                   <View style={{ flex: 1 }}>
                     <DateField
+                      title="Planned start"
                       value={task.plannedStart}
                       onChange={(d) => save(task, d > task.plannedFinish ? { plannedStart: d, plannedFinish: d } : { plannedStart: d })}
                     />
@@ -287,7 +288,7 @@ function TaskDetail({ taskId: id }: { taskId: string }) {
                     Planned finish
                   </T>
                   <View style={{ flex: 1 }}>
-                    <DateField value={task.plannedFinish} min={task.plannedStart} onChange={(d) => save(task, { plannedFinish: d })} />
+                    <DateField title="Planned finish" value={task.plannedFinish} min={task.plannedStart} onChange={(d) => save(task, { plannedFinish: d })} />
                   </View>
                 </View>
                 <ReadOnly label="Baseline" icon="lock" value={task.baselineStart ? range(task.baselineStart, task.baselineFinish) : 'Not set'} />

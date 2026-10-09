@@ -150,6 +150,7 @@ export function NewTaskSheet({ visible, onClose, projectId, channelId, initialNa
           name="plannedStart"
           render={({ field }) => (
             <DateField
+              title={t('forms.start', 'Planned start')}
               value={field.value}
               onChange={(d) => {
                 field.onChange(d);
@@ -160,7 +161,7 @@ export function NewTaskSheet({ visible, onClose, projectId, channelId, initialNa
         />
       </Field>
       <Field label={t('forms.finish', 'Planned finish')} error={e.plannedFinish?.message}>
-        <Controller control={control} name="plannedFinish" render={({ field }) => <DateField value={field.value} onChange={field.onChange} min={start} />} />
+        <Controller control={control} name="plannedFinish" render={({ field }) => <DateField title={t('forms.finish', 'Planned finish')} value={field.value} onChange={field.onChange} min={start} />} />
       </Field>
       <Field label={t('forms.description', 'Description')} error={e.description?.message}>
         <Controller
