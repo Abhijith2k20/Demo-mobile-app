@@ -52,19 +52,25 @@
     "openProject": "Open the schedule"
   },
   "auth": {
+    "change": "Change",
     "codeField": "6-digit code",
-    "codeSent": "We sent a 6-digit code to +91 {{phone}}.",
-    "demoAs": "Demo: sign in as",
-    "demoHint": "Tap a person to fill the number. The code is 123456.",
+    "codeSentTo": "Sent by text to",
+    "continue": "Continue",
+    "demoCode": "Demo build: the code is 123456.",
+    "demoHint": "Pick a person to sign in as. The code is always 123456.",
+    "demoTitle": "Demo accounts",
     "enterCode": "Enter the code",
+    "help": "Can't sign in? Ask your company admin to add your number.",
+    "noCode": "Didn't get it?",
     "phone": "Mobile number",
     "phoneInvalid": "Enter your 10-digit mobile number.",
     "resend": "Resend code",
-    "resendIn": "Resend code in 0:{{s}}",
-    "sendCode": "Send code",
+    "resendIn": "Resend in 0:{{s}}",
+    "signIn": "Sign in",
     "signingIn": "Signing in…",
-    "subtitle": "Siteline keeps your projects, site updates and tasks in one place.",
-    "title": "Sign in to Paliath Interiors"
+    "signInHint": "Enter your mobile number and we'll text you a 6-digit code.",
+    "useDemo": "Use a demo account",
+    "workspace": "Siteline workspace"
   },
   "bot": {
     "intro": "You have {{count}} open tasks. Please update the status of each one below.",
@@ -163,6 +169,17 @@
     "tryAgain": "Try again",
     "yesterday": "Yesterday"
   },
+  "dms": {
+    "emptyHint": "Message someone on your team to get started.",
+    "emptyTitle": "No direct messages yet",
+    "noMessages": "No messages yet",
+    "previewCheckin": "Check-in: tap to update a task",
+    "previewIntro": "Please update your open tasks",
+    "previewPhoto": "Photo",
+    "previewSummary": "Your tasks for today",
+    "search": "Find a conversation",
+    "title": "Direct messages"
+  },
   "forms": {
     "addTask": "Add task",
     "dailyReport": "Daily report",
@@ -197,7 +214,6 @@
     "archived": "Archived ({{count}})",
     "company": "Company",
     "daysBehind": "{{count}} days behind",
-    "dms": "Direct messages",
     "jumpTo": "Jump to…",
     "newMessage": "New message",
     "newProject": "New project",
@@ -275,6 +291,7 @@
   "tabs": {
     "activity": "Activity",
     "dashboard": "Dashboard",
+    "dms": "DMs",
     "home": "Home",
     "tasks": "Tasks",
     "you": "You"

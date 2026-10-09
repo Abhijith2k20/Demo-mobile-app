@@ -9,10 +9,9 @@ import { Avatar, Badge, Button, EmptyState, Row, SectionHeader, Skeleton, StageP
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
 import { CompanyTile } from '@/components/CompanyTile';
 import { Field } from '@/components/form';
-import { Sheet, SheetAction, SheetInput } from '@/components/Sheet';
+import { Sheet, SheetInput } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { openDm } from '@/features/chat/api';
-import { useDirectory, useHome, useRefresh } from '@/features/home/hooks';
+import { useHome, useRefresh } from '@/features/home/hooks';
 import { createProject } from '@/features/projects/api';
 import { shortProjectName, useMe, useStageLabel, useUnsentCount, useUsers } from '@/features/shared';
 import { isCompanyAdmin } from '@/shared/permissions';
@@ -68,8 +67,6 @@ function HomeScreen() {
   const collapsed = useUi((s) => s.collapsed);
   const toggle = useUi((s) => s.toggleCollapsed);
   const [query, setQuery] = useState('');
-  const [fab, setFab] = useState(false);
-  const [newMessage, setNewMessage] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const q = query.trim().toLowerCase();
 
@@ -242,136 +239,37 @@ function HomeScreen() {
 
             <SectionHeader title={t('home.company', 'Company')} collapsed={collapsed.company} onToggle={() => toggle('company')} />
             {collapsed.company ? null : home.company.map((ch) => <ChannelRow key={ch.id} channel={ch} unread={home.unread.get(ch.id) ?? 0} />)}
-
-            <SectionHeader title={t('home.dms', 'Direct messages')} collapsed={collapsed.dms} onToggle={() => toggle('dms')} />
-            {collapsed.dms ? null : (
-              <>
-                {home.bot ? (
-                  <Row
-                    left={<Avatar id="bot" name="Siteline Bot" size={28} bot />}
-                    title="Siteline Bot"
-                    strong={(home.unread.get(home.bot.id) ?? 0) > 0}
-                    muted
-                    right={<Badge count={home.unread.get(home.bot.id) ?? 0} />}
-                    onPress={() => router.push('/dm/bot')}
-                  />
-                ) : null}
-                {home.dms.map(({ channel, peer, unread }) => (
-                  <Row
-                    key={channel.id}
-                    left={
-                      <View>
-                        <Avatar id={peer.id} name={peer.name} size={28} />
-                        <View
-                          style={{
-                            position: 'absolute',
-                            right: -3,
-                            bottom: -3,
-                            width: 11,
-                            height: 11,
-                            borderRadius: 6,
-                            borderWidth: 2,
-                            borderColor: c.bg,
-                            backgroundColor: peer.online ? c.success : c.textFaint,
-                          }}
-                        />
-                      </View>
-                    }
-                    title={peer.name}
-                    strong={unread > 0}
-                    muted
-                    right={<Badge count={unread} />}
-                    onPress={() => router.push(`/dm/${peer.id}`)}
-                  />
-                ))}
-              </>
-            )}
           </>
         )}
       </ScrollView>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('home.newMessage', 'New message')}
-        onPress={() => (admin ? setFab(true) : setNewMessage(true))}
-        style={({ pressed }) => ({
-          position: 'absolute',
-          right: space.lg,
-          bottom: space.lg,
-          width: 56,
-          height: 56,
-          borderRadius: radius.card + 4,
-          backgroundColor: c.accent,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.85 : 1,
-          shadowColor: c.shadow,
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 5,
-        })}>
-        <Feather name="edit" size={22} color={c.onAccent} />
-      </Pressable>
-
-      <Sheet visible={fab} onClose={() => setFab(false)}>
-        <SheetAction
-          icon="edit"
-          label={t('home.newMessage', 'New message')}
-          onPress={() => {
-            setFab(false);
-            setNewMessage(true);
-          }}
-        />
-        <SheetAction
-          icon="folder-plus"
-          label={t('home.newProject', 'New project')}
-          onPress={() => {
-            setFab(false);
-            setNewProject(true);
-          }}
-        />
-      </Sheet>
-      <NewMessageSheet visible={newMessage} onClose={() => setNewMessage(false)} />
+      {admin ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('home.newProject', 'New project')}
+          onPress={() => setNewProject(true)}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            right: space.lg,
+            bottom: space.lg,
+            width: 56,
+            height: 56,
+            borderRadius: radius.card + 4,
+            backgroundColor: c.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.85 : 1,
+            shadowColor: c.shadow,
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 5,
+          })}>
+          <Feather name="folder-plus" size={22} color={c.onAccent} />
+        </Pressable>
+      ) : null}
       <NewProjectSheet visible={newProject} onClose={() => setNewProject(false)} />
     </Screen>
-  );
-}
-
-function NewMessageSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
-  const me = useMe();
-  const local = useUsers();
-  const directory = useDirectory();
-  const [query, setQuery] = useState('');
-  // Show what we have on the phone first; the directory fills in when the server answers.
-  const people = (directory.data ?? local.list).filter(
-    (u) => u.id !== me.id && u.phone !== '0000000000' && u.name.toLowerCase().includes(query.trim().toLowerCase()),
-  );
-  return (
-    <Sheet visible={visible} onClose={onClose} title={t('home.newMessage', 'New message')} full>
-      <SheetInput value={query} onChangeText={setQuery} placeholder={t('home.searchPeople', 'Search people')} />
-      {directory.isError ? (
-        <T variant="meta" color="warning" style={{ marginTop: space.sm }}>
-          {t('common.couldntRefresh', "Couldn't refresh")}
-        </T>
-      ) : null}
-      <View style={{ marginHorizontal: -space.lg, marginTop: space.sm }}>
-        {people.map((u) => (
-          <Row
-            key={u.id}
-            left={<Avatar id={u.id} name={u.name} size={32} />}
-            title={u.name}
-            height={52}
-            onPress={() => {
-              onClose();
-              openDm(u.id);
-              router.push(`/dm/${u.id}`);
-            }}
-          />
-        ))}
-      </View>
-    </Sheet>
   );
 }
 

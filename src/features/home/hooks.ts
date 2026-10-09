@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
@@ -7,7 +7,7 @@ import { db } from '@/lib/db/client';
 import { catchUp } from '@/lib/sync/catchup';
 import { useUi } from '@/stores/ui';
 import { activity, channelMembers, channels, messages } from '@/lib/db/schema';
-import type { Channel, ID, Project, User } from '@/types/models';
+import type { Channel, ID, Message, Project, User } from '@/types/models';
 import { byChannelOrder } from '../projects/hooks';
 import { useChannels, useMe, useProjects, useUsers } from '../shared';
 
@@ -104,4 +104,38 @@ export function useRefresh(): { refreshing: boolean; refresh: () => void; failed
     void catchUp().finally(() => setRefreshing(false));
   }, []);
   return { refreshing, refresh, failed };
+}
+
+export interface DmRow {
+  channel: Channel;
+  /** null for the Siteline Bot. */
+  peer: User | null;
+  unread: number;
+  last: Message | null;
+}
+
+/** Direct messages for the DMs tab: the bot first, then people by most recent message. */
+export function useDmList(): { rows: DmRow[]; totalUnread: number; loading: boolean } {
+  const home = useHome();
+  const recent = useLiveQuery(
+    db
+      .select({ message: messages })
+      .from(messages)
+      .innerJoin(channels, eq(channels.id, messages.channelId))
+      .where(and(inArray(channels.kind, ['dm', 'bot']), isNull(messages.deletedAt)))
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(300),
+  );
+  return useMemo(() => {
+    // Rows arrive newest first, so the first one seen per conversation is its latest message.
+    const last = new Map<ID, Message>();
+    for (const r of recent.data) if (!last.has(r.message.channelId)) last.set(r.message.channelId, r.message);
+    const people: DmRow[] = home.dms.map((d) => ({ channel: d.channel, peer: d.peer, unread: d.unread, last: last.get(d.channel.id) ?? null }));
+    people.sort((a, b) => (b.last?.createdAt ?? '').localeCompare(a.last?.createdAt ?? '') || (a.peer?.name ?? '').localeCompare(b.peer?.name ?? ''));
+    const bot: DmRow[] = home.bot
+      ? [{ channel: home.bot, peer: null, unread: home.unread.get(home.bot.id) ?? 0, last: last.get(home.bot.id) ?? null }]
+      : [];
+    const rows = [...bot, ...people];
+    return { rows, totalUnread: rows.reduce((n, r) => n + r.unread, 0), loading: home.loading };
+  }, [home.dms, home.bot, home.unread, home.loading, recent.data]);
 }

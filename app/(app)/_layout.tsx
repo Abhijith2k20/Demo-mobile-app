@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router/js-tabs';
 import { useTranslation } from 'react-i18next';
-import { useUnreadActivityCount, useUnreadCounts } from '@/features/home/hooks';
+import { useDmList, useUnreadActivityCount, useUnreadCounts } from '@/features/home/hooks';
 import { isCompanyAdmin } from '@/shared/permissions';
 import { useSession } from '@/stores/session';
 import { fonts } from '@/theme/typography';
@@ -13,9 +13,13 @@ function TabsForUser() {
   const user = useSession((s) => s.user);
   const admin = !!user && isCompanyAdmin(user);
   const unread = useUnreadCounts();
+  const dms = useDmList();
   const activity = useUnreadActivityCount();
-  let totalUnread = 0;
-  for (const n of unread.values()) totalUnread += n;
+  let allUnread = 0;
+  for (const n of unread.values()) allUnread += n;
+  // Direct messages have their own tab, so Home counts channels only.
+  const totalUnread = allUnread - dms.totalUnread;
+  const count = (n: number) => (n > 0 ? (n > 99 ? '99+' : n) : undefined);
   const badgeStyle = { backgroundColor: c.accent, color: c.onAccent, fontFamily: fonts.semibold, fontSize: 11 };
 
   return (
@@ -25,7 +29,7 @@ function TabsForUser() {
         tabBarActiveTintColor: c.accent,
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, borderTopWidth: 1, elevation: 0 },
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
+        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
         tabBarBadgeStyle: badgeStyle,
         sceneStyle: { backgroundColor: c.bg },
       }}>
@@ -34,7 +38,15 @@ function TabsForUser() {
         options={{
           title: t('tabs.home', 'Home'),
           tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
-          tabBarBadge: totalUnread > 0 ? (totalUnread > 99 ? '99+' : totalUnread) : undefined,
+          tabBarBadge: count(totalUnread),
+        }}
+      />
+      <Tabs.Screen
+        name="dms"
+        options={{
+          title: t('tabs.dms', 'DMs'),
+          tabBarIcon: ({ color }) => <Feather name="message-circle" size={22} color={color} />,
+          tabBarBadge: count(dms.totalUnread),
         }}
       />
       <Tabs.Screen
@@ -50,7 +62,7 @@ function TabsForUser() {
         options={{
           title: t('tabs.activity', 'Activity'),
           tabBarIcon: ({ color }) => <Feather name="bell" size={22} color={color} />,
-          tabBarBadge: activity > 0 ? (activity > 99 ? '99+' : activity) : undefined,
+          tabBarBadge: count(activity),
         }}
       />
       <Tabs.Screen

@@ -46,7 +46,8 @@ export function DemoPill() {
   const tap = Gesture.Tap().runOnJS(true).onEnd(open);
   const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }] }));
 
-  if (hidden || pathname === '/demo') return null;
+  // Not on the sign-in screens: they should look like the real product.
+  if (hidden || pathname === '/demo' || pathname === '/login' || pathname === '/otp') return null;
 
   return (
     <Animated.View

@@ -151,6 +151,15 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   channel.
 - Sheets now shrink above the keyboard, so a tall form's first field stays on screen while typing.
 
+- **Sign-in screens redesigned.** Login and code entry share one layout (`AuthShell`): the ink
+  brand header over a clean card. The seven demo sign-ins moved from an always-visible list
+  (§5.1) into a "Use a demo account" sheet; picking one goes straight to the code screen. The
+  Demo pill is hidden on these two screens.
+- **DMs have their own bottom tab** (Home · DMs · Tasks · Activity · You; the spec has four tabs
+  with DMs as a Home section). The tab lists the bot first, then people by most recent message,
+  with a preview, time and unread count. "New message" lives there. Home's badge now counts
+  channels only, and Home's action button is "New project" for Owner/Admin only.
+
 ## Fixes after the code audit
 
 - **Read markers:** a channel only marks messages read while its screen is on top, and the
