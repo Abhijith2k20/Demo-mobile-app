@@ -54,10 +54,11 @@ export function Conversation({ channelId }: { channelId: ID }) {
       jobTitles: info.jobTitles,
       mentionNames: new Set(info.members.map((u) => firstName(u.name).toLowerCase())),
       inThread: false,
+      isBotChat: info.isBot,
       onLongPress: setMenu,
       onOpenThread,
     }),
-    [me, users.byId, info.jobTitles, info.members, onOpenThread],
+    [me, users.byId, info.jobTitles, info.members, info.isBot, onOpenThread],
   );
 
   // The bot conversation shows one open check-in at a time.

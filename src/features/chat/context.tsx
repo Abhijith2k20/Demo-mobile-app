@@ -8,6 +8,8 @@ export interface ChatContextValue {
   /** Lower-cased first names that count as @mentions here. */
   mentionNames: Set<string>;
   inThread: boolean;
+  /** The Siteline Bot conversation: everything is laid out in one full-width column. */
+  isBotChat: boolean;
   onLongPress: (m: Message) => void;
   onOpenThread: (m: Message) => void;
 }

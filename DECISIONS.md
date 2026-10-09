@@ -168,22 +168,18 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   with the current baseline state). The menu is hidden for people who cannot change the baseline.
 
 - **Bot conversation redesigned** (replaces the stacked full-width buttons of §8):
+  - the whole conversation is one full-width column, so every card shares the same edges; bot
+    text is a quiet line without an avatar;
   - one check-in is open at a time; the others are one-line rows ("Update") and the next one
     opens by itself after an answer;
-  - three main replies in one row (Done · In progress · Problem) with short labels; "Not started
-    yet" and "Add a note" are small links underneath;
-  - the open card shows the project, the due date (red when overdue) and current progress;
-  - an answered card collapses to a single line; a reminder is a single line, not a second card;
-  - a bar under the header shows "N tasks need an update · X of Y done";
-  - check-in cards are full width with no sender header. The "You have N open tasks" message was
-    removed because the bar says the same.
-
-- **Dashboard redesigned** (changes §5.10): a headline ("Needs attention" / "Everything is on
-  track"), four numbers, **every active project** with stage, progress and schedule health
-  (not only the delayed ones), a "Blocked now" list, a six-cell pipeline in place of the
-  segmented stage bar, and a compact "From site" feed. `GET /dashboard` now returns `projects`
-  and `blockedTasks` instead of `delayedProjects`. Health is always an icon plus words, never
-  colour alone.
+  - progress is answered on a **scale** (25 · 50 · 75 · 90 · Done) with one tap; the part already
+    reached is shaded. Problem, Not started and Note are neutral outlined buttons underneath;
+  - no coloured buttons: state colour appears only as a small dot beside the answer;
+  - an answered card is a single line; a reminder is a single line, not a second card;
+  - a bar under the header shows "N tasks need an update · X of Y done".
+- **Calmer colour palette.** The accent and status colours of §3.2 were desaturated and their
+  soft tints made lighter, in both light and dark mode (values in `src/theme/colors.ts`). Colour
+  is meant to mark state, not decorate.
 
 ## Fixes after the code audit
 

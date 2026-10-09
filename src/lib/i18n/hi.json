@@ -86,27 +86,28 @@
     "stopRecording": "रिकॉर्डिंग रोकें",
     "removeVoice": "वॉइस नोट हटाएँ",
     "withPhoto": "फ़ोटो जोड़ी गई",
-    "inProgress": "चल रहा है",
     "overdue": "देर हो गई · {{date}}",
     "reminderLine": "रिमाइंडर: {{task}} का अपडेट बाकी है",
     "archived": "आर्काइव",
     "update": "अपडेट",
     "now": "अभी {{percent}}%",
-    "confirmDone": "इस काम को पूरा मानें?",
-    "markDone": "पूरा हुआ",
-    "withPhotoButton": "पूरा + फ़ोटो",
     "addNote": "नोट जोड़ें",
-    "notStartedYet": "अभी शुरू नहीं हुआ"
+    "howFar": "कितना काम हुआ?",
+    "setTo": "प्रगति {{percent}}% करें",
+    "note": "नोट",
+    "hideNote": "नोट छिपाएँ",
+    "addPhoto": "फ़ोटो जोड़ें",
+    "photoAdded": "फ़ोटो जोड़ी गई · हटाने के लिए दबाएँ",
+    "noteHint": "आपका नोट ऊपर दबाए गए जवाब के साथ भेजा जाएगा।"
   },
   "bot": {
-    "morning": "सुप्रभात {{name}}। आज के आपके काम:",
     "noTasks": "अभी आपके पास कोई बाकी काम नहीं है।",
-    "intro": "आपके {{count}} काम बाकी हैं। कृपया नीचे हर एक की स्थिति अपडेट करें।",
-    "introOne": "आपका 1 काम बाकी है। कृपया नीचे उसकी स्थिति अपडेट करें।",
     "allDone": "सब अपडेट हो गया। धन्यवाद!",
     "oneLeft": "1 काम का अपडेट बाकी है",
     "left": "{{count}} कामों का अपडेट बाकी है",
-    "progress": "{{total}} में से {{done}} पूरे"
+    "progress": "{{total}} में से {{done}} पूरे",
+    "morningTitle": "सुप्रभात, {{name}}",
+    "todayCount": "आज {{count}}"
   },
   "my": {
     "morning": "सुप्रभात, {{name}}",

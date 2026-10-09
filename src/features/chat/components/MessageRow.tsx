@@ -93,11 +93,20 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
     );
   }
 
-  // Check-in cards are the content of the bot conversation: full width, no sender header.
-  if (m.type === 'checkin' && !m.deletedAt) {
+  // The bot conversation is one full-width column, so every card lines up on the same edges.
+  if ((chat.isBotChat || m.type === 'checkin') && !m.deletedAt) {
+    const card = m.type === 'checkin' || !!m.data?.kind;
     return (
       <View style={{ paddingHorizontal: space.lg, paddingVertical: 4 }}>
-        <Renderer message={m} />
+        {card ? (
+          <Renderer message={m} />
+        ) : (
+          <View style={{ paddingHorizontal: space.md, paddingVertical: space.xs }}>
+            <T variant="meta" color="textMuted" style={{ fontSize: 14, lineHeight: 20 }}>
+              {m.body}
+            </T>
+          </View>
+        )}
       </View>
     );
   }
