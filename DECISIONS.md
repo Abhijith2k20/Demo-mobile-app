@@ -177,9 +177,12 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   - no coloured buttons: state colour appears only as a small dot beside the answer;
   - an answered card is a single line; a reminder is a single line, not a second card;
   - a bar under the header shows "N tasks need an update · X of Y done".
-- **Calmer colour palette.** The accent and status colours of §3.2 were desaturated and their
-  soft tints made lighter, in both light and dark mode (values in `src/theme/colors.ts`). Colour
-  is meant to mark state, not decorate.
+- **Neutral work-chat palette (replaces §3.2).** The warm off-white surfaces and terracotta accent
+  were replaced, at the owner's request, with the look of mainstream work-chat apps: white
+  surfaces, grey hairlines and near-black text in light mode; charcoal surfaces in dark mode; one
+  blue accent; muted status colours. All values are in `src/theme/colors.ts`; no component
+  changed. The spec's rule against using another product's logo, name or brand colour still
+  holds: the structure and neutrals follow the convention, the blue and the dark header are our own.
 
 ## Fixes after the code audit
 

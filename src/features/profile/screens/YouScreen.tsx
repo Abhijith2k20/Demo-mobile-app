@@ -49,7 +49,9 @@ function YouScreen() {
   return (
     <Screen>
       <OfflineBanner waiting={unsent.waiting} />
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.lg, gap: space.lg, paddingBottom: space.xxl * 2 }}>
+      {/* Keeps scrolled content from showing through the status bar. */}
+      <View style={{ height: insets.top, backgroundColor: c.bg }} />
+      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl * 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
           <Avatar id={me.id} name={me.name} size={64} />
           <View style={{ flex: 1, gap: 2 }}>
