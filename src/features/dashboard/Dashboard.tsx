@@ -1,19 +1,24 @@
 // Company dashboard (Owner/Admin). Not offline data: TanStack Query against GET /dashboard,
 // cached numbers shown first, and a "Couldn't refresh" chip when the request fails.
+//
+// Layout, top to bottom: one headline (is anything wrong?), four numbers, every project with its
+// health, what is blocked, where projects sit in the pipeline, and the latest from site.
+import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Card, EmptyState, Skeleton, StagePill } from '@/components/basics';
+import { Avatar, Card, EmptyState, Skeleton, StagePill, type IconName } from '@/components/basics';
 import { PhotoTile } from '@/components/PhotoGrid';
 import { T } from '@/components/T';
 import { api } from '@/lib/api/client';
-import { stageColors } from '@/theme/colors';
+import type { ColorToken } from '@/theme/colors';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { DashboardResponse } from '@/types/models';
-import { firstName, useStageLabel, useUsers } from '../shared';
+import { firstName, shortProjectName, useStageLabel, useUsers } from '../shared';
 
 export function useDashboard() {
   return useQuery({
@@ -23,16 +28,60 @@ export function useDashboard() {
   });
 }
 
-function StatTile({ value, label, tone }: { value: number; label: string; tone?: 'danger' | 'warning' }) {
-  const { c } = useTheme();
-  const color = tone === 'danger' && value > 0 ? c.danger : tone === 'warning' && value > 0 ? c.warning : c.text;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+function Section({ title, right, children }: { title: string; right?: string; children: ReactNode }) {
   return (
-    <View style={{ flexBasis: '47%', flexGrow: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: radius.card, padding: space.md }}>
-      <T variant="display" style={{ color }}>
+    <View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: space.sm }}>
+        <T variant="label" color="textMuted" style={{ flex: 1 }}>
+          {title}
+        </T>
+        {right ? (
+          <T variant="meta" color="textFaint">
+            {right}
+          </T>
+        ) : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** One number with its label. The number stays in text ink; a small icon carries the state. */
+function Stat({ value, label, flag }: { value: number; label: string; flag?: { icon: IconName; color: ColorToken } }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexBasis: '47%', flexGrow: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: radius.card, paddingHorizontal: space.md, paddingVertical: space.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <T variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={1}>
+          {label}
+        </T>
+        {flag ? <Feather name={flag.icon} size={14} color={c[flag.color]} /> : null}
+      </View>
+      <T variant="display" style={{ marginTop: 2 }}>
         {value}
       </T>
-      <T variant="meta" color="textMuted">
-        {label}
+    </View>
+  );
+}
+
+/** Schedule health in words plus an icon, never colour alone. */
+function Health({ delayDays }: { delayDays: number | null }) {
+  const { c } = useTheme();
+  const state =
+    delayDays === null
+      ? { icon: 'minus' as const, color: 'textFaint' as const, text: 'No baseline' }
+      : delayDays > 0
+        ? { icon: 'alert-triangle' as const, color: 'danger' as const, text: `${delayDays}d behind` }
+        : delayDays < 0
+          ? { icon: 'check-circle' as const, color: 'success' as const, text: `${-delayDays}d ahead` }
+          : { icon: 'check-circle' as const, color: 'success' as const, text: 'On track' };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <Feather name={state.icon} size={13} color={c[state.color]} />
+      <T variant="metaStrong" color={state.color === 'textFaint' ? 'textMuted' : state.color}>
+        {state.text}
       </T>
     </View>
   );
@@ -45,7 +94,10 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
   const stageLabel = useStageLabel();
   const q = useDashboard();
   const d = q.data;
-  const total = d ? d.byStage.reduce((n, s) => n + s.count, 0) : 0;
+
+  const issues: string[] = [];
+  if (d && d.stats.delayed > 0) issues.push(plural(d.stats.delayed, 'project is behind schedule', 'projects are behind schedule'));
+  if (d && d.stats.blocked > 0) issues.push(plural(d.stats.blocked, 'task is blocked', 'tasks are blocked'));
 
   return (
     <View style={{ flex: 1 }}>
@@ -53,155 +105,211 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
         <View style={{ paddingTop: insets.top + space.lg, paddingHorizontal: space.lg, paddingBottom: space.md, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border }}>
           <T variant="title">Dashboard</T>
           <T variant="meta" color="textMuted">
-            Paliath Interiors · {format(new Date(), 'EEE d MMM')}
+            {format(new Date(), 'EEEE, d MMMM')}
+            {d ? ` · updated ${format(parseISO(d.generatedAt), 'h:mm a')}` : ''}
           </T>
         </View>
       ) : null}
       <ScrollView
-        contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl * 2 }}
+        contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: space.xxl * 2 }}
         refreshControl={<RefreshControl refreshing={q.isRefetching && !q.isLoading} onRefresh={() => void q.refetch()} tintColor={c.accent} colors={[c.accent]} progressBackgroundColor={c.surface} />}>
-        {q.isError && d ? (
-          <Pressable
-            onPress={() => void q.refetch()}
-            accessibilityRole="button"
-            style={{ alignSelf: 'flex-start', backgroundColor: c.warningSoft, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 }}>
-            <T variant="metaStrong" color="warning">
-              Couldn&apos;t refresh · showing {formatDistanceToNowStrict(parseISO(d.generatedAt))} old numbers
-            </T>
-          </Pressable>
-        ) : null}
-
         {!d ? (
           q.isError ? (
-            <EmptyState
-              icon="cloud-off"
-              title="Couldn't load the dashboard"
-              hint="Check the connection and pull down to try again."
-            />
+            <EmptyState icon="cloud-off" title="Couldn't load the dashboard" hint="Check the connection and pull down to try again." />
           ) : (
             <Skeleton rows={6} avatar={false} />
           )
         ) : (
           <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-              <StatTile value={d.stats.activeProjects} label="Active projects" />
-              <StatTile value={d.stats.delayed} label="Delayed" tone="danger" />
-              <StatTile value={d.stats.dueThisWeek} label="Tasks due this week" />
-              <StatTile value={d.stats.blocked} label="Blocked" tone="warning" />
+            <View style={{ gap: space.md }}>
+              {q.isError ? (
+                <Pressable
+                  onPress={() => void q.refetch()}
+                  accessibilityRole="button"
+                  style={{ alignSelf: 'flex-start', backgroundColor: c.warningSoft, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 }}>
+                  <T variant="metaStrong" color="warning">
+                    Couldn&apos;t refresh · showing {formatDistanceToNowStrict(parseISO(d.generatedAt))} old numbers
+                  </T>
+                </Pressable>
+              ) : null}
+
+              {/* Headline: the one thing to know before reading anything else. */}
+              <View
+                accessibilityRole="summary"
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: space.md,
+                  backgroundColor: issues.length ? c.warningSoft : c.successSoft,
+                  borderRadius: radius.card,
+                  padding: space.md,
+                }}>
+                <Feather name={issues.length ? 'alert-triangle' : 'check-circle'} size={20} color={issues.length ? c.warning : c.success} />
+                <View style={{ flex: 1 }}>
+                  <T variant="bodyStrong">{issues.length ? 'Needs attention' : 'Everything is on track'}</T>
+                  <T variant="meta" color="textMuted">
+                    {issues.length ? `${issues.join(' and ')}.` : 'No project is behind its baseline and nothing is blocked.'}
+                  </T>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+                <Stat value={d.stats.activeProjects} label="Active projects" />
+                <Stat value={d.stats.delayed} label="Behind schedule" flag={d.stats.delayed > 0 ? { icon: 'alert-triangle', color: 'danger' } : undefined} />
+                <Stat value={d.stats.dueThisWeek} label="Tasks due in 7 days" />
+                <Stat value={d.stats.blocked} label="Blocked tasks" flag={d.stats.blocked > 0 ? { icon: 'alert-circle', color: 'warning' } : undefined} />
+              </View>
             </View>
 
-            <Card>
-              <T variant="label" color="textMuted" style={{ marginBottom: space.md }}>
-                Projects by stage
-              </T>
-              <View style={{ flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden', backgroundColor: c.surfaceAlt, gap: 2 }}>
-                {d.byStage
-                  .filter((s) => s.count > 0)
-                  .map((s) => (
-                    <View key={s.stage} style={{ flex: s.count / Math.max(1, total), backgroundColor: stageColors(c, s.stage).fg }} />
-                  ))}
-              </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: space.md, rowGap: space.sm }}>
-                {d.byStage.map((s) => (
-                  <View key={s.stage} style={{ width: '33.3%', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: stageColors(c, s.stage).fg, opacity: s.count ? 1 : 0.35 }} />
-                    <T variant="meta" color={s.count ? 'text' : 'textFaint'} numberOfLines={1}>
-                      {stageLabel(s.stage)} <T variant="metaStrong" color={s.count ? 'text' : 'textFaint'}>{s.count}</T>
-                    </T>
-                  </View>
-                ))}
-              </View>
-            </Card>
-
-            <View>
-              <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-                Delayed projects
-              </T>
-              {d.delayedProjects.length === 0 ? (
+            <Section title="Projects" right="Most delayed first">
+              {d.projects.length === 0 ? (
                 <Card>
                   <T variant="body" color="textMuted">
-                    No project is behind its baseline.
+                    No active projects.
                   </T>
                 </Card>
               ) : (
                 <Card style={{ padding: 0 }}>
-                  {d.delayedProjects.map((p, i) => {
+                  {d.projects.map((p, i) => {
                     const pm = p.pmId ? users.byId.get(p.pmId) : undefined;
                     return (
                       <Pressable
                         key={p.id}
                         accessibilityRole="button"
                         onPress={() => router.push(`/project/${p.id}`)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
-                        <View style={{ flex: 1, gap: 4 }}>
-                          <T variant="bodyStrong" numberOfLines={1}>
-                            {p.name}
+                        style={({ pressed }) => ({ padding: space.md, gap: space.sm, borderTopWidth: i ? 1 : 0, borderTopColor: c.border, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                          <T variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
+                            {shortProjectName(p.name)}
                           </T>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                            <StagePill stage={p.stage} label={stageLabel(p.stage)} />
-                            <T variant="metaStrong" color="danger">
-                              {p.daysBehind} {p.daysBehind === 1 ? 'day' : 'days'} behind
-                            </T>
-                          </View>
+                          <StagePill stage={p.stage} label={stageLabel(p.stage)} />
+                          <View style={{ flex: 1 }} />
+                          <Health delayDays={p.delayDays} />
                         </View>
-                        {pm ? (
-                          <View style={{ alignItems: 'center', gap: 2 }}>
-                            <Avatar id={pm.id} name={pm.name} size={28} />
-                            <T variant="meta" color="textMuted">
-                              {firstName(pm.name)}
-                            </T>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                          <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.surfaceAlt, overflow: 'hidden' }}>
+                            <View style={{ width: `${p.percent}%`, height: 6, borderRadius: 3, backgroundColor: c.accent }} />
                           </View>
-                        ) : null}
+                          <T variant="metaStrong" style={{ minWidth: 36, textAlign: 'right' }}>
+                            {p.percent}%
+                          </T>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                          <T variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={1}>
+                            {p.doneTasks} of {plural(p.totalTasks, 'task', 'tasks')} done
+                            {p.blocked > 0 ? ` · ${p.blocked} blocked` : ''}
+                          </T>
+                          {pm ? (
+                            <>
+                              <Avatar id={pm.id} name={pm.name} size={20} />
+                              <T variant="meta" color="textMuted">
+                                {firstName(pm.name)}
+                              </T>
+                            </>
+                          ) : null}
+                        </View>
                       </Pressable>
                     );
                   })}
                 </Card>
               )}
-            </View>
+            </Section>
 
-            <View>
-              <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-                Today on sites
-              </T>
+            {d.blockedTasks.length > 0 ? (
+              <Section title="Blocked now">
+                <Card style={{ padding: 0 }}>
+                  {d.blockedTasks.map((task, i) => {
+                    const owner = task.ownerId ? users.byId.get(task.ownerId) : undefined;
+                    return (
+                      <Pressable
+                        key={task.id}
+                        accessibilityRole="button"
+                        onPress={() => router.push(`/task/${task.id}`)}
+                        style={({ pressed }) => ({
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: space.md,
+                          paddingHorizontal: space.md,
+                          minHeight: 56,
+                          borderTopWidth: i ? 1 : 0,
+                          borderTopColor: c.border,
+                          backgroundColor: pressed ? c.surfaceAlt : 'transparent',
+                        })}>
+                        <Feather name="alert-circle" size={16} color={c.danger} />
+                        <View style={{ flex: 1 }}>
+                          <T variant="body" numberOfLines={1}>
+                            {task.name}
+                          </T>
+                          <T variant="meta" color="textMuted" numberOfLines={1}>
+                            {task.projectName}
+                            {owner ? ` · ${firstName(owner.name)}` : ' · Unassigned'}
+                          </T>
+                        </View>
+                        <Feather name="chevron-right" size={18} color={c.textFaint} />
+                      </Pressable>
+                    );
+                  })}
+                </Card>
+              </Section>
+            ) : null}
+
+            <Section title="Pipeline" right="Projects in each stage">
+              <View style={{ flexDirection: 'row', gap: 2, borderRadius: radius.card, overflow: 'hidden', borderWidth: 1, borderColor: c.border, backgroundColor: c.border }}>
+                {d.byStage.map((s) => (
+                  <View key={s.stage} accessibilityLabel={`${stageLabel(s.stage)}: ${s.count}`} style={{ flex: 1, alignItems: 'center', paddingVertical: space.md, backgroundColor: c.surface }}>
+                    <T variant="heading" color={s.count ? 'text' : 'textFaint'}>
+                      {s.count}
+                    </T>
+                    <T variant="meta" color={s.count ? 'textMuted' : 'textFaint'} style={{ fontSize: 10, lineHeight: 13 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.1}>
+                      {stageLabel(s.stage)}
+                    </T>
+                  </View>
+                ))}
+              </View>
+            </Section>
+
+            <Section title="From site" right="Last 36 hours">
               {d.todayOnSites.length === 0 ? (
                 <Card>
                   <T variant="body" color="textMuted">
-                    No site updates yet today.
+                    No site updates yet.
                   </T>
                 </Card>
               ) : (
-                <View style={{ gap: space.sm }}>
-                  {d.todayOnSites.map((item) => {
+                <Card style={{ padding: 0 }}>
+                  {d.todayOnSites.map((item, i) => {
                     const who = users.byId.get(item.userId);
                     return (
-                      <Card key={item.id}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                          {who ? <Avatar id={who.id} name={who.name} size={20} /> : null}
-                          <T variant="metaStrong" style={{ flex: 1 }} numberOfLines={1}>
-                            {item.projectName}
-                          </T>
-                          <T variant="meta" color="textMuted">
-                            {format(parseISO(item.at), 'h:mm a')}
-                          </T>
-                        </View>
-                        <T variant="body" numberOfLines={3} style={{ marginTop: 4 }}>
-                          {item.text}
-                        </T>
-                        {item.attachments.length > 0 ? (
-                          <View style={{ flexDirection: 'row', gap: 6, marginTop: space.sm }}>
-                            {item.attachments.slice(0, 4).map((a) => (
-                              <View key={a.id} style={{ width: 56, height: 56 }}>
-                                <PhotoTile photo={a} small />
-                              </View>
-                            ))}
+                      <View key={item.id} style={{ flexDirection: 'row', gap: space.md, padding: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
+                        {who ? <Avatar id={who.id} name={who.name} size={28} /> : <View style={{ width: 28 }} />}
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                            <T variant="metaStrong" style={{ flex: 1 }} numberOfLines={1}>
+                              {item.projectName}
+                            </T>
+                            <T variant="meta" color="textFaint">
+                              {format(parseISO(item.at), 'h:mm a')}
+                            </T>
                           </View>
-                        ) : null}
-                      </Card>
+                          <T variant="meta" color="textMuted" numberOfLines={2} style={{ fontSize: 14, lineHeight: 19 }}>
+                            {item.text}
+                          </T>
+                          {item.attachments.length > 0 ? (
+                            <View style={{ flexDirection: 'row', gap: 6, marginTop: space.sm }}>
+                              {item.attachments.slice(0, 4).map((a) => (
+                                <View key={a.id} style={{ width: 48, height: 48 }}>
+                                  <PhotoTile photo={a} small />
+                                </View>
+                              ))}
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
                     );
                   })}
-                </View>
+                </Card>
               )}
-            </View>
+            </Section>
           </>
         )}
       </ScrollView>

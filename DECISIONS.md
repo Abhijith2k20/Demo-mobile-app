@@ -178,6 +178,13 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   - check-in cards are full width with no sender header. The "You have N open tasks" message was
     removed because the bar says the same.
 
+- **Dashboard redesigned** (changes §5.10): a headline ("Needs attention" / "Everything is on
+  track"), four numbers, **every active project** with stage, progress and schedule health
+  (not only the delayed ones), a "Blocked now" list, a six-cell pipeline in place of the
+  segmented stage bar, and a compact "From site" feed. `GET /dashboard` now returns `projects`
+  and `blockedTasks` instead of `delayedProjects`. Health is always an icon plus words, never
+  colour alone.
+
 ## Fixes after the code audit
 
 - **Read markers:** a channel only marks messages read while its screen is on top, and the

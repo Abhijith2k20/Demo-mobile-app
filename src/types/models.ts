@@ -253,7 +253,19 @@ export interface DashboardResponse {
   generatedAt: string;
   stats: { activeProjects: number; delayed: number; dueThisWeek: number; blocked: number };
   byStage: { stage: Stage; count: number }[];
-  delayedProjects: { id: ID; name: string; stage: Stage; daysBehind: number; pmId: ID | null }[];
+  /** Every active project, most delayed first. `delayDays` is negative when ahead; null without a baseline. */
+  projects: {
+    id: ID;
+    name: string;
+    stage: Stage;
+    delayDays: number | null;
+    percent: number;
+    doneTasks: number;
+    totalTasks: number;
+    blocked: number;
+    pmId: ID | null;
+  }[];
+  blockedTasks: { id: ID; name: string; projectName: string; ownerId: ID | null }[];
   todayOnSites: {
     id: ID;
     projectName: string;

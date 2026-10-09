@@ -115,13 +115,27 @@ export const miscRoutes: RouteDef[] = [
         blocked: tasks.filter((t) => t.status === 'blocked').length,
       },
       byStage,
-      delayedProjects: delayed.map(({ p, days }) => ({
-        id: p.id,
-        name: p.name,
-        stage: p.stage,
-        daysBehind: days,
-        pmId: s.projectMembers.find((m) => m.projectId === p.id && m.jobTitle === 'Project Manager')?.userId ?? null,
-      })),
+      projects: projects
+        .map((p) => {
+          const mine = tasks.filter((t) => t.projectId === p.id);
+          const done = mine.filter((t) => t.status === 'done').length;
+          return {
+            id: p.id,
+            name: p.name,
+            stage: p.stage,
+            delayDays: p.baselineLocked ? projectDelayDays(p) : null,
+            percent: mine.length ? Math.round((done / mine.length) * 100) : 0,
+            doneTasks: done,
+            totalTasks: mine.length,
+            blocked: mine.filter((t) => t.status === 'blocked').length,
+            pmId: s.projectMembers.find((m) => m.projectId === p.id && m.jobTitle === 'Project Manager')?.userId ?? null,
+          };
+        })
+        .sort((x, y) => (y.delayDays ?? 0) - (x.delayDays ?? 0) || x.name.localeCompare(y.name)),
+      blockedTasks: tasks
+        .filter((t) => t.status === 'blocked')
+        .slice(0, 6)
+        .map((t) => ({ id: t.id, name: t.name, projectName: shortProject(t.projectId), ownerId: t.ownerId })),
       todayOnSites,
     };
   }),
