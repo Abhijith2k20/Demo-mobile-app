@@ -27,8 +27,8 @@ Sign in with any of the seven demo people on the login screen; the code is alway
 ## Code map
 
 ```
-app/                 screens (Expo Router)
-src/features/        one folder per feature: hooks, api (writes), components
+app/                 routes only (Expo Router): each file reads the URL and renders a screen
+src/features/        one folder per feature: screens/, components/, hooks, api (writes)
 src/lib/api/         api client + transport.ts (the only link to the mock; swap for fetch later)
 src/lib/db/          local SQLite (drizzle) — every screen reads from here via live queries
 src/lib/outbox/      queued writes: lanes, merge, retry, handlers (the seven rules)

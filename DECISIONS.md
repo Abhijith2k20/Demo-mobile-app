@@ -17,6 +17,10 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
 
 ## Navigation
 
+- **Route files are thin.** Every file in `app/` (apart from `_layout.tsx`) only reads the URL
+  parameters and renders a screen from `src/features/<area>/screens/`. All screen layout and
+  logic lives under `src/features/`, so there is one place to look for each area.
+
 - Tab files are `app/(app)/index.tsx`, `tasks.tsx`, `activity.tsx`, `you.tsx` instead of
   `(home)/index.tsx`, `(tasks)/index.tsx`, … Four `index` routes in sibling groups all map to the
   URL `/`, which Expo Router cannot tell apart.

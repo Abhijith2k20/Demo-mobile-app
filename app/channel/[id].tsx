@@ -1,10 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
-import { appScreen } from '@/components/chrome';
-import { Conversation } from '@/features/chat/components/Conversation';
+import ChannelScreen from '@/features/chat/screens/ChannelScreen';
 
-function ChannelScreen() {
+// Route only: reads the URL parameters and renders the screen from src/features/chat/screens/ChannelScreen.tsx
+export default function Route() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  return <Conversation channelId={id} />;
+  return <ChannelScreen channelId={id} />;
 }
-
-export default appScreen(ChannelScreen);
