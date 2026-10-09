@@ -1,12 +1,14 @@
 # Siteline — Demo App Implementation Spec
 
+> **Version 1.2 — updated to match the code.** This file describes the app as it is built today. Where the first version said something different, the text here has been changed; the reasons are in `DECISIONS.md`. A planned change that is **not built yet** (parent/sub-tasks and areas, replacing phases) is parked in `docs/CHANGE_01_PARENT_SUBTASKS_AREAS.md`.
+
 > **For Claude Code.** Build a clickable, realistic **demo** of an internal project-communication app for an interior design company. It runs entirely on the phone with a **mock backend** (no real server). The goal is to *see and feel* the real product so the owner can make decisions. Read this whole file before starting. When something is unclear, choose the simplest option that keeps the architecture described here, and note it in `DECISIONS.md`.
 
 ---
 
 ## 0. What this demo must prove
 
-1. **The experience:** Slack-style workspace navigation, channels per project, chat, tasks with schedules, a button-based bot, in-chat forms, and a CEO dashboard, all simple enough for site workers.
+1. **The experience:** Slack-style workspace navigation, channels per project, a DMs tab, chat, tasks with schedules, a button-based bot, in-chat forms, project settings, and a CEO dashboard, all simple enough for site workers.
 2. **The architecture:** local SQLite as the source for screens, an **outbox** following the seven rules, catch-up **sync**, live **events**, a typed **error** system, and **role-based permissions**. The mock backend behaves like the real FastAPI server will (same endpoints, same error format, same events) so the app code can later point at the real server with minimal change.
 3. **Decision support:** a **Demo panel** lets the viewer switch user and role, go offline, inject errors, trigger the bot, and watch the outbox, so every design decision can be seen in action.
 
@@ -21,7 +23,7 @@
 - **Android first.** Test on a mid/low-end Android phone. Smooth scrolling is a requirement.
 - **Light and dark mode**, following the system setting.
 - **No network required.** All data, images and avatars work offline. (The camera/gallery picker is the only device feature used.)
-- **Original visual identity.** The layout and density are *inspired by* Slack's mobile app (see §3), but do **not** use Slack's logo, name, colours, icon set, illustrations or copy.
+- **No borrowed branding.** The layout, density and neutral palette follow mainstream work-chat apps such as Slack (see §3), but do **not** use Slack's logo, name, brand purple, icon set, illustrations or copy.
 
 ---
 
@@ -34,8 +36,8 @@
 | Local database | `expo-sqlite` (open with `enableChangeListener: true`) + `drizzle-orm` (expo-sqlite driver, `useLiveQuery`) |
 | Server cache (non-offline screens) | `@tanstack/react-query` |
 | App-only state | `zustand` |
-| Lists | `@shopify/flash-list` |
-| Bottom sheets | `@gorhom/bottom-sheet` + `react-native-reanimated` + `react-native-gesture-handler` |
+| Lists | `@shopify/flash-list` v2 (no `inverted` prop; chat uses `maintainVisibleContentPosition` with `startRenderingFromBottom`) |
+| Bottom sheets | Own `Sheet` component (`src/components/Sheet.tsx`): React Native `Modal` + `react-native-reanimated` + `react-native-gesture-handler`. `@gorhom/bottom-sheet` is **not** used: it does not open on Expo SDK 57. |
 | Forms | `react-hook-form` + `zod` |
 | Images | `expo-image`, `expo-image-picker` |
 | IDs | `uuidv7` (pure JS) |
@@ -44,6 +46,11 @@
 | Icons | `@expo/vector-icons` (Feather set only, for consistency) |
 | Fonts | `@expo-google-fonts/inter` (Inter 400/500/600/700) |
 | Haptics | `expo-haptics` (light tap on send, success on task done) |
+| Clipboard | `expo-clipboard` ("Copy text") |
+| Tests | `jest` + `jest-expo` (`npm test`): outbox lane order, task rules, permissions, task filters |
+| Lint | `eslint` 9 + `eslint-config-expo` (`npm run lint`) |
+
+Built on **Expo SDK 57** (React Native 0.86, React 19.2, Reanimated 4.5). `.npmrc` sets `legacy-peer-deps=true`.
 
 **Database setup:** create tables with raw `CREATE TABLE IF NOT EXISTS` statements on first launch. No migration tooling for the demo.
 
@@ -55,9 +62,9 @@
 
 **Information architecture and density inspired by Slack mobile:** a workspace home made of collapsible sections, compact channel rows with bold-when-unread names, left-aligned message rows (avatar, name, time, text — not bubbles), threads, and interactive "block"-style cards in the message stream.
 
-**Visual identity is our own:** warm, calm and material, fitting an interior design firm. Think *architect's drawing set meets well-run site office*. Ink-dark headers, warm off-white surfaces, one confident terracotta accent, generous touch targets for site workers.
+**Visual style: neutral work-chat.** White surfaces, grey hairlines and near-black text in light mode; charcoal surfaces in dark mode; one blue accent; a dark blue-grey workspace header. Status colours are muted: colour marks state, it does not decorate. Generous touch targets for site workers.
 
-Name: **Siteline**. Company in seed data: **Aanya Interiors** (fictional).
+Name: **Siteline**. Company in seed data: **Paliath Interiors**.
 
 ### 3.2 Colour tokens
 
@@ -65,29 +72,34 @@ Define in `src/theme/colors.ts` with light and dark values. Never hard-code colo
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `header` | `#16262B` | `#0F1A1D` | Workspace header, tab bar active tint background areas |
-| `onHeader` | `#F4EFE8` | `#E9E4DC` | Text/icons on header |
-| `bg` | `#FBF8F3` | `#121514` | App background |
-| `surface` | `#FFFFFF` | `#1A1E1D` | Cards, sheets, rows |
-| `surfaceAlt` | `#F2EDE5` | `#232827` | Section headers, inputs, pressed rows |
-| `border` | `#E6DFD4` | `#2E3432` | Hairlines (0.5–1 px) |
-| `text` | `#1B1F1E` | `#ECE8E1` | Primary text |
-| `textMuted` | `#6B6F6C` | `#9EA29E` | Secondary text, timestamps |
-| `textFaint` | `#9A9C97` | `#6E726F` | Placeholders, disabled |
-| `accent` | `#C4622D` | `#E07A43` | Primary buttons, unread badges, links, active states |
-| `accentSoft` | `#F7E6DB` | `#3A2418` | Accent backgrounds (selected chip, mention highlight) |
-| `success` | `#2F7A4F` | `#5DB884` | Done, sent ticks, on-track |
-| `successSoft` | `#E3F1E8` | `#173324` | |
-| `warning` | `#B7791F` | `#E3A94A` | At risk, waiting, retrying |
-| `warningSoft` | `#FBF0DC` | `#3A2C12` | Offline banner |
-| `danger` | `#B3392F` | `#E5675C` | Failed, delayed, destructive |
-| `dangerSoft` | `#FBE7E5` | `#3C1A17` | |
-| `info` | `#2D6A8A` | `#6BAED0` | Stage pills, sending state |
-| `infoSoft` | `#E2EFF6` | `#14293A` | |
+| `header` | `#1B2430` | `#121417` | Workspace header, sign-in header |
+| `onHeader` | `#FFFFFF` | `#F2F3F4` | Text/icons on header |
+| `headerField` | `#2A3442` | `#22262B` | Search field inside the header |
+| `bg` | `#FFFFFF` | `#1A1D21` | App background |
+| `surface` | `#FFFFFF` | `#222529` | Cards, sheets, rows |
+| `surfaceAlt` | `#F4F5F6` | `#2C2F33` | Section headers, inputs, pressed rows |
+| `border` | `#E2E4E7` | `#35373B` | Hairlines (1 px) |
+| `text` | `#1D1C1D` | `#D1D2D3` | Primary text |
+| `textMuted` | `#616061` | `#A3A5A8` | Secondary text, timestamps |
+| `textFaint` | `#9A9B9E` | `#6F7174` | Placeholders, disabled |
+| `accent` | `#1667B0` | `#4A9FE0` | Primary buttons, unread badges, links, active states |
+| `accentSoft` | `#E8F1F9` | `#1B2E40` | Accent backgrounds (selected chip, mention highlight) |
+| `onAccent` | `#FFFFFF` | `#FFFFFF` | Text/icons on accent |
+| `success` | `#2E7D5B` | `#5FB58C` | Done, sent ticks, on-track |
+| `successSoft` | `#E6F2EC` | `#1B2F26` | |
+| `warning` | `#9A6B15` | `#D6A64F` | At risk, waiting, retrying |
+| `warningSoft` | `#FBF2DE` | `#332A17` | Offline banner |
+| `danger` | `#B8423A` | `#E0736A` | Failed, delayed, destructive |
+| `dangerSoft` | `#FBEAE8` | `#38201E` | |
+| `info` | `#2F6F99` | `#6FA9CC` | Stage pills, sending state |
+| `infoSoft` | `#E6F0F6` | `#1A2A35` | |
+| `execution` | `#5E55A6` | `#A39BDD` | Execution stage pill |
+| `executionSoft` | `#ECEAF6` | `#28253D` | |
+| `scrim` | `rgba(0,0,0,0.4)` | `rgba(0,0,0,0.6)` | Behind sheets |
 
 **Avatar colours:** 8 muted earthy tones (clay, sage, slate, ochre, plum, teal, sand, rust), picked deterministically from the user ID. Initials in white, 600 weight.
 
-**Project stage colours** (pill background / text): Design → `infoSoft/info`, Approval → `accentSoft/accent`, Procurement → `warningSoft/warning`, Execution → `#E8E4F6/#5B4BA8` (dark: `#2A2446/#A99BEA`), Finishing → `successSoft/success`, Handover → `surfaceAlt/textMuted`.
+**Project stage colours** (pill background / text): Design → `infoSoft/info`, Approval → `accentSoft/accent`, Procurement → `warningSoft/warning`, Execution → `executionSoft/execution`, Finishing → `successSoft/success`, Handover → `surfaceAlt/textMuted`.
 
 ### 3.3 Typography (Inter)
 
@@ -100,6 +112,8 @@ Define in `src/theme/colors.ts` with light and dark values. Never hard-code colo
 | `bodyStrong` | 16 / 23 | 600 | Sender names, unread channel names |
 | `meta` | 13 / 18 | 400 | Timestamps, subtitles |
 | `label` | 12 / 16 | 600, uppercase, letter-spacing 0.6 | Section headers ("PROJECTS"), field labels |
+| `metaStrong` | 13 / 18 | 600 | Small emphasised text, chips |
+| `button` | 16 / 22 | 600 | Button labels |
 
 Worker mode (job title Worker) bumps `body` to 17 and buttons to 18.
 
@@ -123,42 +137,47 @@ Feather icons only, 20 px in rows, 22 px in headers/tab bar, 1.75 stroke look. C
 
 ### 3.7 Signature details (what makes it feel crafted, not generic)
 
-- **Workspace header** in deep ink with the company name, a small square company logo tile (initials "AI" on terracotta), and a search field below it, like a drawing title block.
+- **Workspace header** in dark blue-grey with the company name, a small square company logo tile (initials "PI" on the accent colour), and a search field below it.
 - **Stage banner** at the top of every project channel: a thin bar showing the 6 stages as segments, current stage filled, with "Execution · 4 days behind baseline" text. Tapping opens the project.
 - **Message grouping:** consecutive messages from the same sender within 5 minutes collapse (no repeated avatar/name). Day dividers ("Today", "Yesterday", "Mon 6 Oct") as centred `label` text with hairlines.
 - **"New" divider** in accent colour above the first unread message.
 - **Outbox status** on own messages, after the timestamp: clock (pending/sending), single check (sent), red alert-circle (failed, tappable).
 - **Photo grids** like a site log: 1 photo full-width (4:3), 2 side by side, 3–4 in a 2 × 2 grid, more shows "+N".
-- **Bot cards** look like structured blocks: a left accent rule, title, context line, and full-width buttons stacked vertically for workers.
+- **Cards in chat** (task, issue, daily report, status) look like structured blocks with a left accent rule, title and context line. **Bot check-in cards** are different: see §8.
 
 ---
 
 ## 4. Navigation structure
 
 ```
-app/
+app/                          ROUTES ONLY: each file reads URL params and renders a screen
   _layout.tsx                 Providers, theme, fonts, DB init, auth gate, Demo pill
   (auth)/
-    login.tsx                 Phone number
-    otp.tsx                   6-digit code
+    _layout.tsx
+    login.tsx                 → features/auth/screens/LoginScreen
+    otp.tsx                   → features/auth/screens/OtpScreen
   (app)/
     _layout.tsx               Bottom tabs
-    (home)/index.tsx          Home (workspace)
-    (tasks)/index.tsx         Tasks (role-aware)
-    (activity)/index.tsx      Activity
-    (you)/index.tsx           You / profile & settings
-  channel/[id].tsx            Channel conversation
-  thread/[messageId].tsx      Thread
-  dm/[userId].tsx             Direct message
-  project/[id]/index.tsx      Project overview (tabs: Overview, Tasks, Members, Files)
-  project/[id]/members.tsx    Manage members (Managers only)
-  task/[id].tsx               Task detail
-  dashboard.tsx               Company dashboard (Owner/Admin)
-  unsent.tsx                  Unsent / failed items
-  demo.tsx                    Demo panel (modal)
+    index.tsx                 → features/home/screens/HomeScreen
+    dms.tsx                   → features/chat/screens/DmsScreen
+    tasks.tsx                 → features/tasks/screens/TasksTabScreen (role-aware)
+    activity.tsx              → features/activity/screens/ActivityScreen
+    you.tsx                   → features/profile/screens/YouScreen
+  channel/[id].tsx            → features/chat/screens/ChannelScreen
+  thread/[messageId].tsx      → features/threads/screens/ThreadScreen
+  dm/[userId].tsx             → features/chat/screens/DmScreen (`/dm/bot` is the Siteline Bot)
+  project/[id]/index.tsx      → features/projects/screens/ProjectScreen (Overview, Tasks, Members, Files)
+  project/[id]/settings.tsx   → features/projects/screens/ProjectSettingsScreen
+  project/[id]/members.tsx    → features/members/screens/MembersScreen
+  task/[id].tsx               → features/tasks/screens/TaskDetailScreen
+  dashboard.tsx               → features/dashboard/screens/DashboardScreen
+  unsent.tsx                  → features/unsent/screens/UnsentScreen
+  demo.tsx                    → features/demo/screens/DemoPanelScreen (modal)
 ```
 
-**Bottom tabs:** Home, Tasks, Activity, You. For Owner/Admin the Tasks tab is replaced by **Dashboard**. Tab bar on `surface`, active tint `accent`, labels `meta` size. Unread badge on Home and Activity.
+Tab files are `index`, `dms`, `tasks`, `activity`, `you` (not `(home)/index` etc.): several `index` routes in sibling groups would all map to `/`.
+
+**Bottom tabs:** Home, DMs, Tasks, Activity, You. For Owner/Admin the Tasks tab is titled **Dashboard** and shows the dashboard. Tab bar on `surface`, active tint `accent`. Unread badges: Home counts channel messages only, DMs counts direct messages, Activity counts unseen items.
 
 ---
 
@@ -166,35 +185,38 @@ app/
 
 ### 5.1 Login and OTP (mock)
 
-- **Login:** company tile, "Sign in to Aanya Interiors", phone field with `+91` prefix, primary button "Send code". Below, a muted section **"Demo: sign in as"** with 7 tappable user chips (avatar, name, role/title) that fill the number.
-- **OTP:** 6 separate digit boxes, auto-advance, "Resend code in 0:28" countdown. Code for every demo user is **`123456`**. Wrong code → inline red error from the mock error code `OTP_INVALID`; 5 wrong attempts → `OTP_TOO_MANY_ATTEMPTS`.
+Both screens share one layout (`AuthShell`): the dark header with the logo tile, "Paliath Interiors" and "Siteline workspace", over a rounded card that holds the form. The Demo pill is hidden on these two screens.
+
+- **Login:** title "Sign in", one large phone field with `+91` prefix, primary button **Continue** (enabled at ten digits). At the bottom, a link **"Use a demo account"** opens a sheet listing the 7 demo users (avatar, name, role/title); picking one goes straight to the code screen. A help line: "Can't sign in? Ask your company admin to add your number."
+- **OTP:** six boxes in two groups of three, fed by one hidden input (so paste and SMS autofill work), the number shown with a **Change** link, "Resend in 0:28" countdown then **Resend code**. Signs in automatically on the sixth digit. Code for every demo user is **`123456`**. Wrong code → inline red error from `OTP_INVALID`; 5 wrong attempts → `OTP_TOO_MANY_ATTEMPTS`.
 - On success: tokens stored in memory/zustand (secure storage not needed in demo), run first **sync**, go to Home.
 
 ### 5.2 Home (workspace)
 
 Top to bottom:
-1. **Workspace header** (ink): logo tile, "Aanya Interiors", chevron; search field ("Jump to…") filtering channels/people/projects locally.
+1. **Workspace header:** logo tile, "Paliath Interiors", chevron; search field ("Jump to…") filtering channels, people and projects locally. Picking a person opens their DM.
 2. **Offline banner** (only when offline): `warningSoft`, "You're offline. Changes will send automatically." + count "3 waiting".
 3. **Sections** (collapsible, state remembered in zustand):
-   - **PROJECTS** — one collapsible row per project the user can see: project name (`bodyStrong` if any unread), stage pill, delay indicator (red dot + "4d" if behind baseline). Expanded: its channels indented, each `# design`, `# site-work`, `🔒 qs`, `# general`, unread count badge on the right, bold name when unread.
+   - **PROJECTS** — one collapsible row per active project the user can see: project name (`bodyStrong` if any unread), stage pill, delay indicator (red dot + "4d" if behind baseline). Expanded: its channels indented (`# general`, `# design`, `# site-work`, `🔒 qs`, then custom channels by name), unread badge on the right, bold name when unread, and a **Project overview** row.
+   - **Archived (N)** — collapsed group under the active projects, shown only when the user has archived projects.
    - **COMPANY** — `# announcements` (read-only for Members: composer replaced by "Only admins can post here"), `# general`.
-   - **DIRECT MESSAGES** — avatar + name + presence dot (green if "online" in mock), unread badge. The **Siteline Bot** DM pinned first.
-4. **Floating action button** (accent, bottom-right): "New message" for everyone; Owner/Admin also see "New project".
+4. **Floating action button** (accent, bottom-right): **New project**, Owner/Admin only. ("New message" lives on the DMs tab.)
 
-Pull-to-refresh runs sync. Rows are 44 px tall.
+Direct messages are **not** on Home; they have their own tab (§5.14). Pull-to-refresh runs sync. Rows are 44 px tall.
 
 ### 5.3 Channel conversation
 
-- **Header:** back, `# site-work` (`heading`), subtitle "Sharma Residence · 6 members", right icons: search (non-functional stub ok), info (opens channel details sheet with members and pinned items).
+- **Header:** back, `# site-work` (`heading`), subtitle "Villa 99 · 6 members", right icons: search (stub), info (opens the channel details sheet: public/private note, members, pinned items, and **Channel settings** for Managers or **Leave channel** for Members, except in `#general`).
 - **Stage banner** (project channels only), see §3.7.
 - **Message list** (FlashList, inverted, reads from local DB via `useLiveQuery`, latest 50, loads older on scroll):
   - Message row: 36 px rounded-square avatar, name (`bodyStrong`) + job title chip (tiny `label`) + time (`meta`), body text, attachments, reactions row, "3 replies · Last reply 2h ago" thread link.
   - Long-press menu (bottom sheet): React (6 quick emoji), Reply in thread, Copy text, **Create task from message**, Edit (own, within 15 min), Delete (own within 1 h; Managers any), Pin (Managers).
   - Renderer registry by `type` (see §7.4). Unknown type → "Update the app to see this message."
 - **Composer:** rounded input on `surfaceAlt`, left **"+"** button, right **send** (accent when text present, else mic for voice note).
-  - **"+" sheet** grid: Camera, Gallery, Voice note, File, **New task**, **Report issue**, **Daily report**. Each with a 48 px icon tile.
+  - **"+" sheet** grid: Camera, Gallery, Voice note, File, **New task**, **Report issue**, **Daily report**. Each with a 48 px icon tile. Voice note and File are **simulated** in the demo (a recording timer; a sample PDF).
   - **Worker mode:** a large camera button sits left of the input (48 px, accent outline).
-- **Read-only channels** show a muted bar instead of the composer.
+- **Read-only channels** show a muted bar instead of the composer. So does every channel of an **archived project** ("This project is archived. It is read-only.").
+- Messages are marked read only while the channel is on top and the app is in the foreground.
 
 ### 5.4 Thread
 
@@ -202,68 +224,92 @@ Parent message at top (full), divider "12 replies", replies list, composer. Opti
 
 ### 5.5 Direct message
 
-Same as channel without stage banner. The **Siteline Bot** DM is where check-ins appear (see §8).
+Same as channel without stage banner. A new DM exists only on the phone until its first message is sent; opening a person's chat and leaving without typing creates nothing. The **Siteline Bot** DM is where check-ins appear and has its own layout (see §8).
 
 ### 5.6 Project overview (`project/[id]`)
 
 Segmented control: **Overview · Tasks · Members · Files**.
 
-- **Overview:** project name (`title`), client and address (`meta`), **stage stepper** (6 steps horizontal, current highlighted; Managers can tap "Move to next stage" → confirmation sheet), key dates card (start, planned finish, baseline finish, "4 days behind"), progress ring (% of tasks done), "Channels" list, "Recent updates" (last 5 status cards).
+- **Overview:** project name (`title`), client and address (`meta`), **stage stepper** (6 steps horizontal, current highlighted; Managers can tap "Move to next stage" → confirmation sheet), key dates card (start, planned finish, baseline finish, "4 days behind"), progress ring (% of tasks done), "Channels" list with **Browse channels** (join public channels you are not in) and, for people who can manage the project, a **Project settings** row, then "Recent updates" (last 5 status cards). A gear in the header also opens Project settings (§5.15). Archived projects show a read-only banner.
 - **Tasks:** same component as §5.7 scoped to the project.
 - **Members:** list with avatar, name, **role badge** (Manager / Member), job title, channels. Managers see "Add member" and can edit role/job title/channels (§5.11).
 - **Files:** grid of all photos and files from the project's channels, newest first.
 
 ### 5.7 Tasks tab (role-aware)
 
-**Managers (and Owner/Admin inside a project):** a schedule list.
-- Project switcher at top (dropdown sheet).
-- Filter chips: All · Mine · Delayed · Blocked · Done.
-- Grouped by **phase** (Civil, Electrical, Plumbing, False ceiling, Carpentry, Painting, Finishing, Handover) with sticky phase headers showing "3/7 done".
+**Anyone who manages at least one project (and Owner/Admin inside a project):** a schedule list.
+- Project switcher at top (dropdown sheet; managed projects first, archived last).
+- **Toolbar:** two quick chips, **Mine** and **Pending** (everything not finished), a **Filters** button with a count of active filters, and a **three-dot menu** on the right. When any filter is on, a line shows "Showing 3 of 18 tasks" with **Clear**.
+- **Filters sheet:** Status (multi-select), Owner (Me, Unassigned, or one person), Due (Any time, Overdue, Next 7 days, Next 30 days), Schedule (Behind baseline; only when a baseline exists), Phase (multi-select). Filters combine with AND. The button reads "Show N tasks". Filters reset when the screen is left. Logic is in `features/tasks/filters.ts` (tested).
+- **Three-dot menu** (only for people who may change the baseline): shows the baseline state and **Lock baseline** (with confirmation) or **Re-baseline** (asks for a reason, logged in `#general`).
+- Grouped by **phase** (Civil, Electrical, Plumbing, False ceiling, Carpentry, Painting, Finishing, Handover, plus any custom phase) with sticky phase headers showing "3/7 done".
 - **Task row:** status dot, name, owner avatar (20 px), date range `meta` ("18–21 Oct"), a thin **mini timeline bar** showing planned span vs baseline (baseline as a faint outline, planned as solid; red if planned finish > baseline finish), % on the right.
-- **Quick-add bar** pinned at bottom: "Add a task…" input; enter creates a task with smart defaults (starts the day after the previous task in that phase ends, 3 days long, same phase, owner unassigned).
+- **Quick-add bar** pinned at bottom: a phase chip (tap to change) and "Add a task…"; enter creates a task with smart defaults (starts the day after the previous task in that phase ends, 3 days long, owner unassigned).
 - Swipe right: mark done (Managers: confirmed; Members: "done — awaiting confirmation"). Swipe left: shift dates (sheet with −1/+1/+3/+7 days).
-- **Lock baseline** button in the project header when the baseline isn't locked; once locked, shows a lock icon; "Re-baseline" asks for a reason.
 
 **Members (e.g. Worker):** **"My tasks"** home.
 - Greeting "Good morning, Ravi" and date.
 - **Today** card list: big rows (task name `heading`, project, due), each with three large buttons: **Started**, **Update %**, **Problem**.
 - "This week" and "Done recently" sections.
+- Tasks in archived projects are not listed.
+- **Problem** sets the task to Blocked and posts an issue card in the task's channel.
 - No baseline or variance shown.
 
 ### 5.8 Task detail (`task/[id]`)
 
-Presented as a full-height bottom sheet.
+Presented as a full-height bottom sheet. Dates are picked in a **calendar sheet** (month grid, today ringed, Today / Tomorrow / In a week shortcuts, days before the allowed minimum greyed out).
 - Name (editable by Managers), project › phase breadcrumb, status selector (Not started / In progress / Blocked / Done), % slider snapping to 0/25/50/75/90/100 (save on release).
 - Owner picker (project members only).
 - **Dates block:** Planned start/finish (editable by Managers), Baseline start/finish (read-only, lock icon), Actual start/finish (auto), and a **variance chip** ("+4 days").
 - Linked channel and "Discuss in #site-work" button.
 - **History timeline:** every change with who, what, when ("Amit changed finish 24 Oct → 26 Oct · 2h ago"; "Ravi set progress to 75% · via check-in").
-- Members who can't edit see fields as read-only text, not disabled inputs.
+- Members who can't edit see fields as read-only text, not disabled inputs. Non-managers do not see baseline or variance.
 
 ### 5.9 Activity
 
-Mentions, thread replies, task assignments, task changes and check-in results, newest first. **Batched** task-change items ("Amit changed dates on 20 tasks in Sharma Residence · 3 are yours"), expandable. Unread items have an accent left rule.
+Mentions, thread replies, task assignments, task changes and check-in results, newest first. **Batched** task-change items ("Amit changed dates on 20 tasks in Villa 99 · 3 are yours"), expandable. Unread items have an accent left rule.
 
 ### 5.10 Dashboard (Owner/Admin)
 
-- Stat tiles row: Active projects · Delayed · Tasks due this week · Blocked.
-- **Projects by stage:** horizontal segmented bar with counts.
-- **Delayed projects** list (name, stage pill, days behind, PM avatar) → tap opens project.
-- **Today on sites:** recent check-in results and photos (cards with thumbnail strip).
+- **Headline:** "Needs attention — 1 project is behind schedule and 1 task is blocked", or "Everything is on track".
+- **Four numbers:** Active projects · Behind schedule · Tasks due in 7 days · Blocked tasks. Numbers stay in text colour; a small icon marks a problem.
+- **Projects:** every active project, most delayed first: name, stage pill, schedule health in words with an icon ("4d behind", "1d ahead", "On track", "No baseline"), progress bar and %, "12 of 32 tasks done · 1 blocked", PM avatar → tap opens the project.
+- **Blocked now:** blocked tasks with project and owner → tap opens the task. Hidden when empty.
+- **Pipeline:** six cells, one per stage, each with its project count.
+- **From site:** check-in results, daily reports and photos from the last 36 hours, with small thumbnails.
+- Archived projects are left out.
 - Uses TanStack Query against `GET /dashboard` (not local DB) with cached data shown first and a "Couldn't refresh" chip when the mock fails.
 
 ### 5.11 Manage members (Managers)
 
 - List of project members; "Add member" opens a sheet: search company directory → choose **Role** (Manager / Member, segmented) → choose **Job title** (Designer, QS, Supervisor, Worker) → shows **default channels** that will be joined (checkboxes pre-ticked per §9.3, editable) → Add.
-- Edit and remove members. Removing shows: "Ravi will lose access to this project. His messages stay."
+- Edit and remove members. Removing shows: "Ravi will lose access to this project. Their messages stay."
+- Choosing **Manager** ticks every channel: managers are always in every channel of their project.
 
 ### 5.12 You
 
-Avatar, name, phone, company role, list of projects with project role + job title. Settings: Language (English / ಕನ್ನಡ / हिंदी), Theme (System/Light/Dark), Notifications (stub toggles), **Unsent items** (count), **Send now**, **Log out** (if unsent items exist: "3 changes haven't been sent yet. Log out anyway?").
+Avatar, name, phone, company role, list of projects with project role + job title. Settings: Language (English / ಕನ್ನಡ / हिंदी), Theme (System/Light/Dark), Notifications (stub toggles), **Unsent items** (count), **Send now**, **Show the Demo button** (when hidden), **Log out** (if unsent items exist: "3 changes haven't been sent yet. Log out anyway?").
 
 ### 5.13 Unsent (`unsent.tsx`)
 
 Lists outbox items in **Failed** state (and, in a second section, items waiting more than 24 h). Each row: what it was ("Message in #site-work: 'Starting POP…'"), error reason in plain words, actions **Retry**, **Edit** (messages/tasks), **Discard**.
+
+### 5.14 DMs tab
+
+- Header "Direct messages" with a search field ("Find a conversation").
+- **Siteline Bot** first, then people ordered by most recent message. Each row: avatar with presence dot, name, last-message preview (a readable label for photos, voice notes and cards; "You:" for own messages), time, unread badge.
+- Floating button **New message**: a sheet listing the company directory (TanStack Query against `GET /users`, local users shown first).
+
+### 5.15 Project settings (`project/[id]/settings`)
+
+For Managers, Owner and Admin. Reached from the gear in the project header, the "Project settings" row on the overview, and "Channel settings" inside a channel.
+
+- **Details:** project name, client, site address (editable; Save appears once something changes).
+- **Channels:** list with public/private and member count. Tap a channel to edit: name (lowercase letters, numbers, hyphens), **Private channel** switch, and who is in it. **Delete** sits beside the title in this editor and nowhere else. **Add channel** creates a new one (starts public with everyone ticked).
+- **People:** a row that opens Manage members (§5.11).
+- **Project:** one card with **Archive project** (confirm; becomes **Unarchive project**) and **Delete project** (Owner/Admin only; the user must type the project name).
+
+Rules: `#general` cannot be renamed, made private, deleted or left. Managers cannot be unticked from a channel. See §9.5 for what public, private and archived mean.
 
 ---
 
@@ -273,7 +319,7 @@ All built with react-hook-form + zod; schemas mirror the backend. Pre-fill proje
 
 | Form | Fields | Result card |
 |---|---|---|
-| **New task** | Name*, Phase (picker), Owner (project members), Planned start/finish (date pickers, finish ≥ start), Description | Task card |
+| **New task** | Name*, Phase (picker), Owner (project members), Planned start/finish (calendar sheet, finish ≥ start), Description | Task card |
 | **Report issue** | What's wrong* (preset chips: Material not arrived, Waiting for design, Labour short, Damage, Other + text), Photos (0–4), Related task (optional), Urgency (Normal/Urgent) | Issue card (danger accent) and, if Urgent, a mention of the project Managers |
 | **Daily report** | Work done today*, Workers on site (stepper), Photos (0–6), Problems (optional), Tomorrow's plan | Daily report card |
 
@@ -293,9 +339,11 @@ type ProjectRole = "manager" | "member";
 type JobTitle = "Project Manager" | "Designer" | "QS" | "Supervisor" | "Worker";
 type Stage = "design" | "approval" | "procurement" | "execution" | "finishing" | "handover";
 
-interface User { id: ID; name: string; phone: string; companyRole: CompanyRole; avatarColor: string; isActive: boolean; }
+interface User { id: ID; name: string; phone: string; companyRole: CompanyRole; avatarColor: string; isActive: boolean;
+  online?: boolean; /* presence dot (demo) */ }
 interface Project { id: ID; companyId: ID; name: string; client: string; address: string; stage: Stage;
-  startDate: string; plannedFinish: string; baselineFinish: string | null; baselineLocked: boolean; updatedAt: string; }
+  startDate: string; plannedFinish: string; baselineFinish: string | null; baselineLocked: boolean;
+  archivedAt: string | null; /* set = read-only */ updatedAt: string; }
 interface ProjectMember { projectId: ID; userId: ID; role: ProjectRole; jobTitle: JobTitle; }
 interface Channel { id: ID; companyId: ID; projectId: ID | null; name: string;
   kind: "project" | "company" | "dm" | "bot"; isPrivate: boolean; postingPolicy: "everyone" | "admins"; updatedAt: string; }
@@ -315,12 +363,26 @@ interface Task { id: ID; projectId: ID; phase: string; name: string; description
 interface TaskHistory { id: ID; taskId: ID; userId: ID; field: string; from: string | null; to: string | null;
   via: "app" | "checkin" | "system"; createdAt: string; }
 interface Checkin { id: ID; taskId: ID; userId: ID; askedAt: string; answer: null | {
-  kind: "started" | "progress" | "problem" | "done"; percent?: number; reason?: string; note?: string }; }
+  kind: "started" | "progress" | "problem" | "done" | "not_started"; percent?: number; reason?: string;
+  note?: string; voiceSec?: number; hasPhoto?: boolean; at?: string }; }
+
+// Photos inside message.data.attachments
+interface Attachment { id: ID; kind: "image"; uri: string | null; uploadId: ID | null; caption?: string;
+  tone?: "plywood" | "concrete" | "tile" | "sage"; }
+
+// Items on the Activity screen (sent by sync and by the `activity.new` event)
+interface Activity { id: ID; userId: ID; kind: "mention" | "thread_reply" | "task_assigned" | "task_changes"
+  | "checkin_result" | "escalation"; actorId: ID; projectId: ID | null; channelId: ID | null;
+  messageId: ID | null; taskIds: ID[]; text: string; lines: string[]; createdAt: string; }
 ```
 
 ### 7.2 Local SQLite tables
 
-`users, projects, project_members, channels, channel_members, messages, tasks, task_history, checkins, outbox, kv` (kv stores `lastSyncTime`, current user, settings). Indexes: `messages(channel_id, created_at)`, `tasks(project_id, phase)`, `outbox(status, next_attempt_at)`, `outbox(lane, created_at)`.
+`users, projects, project_members, channels, channel_members, messages, tasks, task_history, checkins, activity, outbox, kv` (kv stores `lastSyncTime`). Indexes: `messages(channel_id, created_at)`, `messages(channel_id, id)` (unread counts), `messages(thread_parent_id)`, `tasks(project_id, phase)`, `task_history(task_id)`, `outbox(status, next_attempt_at)`, `outbox(lane, created_at)`.
+
+A row created on the phone and not yet confirmed by the server carries `updatedAt = 1970-01-01T00:00:00.000Z` (`LOCAL_ONLY`). Optimistic edits never change `updatedAt`.
+
+**Demo only:** the local database is dropped on every app launch, because the mock server's memory is lost on reload. Remove `dropAll()` in `src/lib/db/init.ts` for a real backend.
 
 ### 7.3 Outbox table
 
@@ -330,8 +392,12 @@ interface OutboxItem { id: ID; kind: OutboxKind; lane: string; entityId: ID; pay
   lastErrorCode: string | null; createdAt: number; }
 type OutboxKind = "send_message" | "edit_message" | "delete_message" | "set_reaction" | "mark_read"
   | "create_task" | "update_task" | "checkin_answer" | "upload_file" | "project_stage" | "lock_baseline"
-  | "member_add" | "member_update" | "member_remove";
+  | "member_add" | "member_update" | "member_remove"
+  | "create_dm" | "create_project" | "update_project" | "archive_project" | "delete_project"
+  | "create_channel" | "update_channel" | "delete_channel" | "join_channel";
 ```
+
+Message `data` flags used by the app: `edited`, `pinned`, `mentions` (user ids), `alsoToChannel` (thread reply also shown in the channel), `attachments`.
 
 ### 7.4 Message renderer registry
 
@@ -347,16 +413,21 @@ const renderers: Record<MessageType, React.ComponentType<{ message: Message }>> 
 
 ## 8. The bot (Siteline Bot)
 
-- Lives in a DM channel of kind `bot` with every user.
-- **Check-in card** (`checkin`): title "How is **False ceiling – living room**?", context "Sharma Residence · due Sat 11 Oct", then stacked full-width buttons: ✅ Done · 🔨 Working on it · ⛔ Problem · Not started.
-  - **Working on it** → card expands in place to chips **25% · 50% · 75% · 90%**.
-  - **Problem** → chips: Material not arrived · Waiting for design · Labour short · Other, plus "Add photo" and "Voice note" buttons.
-  - **Done** → "Add a photo of the finished work?" (Add photo / Skip).
-  - After answering, the card collapses to a summary ("You: Working on it · 75% · 6:04 PM") and buttons disappear.
-- Each answer → outbox `checkin_answer` (carries the check-in ID, safe to repeat) → mock server updates the task, writes history, posts a **status card** in the project's `#site-work` ("Ravi · False ceiling – living room → 75% 📷").
-- **Morning summary** message: "Good morning Ravi. Your tasks today: …" with task links.
-- **Reminder** if unanswered after (demo) 60 s; **escalation** status card to the Supervisor/Manager after another 60 s: "Ravi hasn't updated False ceiling."
-- Demo panel buttons trigger "Send morning summary" and "Send evening check-in" for the current user immediately.
+- Lives in a DM channel of kind `bot` with every user. The conversation is **one full-width column** (no avatars), so every card shares the same edges.
+- **Opening the conversation asks about every open task the user owns** (`POST /bot/checkins`). Tasks asked about in the last 12 hours are skipped. Tasks in archived projects are never asked about.
+- **Progress bar under the header:** "3 tasks need an update · 0 of 3 done", then "All caught up. Thanks!".
+- **One question at a time:** only the oldest unanswered check-in is open. The others are one-line rows with **Update**; tapping one opens it instead. After an answer the next one opens by itself.
+- **The open card:** task name, "Villa 99 · due Sun 11 Oct" (red "Overdue" when late), its place in the queue ("1 of 3"), then:
+  - a **progress scale** `25% · 50% · 75% · 90% · Done`. The part already reached is shaded with a thin accent line. Tapping a stop answers in one tap.
+  - three neutral outlined buttons: **Problem**, **Not started**, **Note**.
+  - **Problem** swaps the scale for the reasons: Material not arrived · Waiting for design · Labour short · Other.
+  - **Note** opens a text field with a microphone (recording is simulated: a timer) and "Add a photo". The note is sent with whichever answer is tapped.
+- **No coloured buttons and no emoji.** State colour appears only as a small dot beside an answer.
+- **Answered card:** one line, e.g. "False ceiling – living room · ● 75% · 6:04 PM", with the note underneath if there is one.
+- Each answer → outbox `checkin_answer` (carries the check-in ID, safe to repeat) → mock server updates the task, writes history "via check-in", posts a **status card** in the project's `#site-work` ("Ravi · False ceiling – living room → 75%", with the note) and an Activity item for the managers. "Not started" changes nothing on the task.
+- **Morning summary:** a small table, "Good morning, Ravi · 2 today", one row per task with due date and progress; rows open the task.
+- **Reminder** if unanswered after (demo) 60 s: a single quiet line, not a second card. **Escalation** status card to the Managers after another 60 s: "Ravi hasn't updated False ceiling." The batch asked on open carries no reminder timer; the Demo panel's single evening check-in does.
+- Demo panel buttons trigger "Send morning summary", "Send evening check-in" and "Trigger escalation" for the current user immediately.
 
 ---
 
@@ -400,6 +471,19 @@ Company-level actions (`company.users`, `project.create`) are Owner/Admin only. 
 
 Edit own message ≤ 15 min; delete own ≤ 1 h ("This message was deleted"); DMs private to the two people; removal from a project ends access (channels disappear on next sync/event); members marked Member can mark own task done → `done_pending_confirmation` until a Manager confirms.
 
+### 9.5 Channels and projects
+
+- **Public channel:** anyone on the project can find it under "Browse channels" and join; Members can leave again.
+- **Private channel:** only the people a Manager ticks can see it. Others cannot find or join it.
+- **Managers are in every channel of their project** and cannot be removed from one or leave one. Owner/Admin see every project channel, private or not.
+- `#general` cannot be renamed, made private, deleted or left.
+- Creating, renaming, deleting channels and changing who is in them needs `channel.manage`; editing project details and archiving needs `project.edit` (both Manager).
+- **Archived project:** read-only for everyone. No new messages, task changes, channel changes or check-ins (`409 PROJECT_ARCHIVED`); the app hides every editing control. It moves to "Archived" on Home and is left out of the dashboard, My tasks and bot check-ins. Nothing is deleted; a Manager can unarchive.
+- **Deleting a project** is Owner/Admin only and removes its channels, messages, tasks and memberships for everyone.
+- Deleting a channel removes its messages for everyone (no channel archive in the demo).
+
+Not built yet: adding people to the **company** (`company.users`). The demo only has the seeded people.
+
 ---
 
 ## 10. Mock backend
@@ -410,13 +494,18 @@ An **in-process mock server** in `src/mock/` that the app talks to through the s
 
 ```
 src/mock/
-  server.ts        route table: (method, path, body, auth) → response | MockError
-  db.ts            in-memory store (plain objects/Maps), seeded from seed.ts
+  server.ts        route table: (method, path, body, auth) → response | error; latency + injection
+  db.ts            in-memory store and "who can see what" helpers, seeded from seed.ts
   seed.ts          all demo data (§11)
-  routes/*.ts      one file per resource, same paths as the real API
+  routes/          auth.ts, sync.ts, messages.ts, tasks.ts, projects.ts, channels.ts,
+                   misc.ts (check-ins, uploads, dashboard, directory)
   events.ts        event bus that emulates the WebSocket (subscribe per user)
   actors.ts        scripted teammates (§10.6)
   network.ts       network conditions + error injection (§10.5)
+  bot.ts           check-ins, reminders, escalation, morning summary
+  notify.ts        Activity items and 10 s batching of task changes
+  http.ts          routing, validation and error helpers
+  access.ts        shared access checks
 ```
 
 The in-memory store resets when the app is reloaded or via **Demo panel → Reset demo** (which also wipes the local SQLite DB).
@@ -428,7 +517,7 @@ The in-memory store resets when the app is reloaded or via **Demo panel → Rese
 | `POST /auth/otp/request` `{phone}` | Always "sent" for known numbers; generic response otherwise |
 | `POST /auth/otp/verify` `{phone, code}` | `123456` → `{accessToken, refreshToken, user}` |
 | `POST /auth/refresh` | Demo panel can force access-token expiry to show silent refresh |
-| `GET /sync?since=` | Changes since time (minus 2-min overlap applied by the client), `{serverTime, users, projects, projectMembers, channels, channelMembers, messages, tasks, taskHistory, checkins, removed:{channels,tasks,messages}, hasMore}`; first sync returns latest 50 messages per channel |
+| `GET /sync?since=` | Changes since time (minus 2-min overlap applied by the client), `{serverTime, users, projects, projectMembers, channels, channelMembers, messages, tasks, taskHistory, checkins, activities, removed:{projects,channels,tasks,messages}, hasMore, cursor}`; memberships are always sent in full; first sync returns latest 50 messages per channel |
 | `GET /channels/:id/messages?before=&limit=` | Older history |
 | `POST /channels/:id/messages` `{id, type, body, data, threadParentId}` | Existing `id` → return existing, 200 |
 | `PATCH /messages/:id` / `DELETE /messages/:id` | Time-window and permission checks |
@@ -440,10 +529,19 @@ The in-memory store resets when the app is reloaded or via **Demo panel → Rese
 | `POST /projects/:id/baseline/lock` / `.../rebaseline {reason}` | Managers |
 | `PATCH /projects/:id` `{stage}` | Managers; posts a system message in `#general` |
 | `POST /checkins/:id/answer` | Idempotent by check-in id |
-| `POST /uploads` → `{uploadId, uploadUrl}`; `PUT <uploadUrl>` | Simulated: stores the local file URI, takes 1–4 s ("slow" for big files) |
+| `POST /uploads` `{clientId}` → `{uploadId, uploadUrl}`; `PUT <uploadUrl>` `{uri}` | Simulated: stores the local file URI, takes 1–4 s ("slow" for big files) |
 | `GET/POST/PATCH/DELETE /projects/:id/members[/:userId]` | Managers; applies default channels |
 | `GET /dashboard` | Owner/Admin only |
 | `GET /users` | Company directory |
+| `POST /dms` `{id, userId}` | Open a DM; idempotent by id or by the pair of people |
+| `POST /projects` `{id, name, client, address}` | Owner/Admin; creates the four standard channels |
+| `PATCH /projects/:id` also accepts `{name, client, address}` and `{archived}` | Managers |
+| `DELETE /projects/:id` | Owner/Admin |
+| `GET /projects/:id/channels` | Channels the user may know about, with `joined` and `memberCount` |
+| `POST /projects/:id/channels` `{id, name, isPrivate, memberIds}` | Managers; idempotent by id |
+| `PATCH /channels/:id` `{name?, isPrivate?, memberIds?}` / `DELETE /channels/:id` | Managers |
+| `POST /channels/:id/join` / `.../leave` | Public channels only for join |
+| `POST /bot/checkins` | Ask about every open task the user owns (called when the bot DM opens) |
 
 ### 10.3 Behaviour rules (must match the real server design)
 
@@ -454,18 +552,18 @@ The in-memory store resets when the app is reloaded or via **Demo panel → Rese
   { "error": { "code": "TASK_BASELINE_LOCKED", "message": "...", "details": {}, "request_id": "req_01J..." } }
   ```
 - **Idempotency:** creates keyed by client UUID; updates are absolute values.
-- **Events after "commit":** after a successful write, publish to `events.ts`: `message.new`, `message.updated`, `message.deleted`, `task.updated` (full task), `task.created`, `channel.updated`, `channel.member_added`, `channel.member_removed`, `project.updated`, `checkin.new`. Only to users allowed to see the resource. Never publish for a duplicate create.
+- **Events after "commit":** after a successful write, publish to `events.ts`: `message.new`, `message.updated`, `message.deleted`, `task.updated` (full task + new history rows), `task.created`, `channel.updated`, `channel.member_added`, `channel.member_removed`, `project.updated`, `checkin.new`, `activity.new`. Membership and project events make the app run a catch-up sync. Only to users allowed to see the resource. Never publish for a duplicate create.
 - **Notifications:** messages notify immediately; task changes are **batched** per recipient for 10 s (demo-shortened from 2 min) into one Activity item.
 - **Latency:** every request 250–900 ms random; uploads 1–4 s.
 
 ### 10.4 Error codes to implement
 
-`OTP_INVALID, OTP_EXPIRED, OTP_TOO_MANY_ATTEMPTS, AUTH_EXPIRED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED, TASK_BASELINE_LOCKED, MESSAGE_EDIT_WINDOW_PASSED, CHANNEL_READ_ONLY, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE` — each with English, Kannada and Hindi user messages in i18n files (Kannada/Hindi may be marked "demo translation").
+`OTP_INVALID, OTP_EXPIRED, OTP_TOO_MANY_ATTEMPTS, AUTH_EXPIRED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED, TASK_BASELINE_LOCKED, MESSAGE_EDIT_WINDOW_PASSED, CHANNEL_READ_ONLY, CHANNEL_NAME_TAKEN, CHANNEL_PRIVATE, PROJECT_ARCHIVED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE` (plus the client-side `OFFLINE`, `TIMEOUT`, `DEPENDENCY_FAILED`, `UNKNOWN`) — each with English, Kannada and Hindi user messages in i18n files (Kannada/Hindi may be marked "demo translation").
 
 ### 10.5 Network conditions and error injection (Demo panel)
 
 - **Network:** Online · Slow (2–4 s latency) · Flaky (30% of requests time out after 8 s, some after the server already applied them) · Offline (every request fails immediately as `offline`; event bus disconnected).
-- **Inject on next request:** 500 · 403 · 422 · timeout-after-save (server applies, client never gets the reply — demonstrates idempotency).
+- **Inject on next request:** 500 · 403 · 422 · timeout-after-save (server applies, client never gets the reply — demonstrates idempotency). The injection applies to the next **change** the app sends; sync, auth and read-marker requests are skipped.
 - **Force access-token expiry** (next request returns 401 → client refreshes silently).
 - **Deactivate current user** (next request 401 and refresh fails → app wipes data and returns to login).
 
@@ -475,33 +573,33 @@ When the network is Online, teammates act on a timer (every 20–40 s, random, p
 - Kavya (Designer) posts a design update with 2 photos in `#design`.
 - Suresh (Supervisor) posts site photos and updates a task's % in `#site-work`.
 - Rohan (QS) posts a cost note in `#qs` (only visible to QS/Managers/Owner/Admin — demonstrates channel privacy).
-- Amit (PM) shifts 5 task dates at once (demonstrates batched notifications and live task updates).
+- Amit (PM) shifts 5 task dates at once (demonstrates batched notifications and live task updates). The shift alternates one day later / one day earlier so a long demo does not drift.
 - Owner posts in `#announcements` occasionally.
 
 ---
 
 ## 11. Seed data
 
-**Company:** Aanya Interiors, Bengaluru.
+**Company:** Paliath Interiors, Bengaluru. Client names and addresses are placeholders ("Bengaluru").
 
 **Users** (all OTP `123456`):
 
 | Name | Phone | Company role | Projects (role · job title) |
 |---|---|---|---|
-| Arjun Rao | 98450 00001 | Owner (CEO) | — (sees all) |
-| Meera Iyer | 98450 00002 | Admin (Operations) | — (sees all) |
-| Amit Kulkarni | 98450 00003 | Member | Sharma Residence (Manager · Project Manager), Café Brew (Manager · Project Manager) |
-| Kavya Shetty | 98450 00004 | Member | Sharma Residence (Member · Designer), Mehta Villa (Manager · Project Manager) |
-| Rohan Desai | 98450 00005 | Member | Sharma Residence (Member · QS), Mehta Villa (Member · QS) |
-| Suresh Gowda | 98450 00006 | Member | Sharma Residence (Manager · Supervisor), Café Brew (Member · Supervisor) |
-| Ravi Kumar | 98450 00007 | Member | Sharma Residence (Member · Worker) |
+| Arjun Rao | 98450 00001 | Owner (CEO) | — (sees all); owns two tasks so the bot has something to ask |
+| Meera Iyer | 98450 00002 | Admin (Operations) | — (sees all); owns one task |
+| Amit Kulkarni | 98450 00003 | Member | Villa 99 (Manager · Project Manager), OITH (Manager · Project Manager) |
+| Kavya Shetty | 98450 00004 | Member | Villa 99 (Member · Designer), RV University (Manager · Project Manager) |
+| Rohan Desai | 98450 00005 | Member | Villa 99 (Member · QS), RV University (Member · QS) |
+| Suresh Gowda | 98450 00006 | Member | Villa 99 (Manager · Supervisor), OITH (Member · Supervisor) |
+| Ravi Kumar | 98450 00007 | Member | Villa 99 (Member · Worker) |
 
 Also 4 extra workers (Manjunath, Imran, Lakshmi, Prakash) spread across projects, without demo login chips.
 
 **Projects:**
-1. **Sharma Residence – Whitefield** (3BHK full interior). Stage **Execution**, baseline locked, **4 days behind**. ~32 tasks across all phases; Civil/Electrical/Plumbing done; False ceiling in progress (one task blocked "Material not arrived"); Carpentry starting; Painting/Finishing/Handover not started.
-2. **Mehta Villa – Koramangala** (villa). Stage **Design**, baseline not locked, on track. ~12 tasks (concept, 3D renders, material board, client approval).
-3. **Café Brew Fit-out – Indiranagar** (commercial). Stage **Finishing**, **1 day ahead**. ~18 tasks, mostly done.
+1. **Villa 99** (full interior). Stage **Execution**, baseline locked, **4 days behind**. ~32 tasks across all phases; Civil/Electrical/Plumbing done; False ceiling in progress (one task blocked "Material not arrived"); Carpentry starting; Painting/Finishing/Handover not started.
+2. **RV University** (campus interiors). Stage **Design**, baseline not locked, on track. ~12 tasks in a "Design" phase (concept, 3D renders, material board, client approval).
+3. **OITH** (commercial fit-out). Stage **Finishing**, **1 day ahead**. ~18 tasks, mostly done.
 
 **Channels per project:** `general`, `design`, `site-work`, `qs` (private). Company: `announcements` (admins post), `general`. DMs between Amit↔Ravi, Amit↔Suresh, Arjun↔Amit. Bot DM for everyone.
 
@@ -509,7 +607,7 @@ Also 4 extra workers (Manjunath, Imran, Lakshmi, Prakash) spread across projects
 
 **Images:** do **not** fetch from the internet. Render "photo" placeholders as tiles with a material-like colour (plywood beige, concrete grey, tile white, paint sage) plus a small Feather `image` icon and a caption overlay ("Living room ceiling"). Real photos from the camera/gallery display normally.
 
-**Check-ins:** Ravi has one unanswered evening check-in for "False ceiling – living room" on first login.
+**Check-ins:** Ravi has one unanswered evening check-in for "False ceiling – living room" on first login. Opening the bot adds check-ins for his other open tasks.
 
 ---
 
@@ -520,28 +618,38 @@ Also 4 extra workers (Manjunath, Imran, Lakshmi, Prakash) spread across projects
 ```
 src/
   features/
-    auth/ home/ chat/ threads/ tasks/ projects/ members/ bot/ activity/ dashboard/ profile/ unsent/
-      (each: components/, hooks/, api.ts)
+    auth/ home/ chat/ threads/ tasks/ projects/ members/ bot/ activity/ dashboard/ profile/ unsent/ demo/
+      screens/      one file per screen (rendered by a thin route in app/)
+      components/   pieces of those screens
+      hooks.ts      live queries (read)
+      api.ts        writes: local change + outbox item in one transaction
+    shared.ts       hooks used by several features (useMe, useProjectAccess, useOutbox, …)
   lib/
     api/        client.ts (typed AppError, auth refresh), transport.ts (mock now, fetch later)
     db/         schema.ts, client.ts, init.ts
     sync/       catchup.ts, applyIncoming.ts
-    outbox/     enqueue.ts, runner.ts, lanes.ts, merge.ts, classify.ts, handlers/*.ts
+    outbox/     enqueue.ts, runner.ts, lanes.ts, merge.ts, classify.ts, types.ts, handlers/*.ts
     realtime/   socket.ts (subscribes to mock events now; WebSocket later)
-    i18n/       index.ts, en.json, kn.json, hi.json
-  shared/       permissions.ts, errorCodes.ts, schemas.ts (zod, shared with mock server)
-  components/   Avatar, Badge, Pill, Button, Sheet, Row, SectionHeader, Banner, EmptyState, ErrorBoundary, …
+    i18n/       index.ts, en.base.json, en.json (generated), kn.json, hi.json
+    session.ts  sign in, sign out, wipe
+  shared/       permissions.ts, errorCodes.ts, schemas.ts (zod), taskRules.ts (shared with mock server)
+  components/   T, basics (Avatar, Badge, Pill, Button, Chip, Row, …), Sheet, form (Field, DateField, …),
+                chrome (Header, Screen, ErrorBoundary, Toast), PhotoGrid, CompanyTile
   stores/       session.ts, ui.ts, demo.ts
   theme/        colors.ts, typography.ts, spacing.ts, useTheme.ts
   mock/         (see §10)
+scripts/
+  extract-i18n.mjs   builds en.json from the English defaults written in code
 ```
+
+Files in `app/` are routes only (§4). Not every feature has every file; small ones keep components beside `hooks.ts`.
 
 **Golden rule:** screens never call the API or the database directly; they use feature hooks (`useChannelMessages`, `useSendMessage`, `useMyTasks`, `useUpdateTask`, …).
 
 ### 12.2 Where data lives
 
-- **Local SQLite** (live queries): users, projects, members, channels, messages, tasks, history, check-ins, outbox.
-- **TanStack Query:** dashboard, company directory.
+- **Local SQLite** (live queries): users, projects, members, channels, messages, tasks, history, check-ins, activity, outbox.
+- **TanStack Query:** dashboard, company directory, "Browse channels" (channels you are not in exist only on the server).
 - **Zustand:** session, UI state (collapsed sections, open sheets, drafts), demo settings.
 
 ### 12.3 API client
@@ -560,6 +668,15 @@ src/
 6. **Re-apply pending changes** when sync or events bring a record that still has unsent changes.
 7. **Retry policy:** temporary (`offline, timeout, server, rate_limited`) → backoff with jitter, **demo timings 2 s, 5 s, 10 s, then every 20 s**; `offline` stops the run. `auth` → refresh once. Permanent (`validation, forbidden, not_found, conflict`) → `failed` immediately, roll back or flag per kind (messages keep a red mark; task edits revert to server value with a toast "Couldn't save your change to *X*: <reason>").
 
+**Additions to the rules:**
+- A message's read marker only moves forward.
+- A full re-sync requested while another sync runs is kept, not dropped.
+- A full re-sync keeps channels, DMs and projects that were created on the phone and not sent yet.
+- For changes that touch many rows (baseline lock, member and channel changes, project delete) a permanent failure triggers a full re-sync instead of a field-by-field rollback.
+- Housekeeping items (`mark_read`, reactions) are dropped silently if the server refuses them for good.
+- Replies that arrive after a logout or a user switch are discarded.
+- Deleting a channel also removes messages still queued for it.
+
 Runner triggers: new item, app foreground, network back (demo panel), event bus reconnect, 10 s timer. One run at a time; one request at a time (uploads run in their own concurrent slot).
 
 ### 12.5 Sync
@@ -568,7 +685,7 @@ Runner triggers: new item, app foreground, network back (demo panel), event bus 
 
 ### 12.6 Realtime
 
-`socket.ts` subscribes the current user to `mock/events.ts`. On event: write to local DB (newer wins) or invalidate a query. On "reconnect" (network back): run `catchUp()`. Disconnect when offline.
+`socket.ts` subscribes the current user through `transport.ts` (which wraps `mock/events.ts`). On event: write to local DB (newer wins) or invalidate a query. On "reconnect" (network back): run `catchUp()`. Disconnect when offline.
 
 ### 12.7 Errors in the UI
 
@@ -578,7 +695,7 @@ Friendly translated messages by code; field errors under inputs; offline banner;
 
 ## 13. Demo panel (`demo.tsx`)
 
-Opened from a small floating **"Demo"** pill (bottom-left, above the tab bar, draggable, hideable). Sections:
+Opened from a small floating **"Demo"** pill (bottom-left, above the tab bar, draggable, hideable; "Show the Demo button" on the You tab brings it back; hidden on the sign-in screens). Sections:
 
 1. **Who am I:** switch to any demo user instantly (re-login + full re-sync). Shows their company role and per-project role/job title.
 2. **Network:** Online / Slow / Flaky / Offline (segmented). Shows "Event bus: connected/disconnected".
@@ -596,22 +713,28 @@ Opened from a small floating **"Demo"** pill (bottom-left, above the tab bar, dr
 
 Each scenario must work end to end:
 
-1. **First login as Ravi (Worker):** OTP screen, lands on Home with unread badges; Tasks tab shows "My tasks" with big buttons; Bot DM shows an unanswered check-in.
-2. **Answer the check-in:** Working on it → 75%. Card collapses to summary; `#site-work` shows a status card; switch to Amit and see the task at 75% with history "via check-in".
+1. **First login as Ravi (Worker):** OTP screen, lands on Home with unread badges; Tasks tab shows "My tasks" with big buttons; the DMs tab shows the Siteline Bot with an unanswered check-in.
+2. **Answer the check-in:** tap 75% on the scale. The card collapses to one line and the next task opens; `#site-work` shows a status card; switch to Amit and see the task at 75% with history "via check-in".
 3. **Offline send:** set Offline, send text + photo in `#site-work` → clock icons + offline banner with count; go Online → upload then message deliver in order; no duplicates.
-4. **Lanes:** Slow network, send a photo in `#site-work` then a text in Café Brew `#general` (as Suresh) → the text arrives first.
+4. **Lanes:** Slow network, send a photo in `#site-work` then a text in OITH `#general` (as Suresh) → the text arrives first.
 5. **Merging:** as Amit, Offline, edit one task 5 times → outbox inspector shows one item with final values; Online → one PATCH in the log.
 6. **Timeout after save:** inject timeout-after-save, send a message → it retries and shows once (server returned existing).
 7. **Permanent failure:** as Suresh, inject 403 then edit a task date → change reverts with explanation; item appears in Unsent with Retry/Discard.
-8. **Permissions:** as Ravi, no "Edit dates", "Add member", "Lock baseline" or `#qs` channel; as Rohan, `#qs` visible; as Arjun, all projects + Dashboard tab, but other people's DMs are not listed.
-9. **Live updates:** while viewing Sharma Residence tasks as Suresh, trigger "Amit shifts 5 tasks now" → rows update live; Activity shows one batched item.
-10. **Baseline:** as Kavya (Manager of Mehta Villa), lock the baseline; move a task's finish later → variance chip and red mini-bar; Re-baseline asks for a reason and logs it.
+8. **Permissions:** as Ravi, no "Edit dates", "Add member", "Lock baseline" or `#qs` channel; as Rohan, `#qs` visible; as Arjun, all projects + Dashboard tab, but other people's DMs are not listed on the DMs tab.
+9. **Live updates:** while viewing Villa 99 tasks as Suresh, trigger "Amit shifts 5 tasks now" → rows update live; Activity shows one batched item.
+10. **Baseline:** as Kavya (Manager of RV University), open the three-dot menu and lock the baseline; move a task's finish later → variance chip and red mini-bar; Re-baseline asks for a reason and logs it.
 11. **Forms:** Report issue (Urgent) with a photo → issue card + Managers mentioned; Daily report card renders.
 12. **Members:** as Amit, add Lakshmi as Member · Worker → default channels pre-ticked; she appears in `#site-work` member list; remove Ravi → as Ravi, the project disappears after the event/sync.
 13. **Session:** force token expiry → next action works silently; deactivate me → wiped and back to login.
 14. **Logout with unsent items** shows the warning.
 15. **Language:** switch to ಕನ್ನಡ as Ravi → check-in card, My tasks and error messages appear in Kannada.
 16. **Dark mode** looks intentional on every screen.
+17. **Project settings:** as Amit, add a private channel with three people → it appears for them only; make `#design` private; rename a channel; delete a channel.
+18. **Browse and join:** as Kavya, Browse channels on Villa 99 → join `#site-work`; leave it again from the channel's details.
+19. **Archive:** as Arjun, archive OITH → it moves to "Archived" on Home, its channels are read-only, it leaves the dashboard; unarchive brings it back. Delete a project by typing its name.
+20. **Bot queue:** as Ravi, open the bot → progress bar "3 tasks need an update"; answer each in one tap; add a note to one; the bar ends at "All caught up".
+21. **Task filters:** Pending + an owner + "Next 7 days" → "Showing N of M"; Clear restores the list.
+22. **DMs:** start a new message from the DMs tab; back out without typing → no empty conversation is left behind.
 
 ---
 
@@ -630,6 +753,8 @@ Each scenario must work end to end:
 
 After each milestone: run the app, check the relevant §14 scenarios, and commit.
 
+Before calling any change done: `npm run typecheck`, `npm run lint`, `npm test`.
+
 ---
 
 ## 16. Quality bar
@@ -645,7 +770,7 @@ After each milestone: run the app, check the relevant §14 scenarios, and commit
 
 ## 17. Explicitly out of scope
 
-Real backend, real OTP/SMS, real push, real file storage, search beyond local filtering, video calls, message search across history, task dependencies, Gantt chart, AI assistant, client (homeowner) guest role, iOS-specific polish, app store builds.
+Real backend, real OTP/SMS, real push, real file storage, real voice recording and file picking, adding people to the company, crash reporting, search beyond local filtering, video calls, message search across history, task dependencies, Gantt chart, AI assistant, client (homeowner) guest role, iOS-specific polish, app store builds.
 
 ---
 
@@ -655,6 +780,7 @@ Real backend, real OTP/SMS, real push, real file storage, search beyond local fi
 # Siteline demo — rules
 - Read SITELINE_DEMO_SPEC.md before any change. It is the source of truth.
 - Must run in Expo Go. Do not add libraries that need a dev build.
+- Files in app/ are routes only: read URL params and render a screen from src/features/<area>/screens/.
 - Screens never call the API or DB directly; use feature hooks.
 - All writes go through the outbox (one transaction with the local change).
 - Never import from src/mock outside src/lib/api/transport.ts and the Demo panel.
@@ -674,5 +800,8 @@ Real backend, real OTP/SMS, real push, real file storage, search beyond local fi
 | Empty channel | No messages yet. Share an update or a photo from site. |
 | Empty My tasks | Nothing due today. Enjoy the calm. |
 | Read-only channel | Only admins can post here. |
-| Removed from project | You no longer have access to Sharma Residence. |
+| Removed from project | You no longer have access to Villa 99. |
+| Archived project | This project is archived. It is read-only. |
+| Bot progress | 3 tasks need an update · 0 of 3 done |
+| Bot finished | All caught up. Thanks! |
 | Logout warning | 3 changes haven't been sent yet. Log out anyway? |

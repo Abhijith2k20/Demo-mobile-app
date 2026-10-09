@@ -1,5 +1,8 @@
 # Decisions and deviations from the spec
 
+> **Note:** `SITELINE_DEMO_SPEC.md` was rewritten as version 1.2 to describe the app as built. The
+> entries below are kept as the record of what changed from the first version of the spec and why.
+
 `SITELINE_DEMO_SPEC.md` is the source of truth. This file records every place where the build
 differs from it, or where the spec left a choice open. Built against **Expo SDK 57**
 (React Native 0.86, React 19.2, Reanimated 4.5).
