@@ -42,6 +42,7 @@ src/theme/           colours, type, spacing
 ## Checks
 
 ```bash
+npm test             # jest: outbox ordering, task rules, permissions
 npm run typecheck    # tsc --noEmit
 npm run lint         # expo lint
 npm run i18n         # regenerate en.json from the English defaults in code

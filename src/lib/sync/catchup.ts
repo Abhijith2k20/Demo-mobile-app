@@ -12,6 +12,7 @@ const KEY = 'lastSyncTime';
 
 let inflight: Promise<boolean> | null = null;
 let queued = false;
+let queuedFull = false;
 
 async function runOnce(full: boolean): Promise<void> {
   // A reply that arrives after logout or a user switch belongs to someone else: drop it.
@@ -45,6 +46,8 @@ async function runOnce(full: boolean): Promise<void> {
 export function catchUp(opts: { full?: boolean } = {}): Promise<boolean> {
   if (inflight) {
     queued = true;
+    // Remember that someone needs everything reloaded; the next pass honours it.
+    queuedFull = queuedFull || !!opts.full;
     return inflight;
   }
   useUi.getState().set({ syncing: true });
@@ -53,8 +56,9 @@ export function catchUp(opts: { full?: boolean } = {}): Promise<boolean> {
       let full = !!opts.full;
       do {
         queued = false;
+        queuedFull = false;
         await runOnce(full);
-        full = false;
+        full = queuedFull;
       } while (queued);
       useUi.getState().set({ syncFailed: false });
       return true;

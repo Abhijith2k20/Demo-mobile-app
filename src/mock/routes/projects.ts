@@ -18,6 +18,7 @@ import {
 } from '../db';
 import { publish } from '../events';
 import { forbidden, MockError, notFound, parse, route, type RouteDef } from '../http';
+import { visibleProject } from '../access';
 import { firstName } from '../notify';
 import { postMessage } from './messages';
 
@@ -29,12 +30,6 @@ const STAGE_LABEL: Record<string, string> = {
   finishing: 'Finishing',
   handover: 'Handover',
 };
-
-function visibleProject(user: StoredUser, id: ID): Project {
-  const p = store().projects.get(id);
-  if (!p || !canSeeProject(user, id)) throw notFound('Project');
-  return p;
-}
 
 function requireMembersPermission(user: StoredUser, project: Project): void {
   if (!can(user, 'project.members', { projectRole: projectRole(user.id, project.id) })) {
@@ -178,15 +173,6 @@ export const projectRoutes: RouteDef[] = [
     }
     publish({ type: 'project.updated', project }, admins());
     return { project };
-  }),
-
-  route('GET', '/projects/:id/members', ({ user, params }) => {
-    const project = visibleProject(user, params.id);
-    return {
-      members: store()
-        .projectMembers.filter((m) => m.projectId === project.id)
-        .map(({ joinedAt: _j, ...m }) => m),
-    };
   }),
 
   route('POST', '/projects/:id/members', ({ user, params, body }) => {

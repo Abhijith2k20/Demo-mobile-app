@@ -1,5 +1,6 @@
 // Message renderer registry (§7.4): one component per message type.
 import { Feather } from '@expo/vector-icons';
+import { format, parseISO } from 'date-fns';
 import { router } from 'expo-router';
 import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -255,7 +256,7 @@ function DailyReportCard({ message }: Props) {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <CardTitle icon="clipboard" label={t('report.card', 'Daily report')} color={c.success} />
         <T variant="meta" color="textMuted">
-          {shortDate(message.createdAt.slice(0, 10))}
+          {format(parseISO(message.createdAt), 'd MMM')}
         </T>
       </View>
       <T variant="body">{String(d.workDone ?? '')}</T>

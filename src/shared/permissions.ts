@@ -17,9 +17,6 @@ export const PROJECT_PERMISSIONS = {
   member: ['task.create', 'task.update_own'],
 } as const;
 
-export type ProjectAction =
-  | (typeof PROJECT_PERMISSIONS)['manager'][number]
-  | (typeof PROJECT_PERMISSIONS)['member'][number];
 export type CompanyAction = 'company.users' | 'project.create';
 
 export function isCompanyAdmin(user: Pick<User, 'companyRole'>): boolean {

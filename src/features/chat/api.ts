@@ -1,14 +1,14 @@
 // Chat writes. Each one changes the local DB and queues an outbox item in ONE transaction.
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import * as Haptics from 'expo-haptics';
 import { uuidv7 } from 'uuidv7';
 import { api } from '@/lib/api/client';
 import { db, type Tx } from '@/lib/db/client';
-import { channelMembers, channels, messages } from '@/lib/db/schema';
+import { channelMembers, channels, messages, outbox } from '@/lib/db/schema';
 import { enqueue, write } from '@/lib/outbox/enqueue';
 import { lanes } from '@/lib/outbox/lanes';
 import { editUnsentMessage, enqueueMerged, removeUnsentMessage } from '@/lib/outbox/merge';
-import { applyIncoming, withReaction } from '@/lib/sync/applyIncoming';
+import { applyIncoming, LOCAL_ONLY, withReaction } from '@/lib/sync/applyIncoming';
 import { useSession } from '@/stores/session';
 import type { Attachment, ID, Message, MessageType, User } from '@/types/models';
 
@@ -62,6 +62,7 @@ export function queueMessage(tx: Tx, input: NewMessage): ID {
       deletedAt: null,
     })
     .run();
+  ensureDmCreated(tx, input.channelId, me);
   // Uploads go in their own lane; each waits for the previous one, the message waits for the last.
   let dep: ID | null = input.dependsOn ?? null;
   for (const p of photos) {
@@ -81,10 +82,52 @@ export function queueMessage(tx: Tx, input: NewMessage): ID {
   if (!input.threadParentId) {
     tx.update(channelMembers)
       .set({ lastReadMessageId: id })
-      .where(and(eq(channelMembers.channelId, input.channelId), eq(channelMembers.userId, me)))
+      .where(
+        and(
+          eq(channelMembers.channelId, input.channelId),
+          eq(channelMembers.userId, me),
+          // Never backwards: with a real server the phone's clock may be behind.
+          sql`(${channelMembers.lastReadMessageId} IS NULL OR ${channelMembers.lastReadMessageId} < ${id})`,
+        ),
+      )
       .run();
   }
   return id;
+}
+
+/**
+ * A direct message conversation is only created on the server when its first message is sent.
+ * Until then it exists on this phone alone, so opening a person's chat creates nothing for them.
+ */
+function ensureDmCreated(tx: Tx, channelId: ID, me: ID): void {
+  const ch = tx.select().from(channels).where(eq(channels.id, channelId)).get();
+  if (!ch || ch.kind !== 'dm' || ch.updatedAt !== LOCAL_ONLY) return;
+  const queued = tx
+    .select({ id: outbox.id })
+    .from(outbox)
+    .where(and(eq(outbox.kind, 'create_dm'), eq(outbox.entityId, channelId)))
+    .get();
+  if (queued) return;
+  const other = tx
+    .select({ userId: channelMembers.userId })
+    .from(channelMembers)
+    .where(and(eq(channelMembers.channelId, channelId), ne(channelMembers.userId, me)))
+    .get();
+  // Same lane as the messages, so the conversation always exists before the first one arrives.
+  if (other) enqueue(tx, 'create_dm', lanes.channel(channelId), channelId, { channelId, userId: other.userId });
+}
+
+/** Leaving a brand-new conversation without writing anything removes it again. */
+export function discardEmptyDm(channelId: ID): void {
+  db.transaction((tx) => {
+    const ch = tx.select().from(channels).where(eq(channels.id, channelId)).get();
+    if (!ch || ch.kind !== 'dm' || ch.updatedAt !== LOCAL_ONLY) return;
+    const hasMessage = tx.select({ id: messages.id }).from(messages).where(eq(messages.channelId, channelId)).get();
+    const hasQueued = tx.select({ id: outbox.id }).from(outbox).where(eq(outbox.lane, lanes.channel(channelId))).get();
+    if (hasMessage || hasQueued) return;
+    tx.delete(channelMembers).where(eq(channelMembers.channelId, channelId)).run();
+    tx.delete(channels).where(eq(channels.id, channelId)).run();
+  });
 }
 
 export function sendMessage(input: NewMessage): ID {
@@ -184,7 +227,7 @@ export function markRead(channelId: ID, upToMessageId: ID): void {
   });
 }
 
-/** Returns the DM channel with a person, creating it locally (and queueing the create) if needed. */
+/** Returns the DM channel with a person, creating it on this phone if there isn't one yet. */
 export function openDm(userId: ID): ID {
   const me = meId();
   const mine = db.select().from(channelMembers).where(eq(channelMembers.userId, me)).all();
@@ -208,7 +251,7 @@ export function openDm(userId: ID): ID {
   if (existing) return existing.channelId;
   const id = uuidv7();
   const companyId = useSession.getState().user ? (db.select().from(channels).get()?.companyId ?? '') : '';
-  write((tx) => {
+  db.transaction((tx) => {
     tx.insert(channels)
       .values({
         id,
@@ -218,7 +261,7 @@ export function openDm(userId: ID): ID {
         kind: 'dm',
         isPrivate: true,
         postingPolicy: 'everyone',
-        updatedAt: new Date(0).toISOString(),
+        updatedAt: LOCAL_ONLY,
       })
       .run();
     tx.insert(channelMembers)
@@ -227,7 +270,7 @@ export function openDm(userId: ID): ID {
         { channelId: id, userId, lastReadMessageId: null },
       ])
       .run();
-    enqueue(tx, 'create_dm', lanes.channel(id), id, { channelId: id, userId });
+    // Nothing is queued yet: see ensureDmCreated.
   });
   return id;
 }

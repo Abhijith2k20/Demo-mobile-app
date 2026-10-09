@@ -1,27 +1,21 @@
-// Manager schedule: tasks grouped by phase, with swipe actions, quick add and baseline lock.
+// Manager schedule: filters, tasks grouped by phase, quick add and the shift-dates sheet.
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
-import { memo, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from 'react-native';
-import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Button, Chip, EmptyState, Pill, Skeleton } from '@/components/basics';
-import { Field } from '@/components/form';
-import { Sheet, SheetInput } from '@/components/Sheet';
+import { Button, Chip, EmptyState, Skeleton } from '@/components/basics';
+import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { rebaselineSchema } from '@/shared/schemas';
-import { isDone, shortDate, taskVarianceDays } from '@/shared/taskRules';
+import { isDone, taskVarianceDays } from '@/shared/taskRules';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import { PHASES, type ID, type Project, type Task, type User } from '@/types/models';
-import { useMe, useProjectAccess, useUsers, type ProjectAccess } from '../../shared';
-import { confirmTask, createTask, lockBaseline, quickAddDefaults, shiftTask, updateTask } from '../api';
+import { PHASES, type Project, type Task } from '@/types/models';
+import { useMe, useProjectAccess, useUsers } from '../../shared';
+import { confirmTask, createTask, quickAddDefaults, shiftTask, updateTask } from '../api';
 import { orderedPhases, useProjectTasks } from '../hooks';
-import { MiniTimeline, StatusDot } from './bits';
-
-// Width of a revealed swipe action; pulling half of it is enough to trigger.
-const ACTION_WIDTH = 132;
+import { BaselineControl, RebaselineSheet } from './Baseline';
+import { dateRange, TaskRow } from './TaskRow';
 
 type Filter = 'all' | 'mine' | 'delayed' | 'blocked' | 'done';
 const FILTERS: { value: Filter; label: string }[] = [
@@ -33,91 +27,6 @@ const FILTERS: { value: Filter; label: string }[] = [
 ];
 
 type Item = { kind: 'phase'; key: string; phase: string; done: number; total: number } | { kind: 'task'; key: string; task: Task };
-
-function dateRange(task: Task): string {
-  const a = shortDate(task.plannedStart);
-  const b = shortDate(task.plannedFinish);
-  if (task.plannedStart === task.plannedFinish) return a;
-  // "18–21 Oct" when both dates share a month.
-  return a.split(' ')[1] === b.split(' ')[1] ? `${a.split(' ')[0]}–${b}` : `${a}–${b}`;
-}
-
-interface RowProps {
-  task: Task;
-  owner: User | undefined;
-  window: { from: string; to: string };
-  canDone: boolean;
-  canShift: boolean;
-  onDone: (t: Task) => void;
-  onShift: (t: Task) => void;
-}
-
-const TaskRow = memo(function TaskRow({ task, owner, window, canDone, canShift, onDone, onShift }: RowProps) {
-  const { c } = useTheme();
-  const ref = useRef<SwipeableMethods>(null);
-  const late = (taskVarianceDays(task) ?? 0) > 0 && !isDone(task.status);
-  const action = (label: string, icon: 'check' | 'calendar', bg: string, fg: string, align: 'flex-start' | 'flex-end') => (
-    <View style={{ width: ACTION_WIDTH, backgroundColor: bg, justifyContent: 'center', alignItems: align, paddingHorizontal: space.lg }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-        <Feather name={icon} size={18} color={fg} />
-        <T variant="metaStrong" style={{ color: fg }}>
-          {label}
-        </T>
-      </View>
-    </View>
-  );
-  const body = (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push(`/task/${task.id}`)}
-      style={({ pressed }) => ({
-        backgroundColor: pressed ? c.surfaceAlt : c.bg,
-        paddingHorizontal: space.lg,
-        paddingVertical: space.sm + 2,
-        gap: 6,
-      })}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-        <StatusDot status={task.status} />
-        <T variant="body" numberOfLines={1} style={{ flex: 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }} color={task.status === 'done' ? 'textMuted' : 'text'}>
-          {task.name}
-        </T>
-        {task.status === 'done_pending_confirmation' ? <Pill label="Confirm" bg={c.warningSoft} fg={c.warning} /> : null}
-        {owner ? <Avatar id={owner.id} name={owner.name} size={20} /> : null}
-        <T variant="metaStrong" color={task.percent === 100 ? 'success' : 'textMuted'} style={{ minWidth: 38, textAlign: 'right' }}>
-          {task.percent}%
-        </T>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: 18 }}>
-        <T variant="meta" color={late ? 'danger' : 'textMuted'} style={{ width: 108 }} numberOfLines={1}>
-          {dateRange(task)}
-        </T>
-        <View style={{ flex: 1 }}>
-          <MiniTimeline task={task} from={window.from} to={window.to} />
-        </View>
-      </View>
-    </Pressable>
-  );
-  if (!canDone && !canShift) return body;
-  return (
-    <ReanimatedSwipeable
-      ref={ref}
-      friction={1.2}
-      leftThreshold={ACTION_WIDTH / 2}
-      rightThreshold={ACTION_WIDTH / 2}
-      overshootLeft={false}
-      overshootRight={false}
-      renderLeftActions={canDone && task.status !== 'done' ? () => action(task.status === 'done_pending_confirmation' ? 'Confirm done' : 'Mark done', 'check', c.successSoft, c.success, 'flex-start') : undefined}
-      renderRightActions={canShift ? () => action('Shift dates', 'calendar', c.infoSoft, c.info, 'flex-end') : undefined}
-      onSwipeableWillOpen={(direction) => {
-        ref.current?.close();
-        // Swiping right reveals the left action.
-        if (direction === 'right') onDone(task);
-        else onShift(task);
-      }}>
-      {body}
-    </ReanimatedSwipeable>
-  );
-});
 
 export function ScheduleList({ project, header }: { project: Project; header?: React.ReactNode }) {
   const { c, type } = useTheme();
@@ -332,116 +241,5 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
 
       <RebaselineSheet project={project} visible={rebaseline} onClose={() => setRebaseline(false)} />
     </KeyboardAvoidingView>
-  );
-}
-
-/** Lock baseline (Managers) when it isn't locked; a lock icon + Re-baseline once it is. */
-export function BaselineControl({ project, access, onRebaseline }: { project: Project; access: ProjectAccess; onRebaseline: () => void }) {
-  const { c } = useTheme();
-  const [confirm, setConfirm] = useState(false);
-  const canBaseline = access.can('task.baseline');
-  if (!project.baselineLocked) {
-    if (!canBaseline) return null;
-    return (
-      <>
-        <Button small full={false} kind="secondary" icon="lock" label="Lock baseline" onPress={() => setConfirm(true)} />
-        <Sheet visible={confirm} onClose={() => setConfirm(false)} title="Lock baseline?">
-          <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
-            Today&apos;s planned dates become the baseline. Later date changes will show as variance against it.
-          </T>
-          <Button
-            label="Lock baseline"
-            icon="lock"
-            onPress={() => {
-              lockBaseline(project, null);
-              setConfirm(false);
-            }}
-          />
-        </Sheet>
-      </>
-    );
-  }
-  return (
-    <Pressable
-      disabled={!canBaseline}
-      onPress={onRebaseline}
-      accessibilityLabel={canBaseline ? 'Baseline locked. Re-baseline' : 'Baseline locked'}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: space.sm }}>
-      <Feather name="lock" size={14} color={c.textMuted} />
-      {canBaseline ? (
-        <T variant="metaStrong" color="accent">
-          Re-baseline
-        </T>
-      ) : (
-        <T variant="meta" color="textMuted">
-          Baseline locked
-        </T>
-      )}
-    </Pressable>
-  );
-}
-
-function RebaselineSheet({ project, visible, onClose }: { project: Project; visible: boolean; onClose: () => void }) {
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState<string | undefined>();
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Re-baseline the schedule">
-      <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
-        The current planned dates replace the old baseline and variance goes back to zero. The reason is logged in #general.
-      </T>
-      <Field label="Reason" error={error}>
-        <SheetInput value={reason} onChangeText={setReason} placeholder="e.g. Client added the study room" />
-      </Field>
-      <Button
-        label="Re-baseline"
-        icon="refresh-cw"
-        onPress={() => {
-          const parsed = rebaselineSchema.safeParse({ reason });
-          if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message);
-            return;
-          }
-          lockBaseline(project, parsed.data.reason);
-          setReason('');
-          setError(undefined);
-          onClose();
-        }}
-      />
-    </Sheet>
-  );
-}
-
-export function ProjectSwitcher({ projects, current, onPick }: { projects: Project[]; current: Project; onPick: (id: ID) => void }) {
-  const { c } = useTheme();
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Project: ${current.name}. Change`}
-        onPress={() => setOpen(true)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: touch.min }}>
-        <T variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
-          {current.name.split(' – ')[0]}
-        </T>
-        <Feather name="chevron-down" size={18} color={c.textMuted} />
-      </Pressable>
-      <Sheet visible={open} onClose={() => setOpen(false)} title="Switch project">
-        {projects.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() => {
-              onPick(p.id);
-              setOpen(false);
-            }}
-            style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-            <Feather name={p.id === current.id ? 'check-circle' : 'circle'} size={18} color={p.id === current.id ? c.accent : c.textFaint} />
-            <T variant={p.id === current.id ? 'bodyStrong' : 'body'} style={{ flex: 1 }} numberOfLines={1}>
-              {p.name}
-            </T>
-          </Pressable>
-        ))}
-      </Sheet>
-    </>
   );
 }

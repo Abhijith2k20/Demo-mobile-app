@@ -246,6 +246,20 @@ export function CheckinCard({ message }: { message: Message }) {
     );
   }
 
+  // Archived projects are read-only, so there is nothing to answer.
+  if (access.archived) {
+    return (
+      <Card accent={c.textFaint} style={{ maxWidth: 360, marginTop: 2 }}>
+        <T variant="meta" color="textMuted" numberOfLines={1}>
+          {taskName}
+        </T>
+        <T variant="body" color="textMuted">
+          {t('chat.archived', 'This project is archived. It is read-only.')}
+        </T>
+      </Card>
+    );
+  }
+
   return (
     <Card accent={c.accent} style={{ maxWidth: 360, marginTop: 2 }}>
       {reminder ? (

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_channel_created ON messages (channel_id, created_at);
 CREATE INDEX IF NOT EXISTS messages_thread ON messages (thread_parent_id);
+CREATE INDEX IF NOT EXISTS messages_channel_id ON messages (channel_id, id);
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, phase TEXT NOT NULL, name TEXT NOT NULL,
   description TEXT, owner_id TEXT, planned_start TEXT NOT NULL, planned_finish TEXT NOT NULL,

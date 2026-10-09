@@ -41,16 +41,6 @@ type UserKey =
   | 'prakash'
   | 'bot';
 
-export const DEMO_PHONES: { phone: string; name: string; subtitle: string }[] = [
-  { phone: '9845000001', name: 'Arjun Rao', subtitle: 'Owner · CEO' },
-  { phone: '9845000002', name: 'Meera Iyer', subtitle: 'Admin · Operations' },
-  { phone: '9845000003', name: 'Amit Kulkarni', subtitle: 'Project Manager' },
-  { phone: '9845000004', name: 'Kavya Shetty', subtitle: 'Designer' },
-  { phone: '9845000005', name: 'Rohan Desai', subtitle: 'QS' },
-  { phone: '9845000006', name: 'Suresh Gowda', subtitle: 'Supervisor' },
-  { phone: '9845000007', name: 'Ravi Kumar', subtitle: 'Worker' },
-];
-
 function build(): MockStore {
   seq = 0;
   const now = Date.now();

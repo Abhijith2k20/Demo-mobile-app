@@ -6,7 +6,6 @@ export type JobTitle = 'Project Manager' | 'Designer' | 'QS' | 'Supervisor' | 'W
 export type Stage = 'design' | 'approval' | 'procurement' | 'execution' | 'finishing' | 'handover';
 
 export const STAGES: Stage[] = ['design', 'approval', 'procurement', 'execution', 'finishing', 'handover'];
-export const JOB_TITLES: JobTitle[] = ['Project Manager', 'Designer', 'QS', 'Supervisor', 'Worker'];
 export const PHASES = [
   'Civil',
   'Electrical',

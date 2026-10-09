@@ -2,214 +2,23 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, Switch, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Button, Card, EmptyState, Pill, type IconName } from '@/components/basics';
+import { Button, Card, EmptyState, Pill } from '@/components/basics';
 import { appScreen, Header, OfflineBanner, Screen } from '@/components/chrome';
-import { Field, Input } from '@/components/form';
-import { Sheet, SheetInput } from '@/components/Sheet';
+import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { createChannel, deleteChannel, deleteProject, setProjectArchived, updateChannel, updateProjectDetails } from '@/features/projects/api';
+import { createChannel, deleteChannel, updateChannel } from '@/features/projects/api';
 import { useChannelMembership, useProjectChannels } from '@/features/projects/hooks';
 import { shortProjectName, useProject, useProjectAccess, useUnsentCount } from '@/features/shared';
-import { useProjectMembers, type MemberRow } from '@/features/tasks/hooks';
-import { channelCreateSchema, normalizeChannelName, projectDetailsSchema } from '@/shared/schemas';
-import { toast } from '@/stores/ui';
+import { useProjectMembers } from '@/features/tasks/hooks';
+import { channelCreateSchema, normalizeChannelName } from '@/shared/schemas';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { Channel, ID, Project } from '@/types/models';
-
-const HOME_CHANNEL = 'general';
-
-function ActionRow({ icon, title, subtitle, onPress, danger }: { icon: IconName; title: string; subtitle: string; onPress: () => void; danger?: boolean }) {
-  const { c } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
-      <Feather name={icon} size={18} color={danger ? c.danger : c.textMuted} />
-      <View style={{ flex: 1 }}>
-        <T variant="bodyStrong" color={danger ? 'danger' : 'text'}>
-          {title}
-        </T>
-        <T variant="meta" color="textMuted">
-          {subtitle}
-        </T>
-      </View>
-      <Feather name="chevron-right" size={18} color={c.textFaint} />
-    </Pressable>
-  );
-}
-
-function DetailsForm({ project, canEdit }: { project: Project; canEdit: boolean }) {
-  // null = showing the saved values; an object = the user is editing.
-  const [draft, setDraft] = useState<{ name: string; client: string; address: string } | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const value = draft ?? { name: project.name, client: project.client, address: project.address };
-  const set = (patch: Partial<typeof value>) => setDraft({ ...value, ...patch });
-
-  const save = () => {
-    const parsed = projectDetailsSchema.safeParse(value);
-    if (!parsed.success) {
-      const next: Record<string, string> = {};
-      for (const issue of parsed.error.issues) next[String(issue.path[0])] = issue.message;
-      setErrors(next);
-      return;
-    }
-    updateProjectDetails(project, parsed.data);
-    setDraft(null);
-    setErrors({});
-    toast('Project details saved.', 'success');
-  };
-
-  if (!canEdit) {
-    return (
-      <Card>
-        <T variant="bodyStrong">{project.name}</T>
-        <T variant="meta" color="textMuted">
-          {project.client}
-        </T>
-        <T variant="meta" color="textMuted">
-          {project.address}
-        </T>
-      </Card>
-    );
-  }
-  return (
-    <View>
-      <Field label="Project name" error={errors.name}>
-        <Input value={value.name} onChangeText={(name) => set({ name })} />
-      </Field>
-      <Field label="Client" error={errors.client}>
-        <Input value={value.client} onChangeText={(client) => set({ client })} />
-      </Field>
-      <Field label="Site address" error={errors.address}>
-        <Input value={value.address} onChangeText={(address) => set({ address })} multiline />
-      </Field>
-      {draft ? (
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <View style={{ flex: 1 }}>
-            <Button label="Save details" onPress={save} />
-          </View>
-          <Button
-            kind="secondary"
-            full={false}
-            label="Cancel"
-            onPress={() => {
-              setDraft(null);
-              setErrors({});
-            }}
-          />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-interface Draft {
-  /** null when creating a new channel. */
-  channel: Channel | null;
-  name: string;
-  isPrivate: boolean;
-  memberIds: ID[];
-}
-
-function ChannelEditor({
-  draft,
-  members,
-  onChange,
-  error,
-}: {
-  draft: Draft;
-  members: MemberRow[];
-  onChange: (d: Draft) => void;
-  error?: string;
-}) {
-  const { c } = useTheme();
-  const home = draft.channel?.name === HOME_CHANNEL;
-  const toggle = (id: ID) =>
-    onChange({ ...draft, memberIds: draft.memberIds.includes(id) ? draft.memberIds.filter((x) => x !== id) : [...draft.memberIds, id] });
-
-  return (
-    <View style={{ gap: space.lg }}>
-      <Field label="Name" error={error}>
-        {home ? (
-          <T variant="body" color="textMuted">
-            # general — every project keeps this channel, so it can&apos;t be renamed.
-          </T>
-        ) : (
-          <SheetInput
-            value={draft.name}
-            onChangeText={(v) => onChange({ ...draft, name: v.toLowerCase().replace(/\s+/g, '-') })}
-            placeholder="e.g. electrical"
-            autoCapitalize="none"
-            autoCorrect={false}
-            maxLength={30}
-          />
-        )}
-      </Field>
-
-      <View style={{ marginTop: -space.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: touch.worker }}>
-          <Feather name={draft.isPrivate ? 'lock' : 'hash'} size={18} color={c.textMuted} />
-          <T variant="bodyStrong" style={{ flex: 1 }}>
-            Private channel
-          </T>
-          <Switch
-            value={draft.isPrivate}
-            disabled={home}
-            onValueChange={(isPrivate) => onChange({ ...draft, isPrivate })}
-            trackColor={{ true: c.accent, false: c.border }}
-            thumbColor={c.surface}
-            accessibilityLabel="Private channel"
-          />
-        </View>
-        <T variant="meta" color="textMuted">
-          {home
-            ? '#general stays open to everyone on the project.'
-            : draft.isPrivate
-              ? 'Only the people ticked below can see this channel. Others cannot find or join it.'
-              : 'Anyone on the project can find this channel and join it. The people ticked below are in it from the start.'}
-        </T>
-      </View>
-
-      <View>
-        <T variant="label" color="textMuted" style={{ marginBottom: space.xs }}>
-          People in this channel
-        </T>
-        {members.map(({ user, member }) => {
-          const manager = member.role === 'manager';
-          const on = manager || home || draft.memberIds.includes(user.id);
-          const locked = manager || home;
-          return (
-            <Pressable
-              key={user.id}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on, disabled: locked }}
-              disabled={locked}
-              onPress={() => toggle(user.id)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}>
-              <Feather name={on ? 'check-square' : 'square'} size={20} color={locked ? c.textFaint : on ? c.accent : c.textFaint} />
-              <Avatar id={user.id} name={user.name} size={28} />
-              <View style={{ flex: 1 }}>
-                <T variant="body" numberOfLines={1}>
-                  {user.name}
-                </T>
-                <T variant="meta" color="textMuted">
-                  {manager ? 'Manager · in every channel' : member.jobTitle}
-                </T>
-              </View>
-            </Pressable>
-          );
-        })}
-        <T variant="meta" color="textFaint" style={{ marginTop: space.xs }}>
-          The owner and admins can see every project channel.
-        </T>
-      </View>
-    </View>
-  );
-}
+import type { Channel, ID } from '@/types/models';
+import { ChannelEditor, HOME_CHANNEL, type ChannelDraft } from '../components/settings/ChannelEditor';
+import { DetailsForm } from '../components/settings/DetailsForm';
+import { ProjectLifecycle } from '../components/settings/ProjectLifecycle';
 
 function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; openChannelId?: string }) {
   const { c } = useTheme();
@@ -220,14 +29,11 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
   const members = useProjectMembers(id);
   const membership = useChannelMembership(id);
   const unsent = useUnsentCount();
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [shown, setShown] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<ChannelDraft | null>(null);
+  const [shown, setShown] = useState<ChannelDraft | null>(null);
   const [nameError, setNameError] = useState<string | undefined>();
   const [deleting, setDeleting] = useState<Channel | null>(null);
   const [openedFromLink, setOpenedFromLink] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [typed, setTyped] = useState('');
   if (draft && draft !== shown) setShown(draft);
 
   const canChannels = access.can('channel.manage');
@@ -284,7 +90,6 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
 
   const d = draft ?? shown;
   const anything = canEdit || canChannels || canMembers || access.canArchive || access.isAdmin;
-  const shortName = project ? shortProjectName(project.name) : '';
 
   return (
     <Screen>
@@ -386,51 +191,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
               </T>
             </View>
 
-            {access.canArchive || access.isAdmin ? (
-              <View>
-                <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-                  Project
-                </T>
-                <Card style={{ padding: 0 }}>
-                  {access.canArchive ? (
-                    project.archivedAt ? (
-                      <ActionRow
-                        icon="rotate-ccw"
-                        title="Unarchive project"
-                        subtitle="Make it active again"
-                        onPress={() => setProjectArchived(project, false)}
-                      />
-                    ) : (
-                      <ActionRow
-                        icon="archive"
-                        title="Archive project"
-                        subtitle="Read-only. Can be undone."
-                        onPress={() => setArchiving(true)}
-                      />
-                    )
-                  ) : null}
-                  {access.isAdmin ? (
-                    <View style={{ borderTopWidth: access.canArchive ? 1 : 0, borderTopColor: c.border }}>
-                      <ActionRow
-                        danger
-                        icon="trash-2"
-                        title="Delete project"
-                        subtitle="Permanent, for everyone."
-                        onPress={() => {
-                          setTyped('');
-                          setRemoving(true);
-                        }}
-                      />
-                    </View>
-                  ) : null}
-                </Card>
-                {access.isAdmin ? null : (
-                  <T variant="meta" color="textFaint" style={{ marginTop: space.sm }}>
-                    Only the owner or an admin can delete a project.
-                  </T>
-                )}
-              </View>
-            ) : null}
+            <ProjectLifecycle project={project} access={access} />
           </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -483,41 +244,6 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
         <Button kind="ghost" label="Cancel" onPress={() => setDeleting(null)} />
       </Sheet>
 
-      <Sheet visible={archiving} onClose={() => setArchiving(false)} title={`Archive ${shortName}?`}>
-        <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
-          People can still read it, but nobody can post or change anything until it is unarchived. Nothing is deleted.
-        </T>
-        <Button
-          icon="archive"
-          label="Archive project"
-          onPress={() => {
-            if (project) setProjectArchived(project, true);
-            setArchiving(false);
-          }}
-        />
-        <Button kind="ghost" label="Cancel" onPress={() => setArchiving(false)} />
-      </Sheet>
-
-      <Sheet visible={removing} onClose={() => setRemoving(false)} title={`Delete ${shortName}?`}>
-        <T variant="body" color="textMuted" style={{ marginBottom: space.md }}>
-          All its channels, messages, photos and tasks are removed for everyone. This can&apos;t be undone.
-        </T>
-        <Field label={`Type ${shortName} to confirm`}>
-          <SheetInput value={typed} onChangeText={setTyped} autoCapitalize="none" autoCorrect={false} placeholder={shortName} />
-        </Field>
-        <Button
-          kind="danger"
-          icon="trash-2"
-          label="Delete project"
-          disabled={typed.trim().toLowerCase() !== shortName.toLowerCase()}
-          onPress={() => {
-            setRemoving(false);
-            if (project) deleteProject(project);
-            router.dismissTo('/');
-          }}
-        />
-        <Button kind="ghost" label="Cancel" onPress={() => setRemoving(false)} />
-      </Sheet>
     </Screen>
   );
 }

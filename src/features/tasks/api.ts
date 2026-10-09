@@ -3,7 +3,6 @@ import { addDays, format, parseISO } from 'date-fns';
 import { eq } from 'drizzle-orm';
 import * as Haptics from 'expo-haptics';
 import { uuidv7 } from 'uuidv7';
-import { db } from '@/lib/db/client';
 import { checkins, projects, tasks } from '@/lib/db/schema';
 import { enqueue, write } from '@/lib/outbox/enqueue';
 import { lanes } from '@/lib/outbox/lanes';
@@ -172,8 +171,4 @@ export function answerCheckin(checkin: Checkin, task: Task | null, answer: Check
   });
   if (answer.kind === 'done') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   else void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-}
-
-export function getTask(id: ID): Task | null {
-  return db.select().from(tasks).where(eq(tasks.id, id)).get() ?? null;
 }

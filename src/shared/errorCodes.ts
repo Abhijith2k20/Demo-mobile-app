@@ -19,9 +19,6 @@ export const ERROR_CODES = {
 
 export type ErrorCode = keyof typeof ERROR_CODES;
 
-/** Client-side codes that never come from the server. */
-export type ClientErrorCode = 'OFFLINE' | 'TIMEOUT' | 'DEPENDENCY_FAILED' | 'UNKNOWN';
-
 export interface ApiErrorBody {
   error: {
     code: string;

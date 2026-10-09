@@ -51,6 +51,9 @@ export interface Incoming {
   fullSnapshot?: boolean;
 }
 
+/** `updatedAt` of a row that exists only on this phone so far (the server always sends a real time). */
+export const LOCAL_ONLY = new Date(0).toISOString();
+
 const CHUNK = 60;
 
 function chunks<T>(list: T[]): T[][] {
@@ -167,8 +170,26 @@ export function applyIncoming(inc: Incoming): void {
 
   db.transaction((tx) => {
     if (inc.fullSnapshot) {
-      const keepProjects = (inc.projects ?? []).map((p) => p.id);
-      const keepChannels = (inc.channels ?? []).map((c) => c.id);
+      // Things created on this phone and not sent yet are not on the server: keep them.
+      const unsentCreates = tx
+        .select({ kind: outbox.kind, entityId: outbox.entityId })
+        .from(outbox)
+        .where(inArray(outbox.kind, ['create_project', 'create_channel', 'create_dm', 'join_channel']))
+        .all();
+      const localDms = tx
+        .select({ id: channels.id })
+        .from(channels)
+        .where(and(eq(channels.kind, 'dm'), eq(channels.updatedAt, LOCAL_ONLY)))
+        .all();
+      const keepProjects = [
+        ...(inc.projects ?? []).map((p) => p.id),
+        ...unsentCreates.filter((i) => i.kind === 'create_project').map((i) => i.entityId),
+      ];
+      const keepChannels = [
+        ...(inc.channels ?? []).map((c) => c.id),
+        ...unsentCreates.filter((i) => i.kind !== 'create_project').map((i) => i.entityId),
+        ...localDms.map((c) => c.id),
+      ];
       const goneChannels = tx.select({ id: channels.id }).from(channels).where(notInArray(channels.id, keepChannels)).all();
       removeChannelsLocal(tx, goneChannels.map((c) => c.id));
       tx.delete(tasks).where(notInArray(tasks.projectId, keepProjects)).run();

@@ -4,7 +4,6 @@ import { channelCreateSchema, channelPatchSchema } from '@/shared/schemas';
 import type { Channel, ID, Project } from '@/types/models';
 import {
   admins,
-  canSeeProject,
   channelAudience,
   isChannelMember,
   logRemoval,
@@ -15,6 +14,7 @@ import {
   store,
   type StoredUser,
 } from '../db';
+import { visibleProject } from '../access';
 import { publish } from '../events';
 import { forbidden, MockError, notFound, parse, route, type RouteDef } from '../http';
 import { firstName } from '../notify';
@@ -22,12 +22,6 @@ import { postMessage } from './messages';
 
 /** The one channel every project keeps: it cannot be made private, renamed or deleted. */
 const HOME_CHANNEL = 'general';
-
-function visibleProject(user: StoredUser, id: ID): Project {
-  const p = store().projects.get(id);
-  if (!p || !canSeeProject(user, id)) throw notFound('Project');
-  return p;
-}
 
 function projectChannelFor(user: StoredUser, id: ID): { channel: Channel; project: Project } {
   const channel = store().channels.get(id);

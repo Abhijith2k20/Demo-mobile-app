@@ -64,7 +64,6 @@ export const taskPatchSchema = z
     percent: z.number().int().min(0).max(100),
   })
   .partial();
-export type TaskPatch = z.infer<typeof taskPatchSchema>;
 
 export const checkinAnswerSchema = z.object({
   kind: z.enum(['started', 'progress', 'problem', 'done', 'not_started']),

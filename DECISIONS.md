@@ -151,6 +151,22 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   channel.
 - Sheets now shrink above the keyboard, so a tall form's first field stays on screen while typing.
 
+## Fixes after the code audit
+
+- **Read markers:** a channel only marks messages read while its screen is on top, and the
+  marker only ever moves forward.
+- **Sync:** a full re-sync requested while another sync is running is no longer dropped, and a
+  full re-sync keeps channels, DMs and projects that were created on the phone and not sent yet.
+- **Direct messages** are created on the server with their first message. Opening a person's
+  chat and leaving without writing creates nothing for either person.
+- **Archived projects:** bot check-ins are refused by the server and their cards show no buttons.
+- **Deleting a channel** also removes messages still queued for it.
+- **Daily report date** uses local time (it used the UTC date, a day early before 05:30 IST).
+- **Tests** (`npm test`, Jest via `jest-expo`): outbox lane ordering, task rules and permissions.
+  These cover pure logic only; nothing that needs a phone or the database is tested.
+- The schedule list and project settings were split into smaller files by job; unused code and a
+  helper copied in three route files were removed.
+
 ## Translations
 
 - English strings live next to their keys in code (`t('home.jumpTo', 'Jump to…')`) and

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
+import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { db } from '@/lib/db/client';
@@ -8,7 +9,7 @@ import { channelMembers, channels, messages, projectMembers, users } from '@/lib
 import { canPost } from '@/shared/permissions';
 import type { Channel, ID, JobTitle, Message, User } from '@/types/models';
 import { shortProjectName, useMe, useProject } from '../shared';
-import { fetchOlderMessages, markRead, openDm } from './api';
+import { discardEmptyDm, fetchOlderMessages, markRead, openDm } from './api';
 
 export interface ChannelInfo {
   channel: Channel | null;
@@ -194,9 +195,12 @@ export function useChannelMessages(channelId: ID) {
 
   // Mark read up to the newest message while the channel is open.
   const newest = ordered.length ? ordered[ordered.length - 1] : null;
+  // Only while this screen is on top: a channel left open underneath a task or thread must not
+  // swallow new messages.
+  const focused = useIsFocused();
   useEffect(() => {
-    if (newest && newest.status === 'sent') markRead(channelId, newest.id);
-  }, [channelId, newest]);
+    if (focused && newest && newest.status === 'sent') markRead(channelId, newest.id);
+  }, [channelId, newest, focused]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder || ordered.length === 0) return;
@@ -245,7 +249,7 @@ export function usePinned(channelId: ID): Message[] {
 /** Resolves the DM channel for a person (creating it locally if needed) or the bot DM. */
 export function useDmChannelId(userId: string): ID | null {
   const bot = useLiveQuery(db.select().from(channels).where(eq(channels.kind, 'bot')));
-  // Runs once per screen: opening a DM may create the channel locally and queue its creation.
+  // Runs once per screen: opening a DM may create the conversation on this phone.
   const [dm] = useState<ID | null>(() => {
     if (userId === 'bot') return null;
     try {
@@ -254,5 +258,10 @@ export function useDmChannelId(userId: string): ID | null {
       return null;
     }
   });
+  // A conversation opened and left without a message is removed again.
+  useEffect(() => {
+    if (!dm) return;
+    return () => discardEmptyDm(dm);
+  }, [dm]);
   return userId === 'bot' ? (bot.data[0]?.id ?? null) : dm;
 }

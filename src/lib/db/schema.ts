@@ -87,7 +87,12 @@ export const messages = sqliteTable(
     updatedAt: text('updated_at').notNull(),
     deletedAt: text('deleted_at'),
   },
-  (t) => [index('messages_channel_created').on(t.channelId, t.createdAt), index('messages_thread').on(t.threadParentId)],
+  (t) => [
+    index('messages_channel_created').on(t.channelId, t.createdAt),
+    index('messages_thread').on(t.threadParentId),
+    // Unread counts filter by id within a channel.
+    index('messages_channel_id').on(t.channelId, t.id),
+  ],
 );
 
 export const tasks = sqliteTable(

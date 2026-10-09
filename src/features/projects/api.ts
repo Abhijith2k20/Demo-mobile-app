@@ -1,7 +1,7 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '@/lib/db/client';
-import { channelMembers, channels, projectMembers, projects, taskHistory, tasks } from '@/lib/db/schema';
+import { channelMembers, channels, outbox, projectMembers, projects, taskHistory, tasks } from '@/lib/db/schema';
 import type { ProjectDetails } from '@/lib/outbox/types';
 import { removeChannelsLocal } from '@/lib/sync/applyIncoming';
 import { useSession } from '@/stores/session';
@@ -61,9 +61,11 @@ export function updateMember(input: { projectId: ID; userId: ID; role: ProjectRo
       .where(eq(channels.projectId, input.projectId))
       .all()
       .map((c) => c.id);
-    if (projectChannelIds.length) {
+    // Remove only the channels they are leaving; rows that stay keep their read marker.
+    const leaving = projectChannelIds.filter((id) => !input.channelIds.includes(id));
+    if (leaving.length) {
       tx.delete(channelMembers)
-        .where(and(eq(channelMembers.userId, input.userId), inArray(channelMembers.channelId, projectChannelIds)))
+        .where(and(eq(channelMembers.userId, input.userId), inArray(channelMembers.channelId, leaving)))
         .run();
     }
     for (const channelId of input.channelIds) {
@@ -117,9 +119,11 @@ function setLocalMembers(tx: Parameters<Parameters<typeof write>[0]>[0], project
     .where(eq(projectMembers.projectId, projectId))
     .all()
     .map((m) => m.id);
-  if (projectUserIds.length) {
+  // Remove only people who are no longer in it; rows that stay keep their read marker.
+  const leaving = projectUserIds.filter((id) => !memberIds.includes(id));
+  if (leaving.length) {
     tx.delete(channelMembers)
-      .where(and(eq(channelMembers.channelId, channelId), inArray(channelMembers.userId, projectUserIds)))
+      .where(and(eq(channelMembers.channelId, channelId), inArray(channelMembers.userId, leaving)))
       .run();
   }
   for (const userId of memberIds) {
@@ -177,6 +181,10 @@ export function deleteChannel(channel: Channel): void {
   if (!projectId) return;
   write((tx) => {
     removeChannelsLocal(tx, [channel.id]);
+    // Messages still waiting to be sent to this channel have nowhere to go.
+    tx.delete(outbox)
+      .where(and(eq(outbox.lane, lanes.channel(channel.id)), ne(outbox.status, 'sending')))
+      .run();
     enqueue(tx, 'delete_channel', lanes.project(projectId), channel.id, { projectId, channelId: channel.id });
   });
 }

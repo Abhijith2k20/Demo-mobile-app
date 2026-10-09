@@ -6,7 +6,7 @@ import { checkinAnswerSchema } from '@/shared/schemas';
 import { isDone, projectDelayDays, todayIso } from '@/shared/taskRules';
 import type { Attachment, Checkin, DashboardResponse, ID, Stage } from '@/types/models';
 import { STAGES } from '@/types/models';
-import { humans, store, type StoredCheckin } from '../db';
+import { assertProjectActive, humans, store, type StoredCheckin } from '../db';
 import { applyCheckinAnswer, askAboutOpenTasks } from '../bot';
 import { publish } from '../events';
 import { forbidden, notFound, parse, route, type RouteDef } from '../http';
@@ -26,6 +26,7 @@ export const miscRoutes: RouteDef[] = [
     if (!c || c.userId !== user.id) throw notFound('Check-in');
     const answer = parse(checkinAnswerSchema, body);
     if (!c.answer) {
+      assertProjectActive(store().tasks.get(c.taskId)?.projectId);
       applyCheckinAnswer(c, answer); // idempotent by check-in id: a repeat changes nothing
       publish({ type: 'checkin.new', checkin: publicCheckin(c) }, [user.id]);
     }

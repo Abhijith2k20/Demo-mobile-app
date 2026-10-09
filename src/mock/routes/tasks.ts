@@ -4,16 +4,11 @@ import { rebaselineSchema, taskCreateSchema, taskPatchSchema } from '@/shared/sc
 import { MEMBER_EDITABLE, normalizeTaskChange, shortDate, type TaskChanges } from '@/shared/taskRules';
 import type { ID, Project, Task, TaskHistory } from '@/types/models';
 import { assertProjectActive, canSeeProject, nowIso, projectAudience, projectChannel, projectRole, store, type StoredUser } from '../db';
+import { visibleProject } from '../access';
 import { publish } from '../events';
 import { forbidden, MockError, notFound, parse, route, type RouteDef } from '../http';
 import { addActivity, firstName, queueTaskChange, type ChangeKind } from '../notify';
 import { postMessage } from './messages';
-
-function visibleProject(user: StoredUser, id: ID): Project {
-  const p = store().projects.get(id);
-  if (!p || !canSeeProject(user, id)) throw notFound('Project');
-  return p;
-}
 
 function visibleTask(user: StoredUser, id: ID): Task {
   const t = store().tasks.get(id);
