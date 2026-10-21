@@ -1,49 +1,13 @@
-# Siteline — demo app
+# Demo-mobile-app
 
-A clickable demo of an internal project-communication app for an interior design company
-(fictional: **Paliath Interiors**). It runs entirely on the phone against an in-process mock
-backend. Spec: [`SITELINE_DEMO_SPEC.md`](SITELINE_DEMO_SPEC.md). Deviations and open points:
-[`DECISIONS.md`](DECISIONS.md).
-
-## Run it
+Siteline: a clickable demo of an offline-first project chat and task app for Paliath Interiors.
+Built with Expo (SDK 57) and runs in Expo Go, with an in-app mock server, so no backend is needed.
 
 ```bash
 npm install
-npx expo start
+npx expo start   # scan the QR code with Expo Go
 ```
 
-Then open the project in **Expo Go** (scan the QR code, or press `a` for an Android emulator).
-Expo SDK 57 — use a matching Expo Go.
-
-Sign in with any of the seven demo people on the login screen; the code is always `123456`.
-
-## Finding your way around
-
-- **Demo pill** (floating, bottom-left): opens the Demo panel — switch user, change the network,
-  inject errors, trigger the bot and teammates, watch the outbox, read the API/event log, reset.
-- **§14 of the spec** is the demo script; each scenario can be played from the Demo panel.
-- Reloading the app resets everything (the mock server lives in memory).
-
-## Code map
-
-```
-app/                 routes only (Expo Router): each file reads the URL and renders a screen
-src/features/        one folder per feature: screens/, components/, hooks, api (writes)
-src/lib/api/         api client + transport.ts (the only link to the mock; swap for fetch later)
-src/lib/db/          local SQLite (drizzle) — every screen reads from here via live queries
-src/lib/outbox/      queued writes: lanes, merge, retry, handlers (the seven rules)
-src/lib/sync/        catch-up sync + applying incoming records
-src/lib/realtime/    live events
-src/mock/            in-process mock server (same endpoints/errors/events as the planned API)
-src/shared/          permissions, zod schemas and task rules shared by app and mock server
-src/theme/           colours, type, spacing
-```
-
-## Checks
-
-```bash
-npm test             # jest: outbox ordering, task rules, permissions
-npm run typecheck    # tsc --noEmit
-npm run lint         # expo lint
-npm run i18n         # regenerate en.json from the English defaults in code
-```
+- Spec: `SITELINE_DEMO_SPEC.md`
+- Changes from the spec: `DECISIONS.md`
+- Project rules: `CLAUDE.md`
