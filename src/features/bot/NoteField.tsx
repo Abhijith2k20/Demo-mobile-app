@@ -31,7 +31,7 @@ export function VoiceChip({ seconds, onRemove }: { seconds: number; onRemove?: (
         {t('chat.voiceNote', 'Voice note')} · {clock(seconds)}
       </T>
       {onRemove ? (
-        <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={t('checkin.removeVoice', 'Remove voice note')}>
+        <Pressable onPress={onRemove} hitSlop={15} accessibilityRole="button" accessibilityLabel={t('checkin.removeVoice', 'Remove voice note')}>
           <Feather name="x" size={14} color={c.textMuted} />
         </Pressable>
       ) : null}

@@ -34,7 +34,7 @@ export function Avatar({ id, name, size = 36, bot }: { id: string; name: string;
       {bot ? (
         <Feather name="cpu" size={size * 0.5} color={c.onHeader} />
       ) : (
-        <T style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: size * 0.38, lineHeight: size * 0.5 }} maxFontSizeMultiplier={1}>
+        <T style={{ color: c.onColor, fontFamily: fonts.semibold, fontSize: size * 0.38, lineHeight: size * 0.5 }} maxFontSizeMultiplier={1}>
           {initials(name)}
         </T>
       )}
@@ -77,7 +77,8 @@ export function Pill({ label, bg, fg, icon }: { label: string; bg: string; fg: s
         alignSelf: 'flex-start',
       }}>
       {icon ? <Feather name={icon} size={11} color={fg} /> : null}
-      <T variant="label" style={{ color: fg, letterSpacing: 0.3 }} numberOfLines={1}>
+      {/* Sentence case: calmer than the uppercase label style, and easier to read. */}
+      <T variant="label" style={{ color: fg, letterSpacing: 0, textTransform: 'none' }} numberOfLines={1}>
         {label}
       </T>
     </View>
@@ -117,6 +118,7 @@ export function Button({ label, onPress, kind = 'primary', icon, disabled, loadi
       accessibilityRole="button"
       accessibilityLabel={label}
       disabled={disabled || loading}
+      hitSlop={small ? { top: 4, bottom: 4 } : undefined}
       onPress={onPress}
       style={({ pressed }) => [
         {
@@ -201,6 +203,8 @@ export function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       onPress={onPress}
+      // Drawn at 34 pt; the touch area still reaches 44 pt.
+      hitSlop={large ? undefined : { top: 5, bottom: 5 }}
       style={({ pressed }) => ({
         minHeight: large ? touch.min : 34,
         paddingHorizontal: large ? space.lg : space.md,
@@ -240,6 +244,7 @@ export function Segmented<V extends string>({
             key={o.value}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            hitSlop={{ top: 4, bottom: 4 }}
             onPress={() => onChange(o.value)}
             style={{
               flex: 1,
@@ -252,7 +257,8 @@ export function Segmented<V extends string>({
               borderWidth: on ? 1 : 0,
               borderColor: c.border,
             }}>
-            <T variant="metaStrong" color={on ? 'text' : 'textMuted'} numberOfLines={1}>
+            {/* Equal-width segments: grow like the system control does, then shrink to fit rather than truncate. */}
+            <T variant="metaStrong" color={on ? 'text' : 'textMuted'} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={1.5}>
               {o.label}
             </T>
           </Pressable>

@@ -30,6 +30,8 @@ function TabsForUser() {
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, borderTopWidth: 1, elevation: 0 },
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
+        // Like the system tab bars: labels grow a little, not to 200%, so five tabs still fit.
+        tabBarAllowFontScaling: false,
         tabBarBadgeStyle: badgeStyle,
         sceneStyle: { backgroundColor: c.bg },
       }}>

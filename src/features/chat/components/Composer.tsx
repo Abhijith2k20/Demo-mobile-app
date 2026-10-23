@@ -166,7 +166,7 @@ export function Composer(props: Props) {
           accessibilityRole="checkbox"
           accessibilityState={{ checked: alsoSend }}
           onPress={() => setAlsoSend((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.sm, minHeight: 32 }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: touch.min }}>
           <Feather name={alsoSend ? 'check-square' : 'square'} size={18} color={alsoSend ? c.accent : c.textMuted} />
           <T variant="meta" color="textMuted">
             {props.alsoSendLabel}

@@ -49,6 +49,7 @@ function Reactions({ message }: { message: Message }) {
             accessibilityRole="button"
             accessibilityLabel={`${emoji} ${ids.length}`}
             onPress={() => toggleReaction(message, emoji)}
+            hitSlop={{ top: 8, bottom: 8 }}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -145,7 +146,7 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
                 {sender?.name ?? t('chat.someone', 'Someone')}
               </T>
               {chip ? (
-                <T variant="label" color="textFaint" style={{ fontSize: 10, letterSpacing: 0.4 }}>
+                <T variant="label" color="textFaint" style={{ letterSpacing: 0.4 }}>
                   {chip}
                 </T>
               ) : null}

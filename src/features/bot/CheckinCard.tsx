@@ -13,7 +13,7 @@ import { T } from '@/components/T';
 import { ISSUE_PRESETS } from '@/shared/schemas';
 import { todayIso } from '@/shared/taskRules';
 import { radius, space, touch } from '@/theme/spacing';
-import { useTheme } from '@/theme/useTheme';
+import { useLargeText, useTheme } from '@/theme/useTheme';
 import type { CheckinAnswer, ID, Message } from '@/types/models';
 import { pickPhotos } from '../chat/photos';
 import { shortProjectName, useProject, useProjectAccess } from '../shared';
@@ -29,6 +29,7 @@ const REASONS = ISSUE_PRESETS.filter((p) => p !== 'Damage');
 /** A neutral, outlined secondary action. */
 function Quiet({ icon, label, onPress, active }: { icon?: IconName; label: string; onPress: () => void; active?: boolean }) {
   const { c, worker } = useTheme();
+  const large = useLargeText();
   return (
     <Pressable
       accessibilityRole="button"
@@ -36,8 +37,8 @@ function Quiet({ icon, label, onPress, active }: { icon?: IconName; label: strin
       accessibilityState={{ selected: !!active }}
       onPress={onPress}
       style={({ pressed }) => ({
-        flex: 1,
-        height: worker ? touch.worker : 40,
+        flex: large ? undefined : 1,
+        minHeight: worker ? touch.worker : touch.min,
         borderRadius: radius.input,
         borderWidth: 1,
         borderColor: active ? c.textMuted : c.border,
@@ -49,7 +50,7 @@ function Quiet({ icon, label, onPress, active }: { icon?: IconName; label: strin
         paddingHorizontal: space.sm,
       })}>
       {icon ? <Feather name={icon} size={14} color={c.textMuted} /> : null}
-      <T variant="metaStrong" numberOfLines={1} maxFontSizeMultiplier={1.15}>
+      <T variant="metaStrong" numberOfLines={2} style={{ flexShrink: 1, textAlign: 'center' }}>
         {label}
       </T>
     </Pressable>
@@ -64,7 +65,7 @@ function Scale({ current, onPick }: { current: number; onPick: (percent: number)
   const { c, worker } = useTheme();
   const { t } = useTranslation();
   return (
-    <View style={{ flexDirection: 'row', height: worker ? touch.worker + 4 : 46, borderRadius: radius.input, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
+    <View style={{ flexDirection: 'row', minHeight: worker ? touch.worker + 4 : 46, borderRadius: radius.input, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
       {STOPS.map((p, i) => {
         const reached = p <= current;
         const label = p === 100 ? t('checkin.done', 'Done') : `${p}%`;
@@ -85,7 +86,8 @@ function Scale({ current, onPick }: { current: number; onPick: (percent: number)
               backgroundColor: pressed ? c.border : reached ? c.surfaceAlt : c.surface,
             })}>
             {p === 100 ? <Feather name="check" size={14} color={c.textMuted} /> : null}
-            <T variant="metaStrong" color={reached ? 'textMuted' : 'text'} maxFontSizeMultiplier={1.15}>
+            {/* Five fixed slots across the card: allow growth, but not past what fits a phone width. */}
+            <T variant="metaStrong" color={reached ? 'textMuted' : 'text'} maxFontSizeMultiplier={1.6}>
               {label}
             </T>
             {reached ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: c.accent }} /> : null}
@@ -131,6 +133,10 @@ function State({ color, text }: { color: string; text: string }) {
 export function CheckinCard({ message }: { message: Message }) {
   const { c } = useTheme();
   const { t } = useTranslation();
+  // At large text sizes: wrap instead of truncating, and stack the option buttons.
+  const large = useLargeText();
+  const lines = large ? 3 : 1;
+  const optionRow = { flexDirection: large ? ('column' as const) : ('row' as const), gap: space.sm };
   const checkinId = message.data?.checkinId as ID | undefined;
   const checkin = useCheckin(checkinId);
   const { task } = useTask(message.data?.taskId as ID | undefined);
@@ -156,7 +162,7 @@ export function CheckinCard({ message }: { message: Message }) {
     return (
       <Pressable onPress={() => checkinId && queue?.open(checkinId)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2, paddingHorizontal: space.md }}>
         <Feather name="bell" size={13} color={c.textMuted} />
-        <T variant="meta" color="textMuted" numberOfLines={1} style={{ flex: 1 }}>
+        <T variant="meta" color="textMuted" numberOfLines={lines} style={{ flex: 1 }}>
           {t('checkin.reminderLine', 'Reminder: {{task}} still needs an update', { task: taskName })}
         </T>
       </Pressable>
@@ -177,10 +183,10 @@ export function CheckinCard({ message }: { message: Message }) {
   const heading = (strong: boolean, right?: ReactNode) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
       <View style={{ flex: 1 }}>
-        <T variant={strong ? 'bodyStrong' : 'metaStrong'} numberOfLines={strong ? 2 : 1} style={strong ? undefined : { fontSize: 14 }}>
+        <T variant={strong ? 'bodyStrong' : 'metaStrong'} numberOfLines={strong ? lines + 1 : lines} style={strong ? undefined : { fontSize: 14 }}>
           {taskName}
         </T>
-        <T variant="meta" color={overdue && !checkin.answer ? 'danger' : 'textMuted'} numberOfLines={1}>
+        <T variant="meta" color={overdue && !checkin.answer ? 'danger' : 'textMuted'} numberOfLines={lines}>
           {where}
         </T>
       </View>
@@ -205,7 +211,7 @@ export function CheckinCard({ message }: { message: Message }) {
     return (
       <Shell>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-          <T variant="meta" color="textMuted" numberOfLines={1} style={{ flex: 1, fontSize: 14 }}>
+          <T variant="meta" color="textMuted" numberOfLines={lines} style={{ flex: 1, fontSize: 14 }}>
             {taskName}
           </T>
           <State color={color} text={what} />
@@ -290,7 +296,7 @@ export function CheckinCard({ message }: { message: Message }) {
             </T>
           </View>
           <Scale current={current} onPick={(p) => submit(p === 100 ? { kind: 'done' } : { kind: 'progress', percent: p })} />
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <View style={optionRow}>
             <Quiet icon="alert-circle" label={t('checkin.problem', 'Problem')} onPress={() => setStep('problem')} />
             <Quiet icon="minus-circle" label={t('checkin.notStarted', 'Not started')} onPress={() => submit({ kind: 'not_started' })} />
             <Quiet icon="edit-3" label={t('checkin.note', 'Note')} active={noteOpen} onPress={() => setNoteOpen((v) => !v)} />
@@ -312,7 +318,7 @@ export function CheckinCard({ message }: { message: Message }) {
             </Pressable>
           </View>
           {[REASONS.slice(0, 2), REASONS.slice(2)].map((pair, i) => (
-            <View key={i} style={{ flexDirection: 'row', gap: space.sm }}>
+            <View key={i} style={optionRow}>
               {pair.map((r) => (
                 <Quiet key={r} label={t(`issue.preset.${r}`, r)} onPress={() => submit({ kind: 'problem', reason: r })} />
               ))}

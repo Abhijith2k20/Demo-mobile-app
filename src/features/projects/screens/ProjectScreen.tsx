@@ -2,9 +2,10 @@ import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Banner, Button, Card, EmptyState, IconButton, Row, Segmented, Skeleton, StagePill } from '@/components/basics';
+import { Avatar, Badge, Banner, Button, Card, EmptyState, IconButton, Row, Segmented, Skeleton, StagePill } from '@/components/basics';
 import { appScreen, Header, OfflineBanner, Screen } from '@/components/chrome';
 import { PhotoTile } from '@/components/PhotoGrid';
 import { Sheet } from '@/components/Sheet';
@@ -21,7 +22,7 @@ import { ScheduleList } from '@/features/tasks/components/ScheduleList';
 import { useProjectTasks } from '@/features/tasks/hooks';
 import { stageColors } from '@/theme/colors';
 import { radius, space } from '@/theme/spacing';
-import { useTheme } from '@/theme/useTheme';
+import { useLargeText, useTheme } from '@/theme/useTheme';
 import { STAGES, type CheckinAnswer, type ID, type Project } from '@/types/models';
 
 type Tab = 'overview' | 'tasks' | 'members' | 'files';
@@ -29,9 +30,13 @@ const day = (iso: string | null) => (iso ? format(parseISO(iso), 'd MMM yyyy') :
 
 function StageStepper({ project }: { project: Project }) {
   const { c } = useTheme();
+  const { t } = useTranslation();
   const stageLabel = useStageLabel();
   const current = STAGES.indexOf(project.stage);
+  const label = t('project.stageOf', 'Stage {{n}} of {{total}} · {{stage}}', { n: current + 1, total: STAGES.length, stage: stageLabel(project.stage) });
+  // Six labels can't fit across a phone at a readable size, so the dots carry position and one line names the stage.
   return (
+    <View accessible accessibilityLabel={label} style={{ gap: space.sm }}>
     <View style={{ flexDirection: 'row' }}>
       {STAGES.map((s, i) => {
         const tone = stageColors(c, s);
@@ -56,19 +61,21 @@ function StageStepper({ project }: { project: Project }) {
               </View>
               <View style={{ flex: 1, height: 2, backgroundColor: i === STAGES.length - 1 ? 'transparent' : i < current ? c.textMuted : c.border }} />
             </View>
-            <T variant="meta" style={{ fontSize: 10, lineHeight: 13, color: on ? tone.fg : c.textMuted, textAlign: 'center' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={1.1}>
-              {stageLabel(s)}
-            </T>
           </View>
         );
       })}
+    </View>
+      <T variant="metaStrong" style={{ color: stageColors(c, project.stage).fg, textAlign: 'center' }}>
+        {label}
+      </T>
     </View>
   );
 }
 
 function DateRow({ label, value, tone }: { label: string; value: string; tone?: 'danger' | 'success' | 'textMuted' }) {
+  const large = useLargeText();
   return (
-    <View style={{ flexDirection: 'row', minHeight: 30, alignItems: 'center' }}>
+    <View style={{ flexDirection: large ? 'column' : 'row', minHeight: 30, alignItems: large ? 'flex-start' : 'center', paddingVertical: large ? 2 : 0 }}>
       <T variant="meta" color="textMuted" style={{ flex: 1 }}>
         {label}
       </T>
@@ -90,6 +97,7 @@ function Overview({ project }: { project: Project }) {
   const unread = useUnreadCounts();
   const updates = useRecentUpdates(project.id);
   const delay = useDelayText()(project);
+  const large = useLargeText();
   const [confirm, setConfirm] = useState(false);
   const [browse, setBrowse] = useState(false);
   const next = STAGES[STAGES.indexOf(project.stage) + 1];
@@ -114,8 +122,8 @@ function Overview({ project }: { project: Project }) {
         ) : null}
       </Card>
 
-      <View style={{ flexDirection: 'row', gap: space.md }}>
-        <Card style={{ flex: 1 }}>
+      <View style={{ flexDirection: large ? 'column' : 'row', gap: space.md }}>
+        <Card style={{ flex: large ? undefined : 1 }}>
           <T variant="label" color="textMuted" style={{ marginBottom: 4 }}>
             Key dates
           </T>
@@ -145,11 +153,7 @@ function Overview({ project }: { project: Project }) {
                 strong={(unread.get(ch.id) ?? 0) > 0}
                 right={
                   (unread.get(ch.id) ?? 0) > 0 ? (
-                    <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }}>
-                      <T variant="label" style={{ color: c.onAccent, letterSpacing: 0 }}>
-                        {unread.get(ch.id)}
-                      </T>
-                    </View>
+                    <Badge count={unread.get(ch.id) ?? 0} />
                   ) : (
                     <Feather name="chevron-right" size={18} color={c.textFaint} />
                   )

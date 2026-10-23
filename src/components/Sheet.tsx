@@ -6,7 +6,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, TextInput, useWindowDimensions, View, type TextInputProps } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { motion, radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -49,16 +49,19 @@ export function Sheet({ visible, onClose, title, subtitle, full, headerRight, ch
   if (visible && !mounted) setMounted(true);
   const progress = useSharedValue(0);
   const drag = useSharedValue(0);
+  // Reduce Motion: appear and disappear without sliding.
+  const reduced = useReducedMotion();
+  const speed = reduced ? 0 : 1;
 
   useEffect(() => {
-    progress.set(withTiming(visible ? 1 : 0, { duration: visible ? motion.base : motion.fast, easing: Easing.out(Easing.cubic) }));
+    progress.set(withTiming(visible ? 1 : 0, { duration: (visible ? motion.base : motion.fast) * speed, easing: Easing.out(Easing.cubic) }));
     if (visible) {
       drag.set(0);
       return;
     }
-    const timer = setTimeout(() => setMounted(false), motion.fast + 40);
+    const timer = setTimeout(() => setMounted(false), motion.fast * speed + 40);
     return () => clearTimeout(timer);
-  }, [visible, progress, drag]);
+  }, [visible, progress, drag, speed]);
 
   // Drag the handle down to dismiss.
   const pan = Gesture.Pan()
@@ -68,7 +71,7 @@ export function Sheet({ visible, onClose, title, subtitle, full, headerRight, ch
     })
     .onEnd((e) => {
       if (e.translationY > DISMISS_DISTANCE || e.velocityY > 900) onClose();
-      else drag.set(withTiming(0, { duration: motion.fast }));
+      else drag.set(withTiming(0, { duration: motion.fast * speed }));
     });
 
   const scrimStyle = useAnimatedStyle(() => ({ opacity: progress.value }));

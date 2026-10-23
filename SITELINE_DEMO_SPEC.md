@@ -81,13 +81,14 @@ Define in `src/theme/colors.ts` with light and dark values. Never hard-code colo
 | `border` | `#E2E4E7` | `#35373B` | Hairlines (1 px) |
 | `text` | `#1D1C1D` | `#D1D2D3` | Primary text |
 | `textMuted` | `#616061` | `#A3A5A8` | Secondary text, timestamps |
-| `textFaint` | `#9A9B9E` | `#6F7174` | Placeholders, disabled |
+| `textFaint` | `#6E7074` | `#979A9E` | Placeholders, hints, timestamps (≥4.5:1 on its surfaces) |
 | `accent` | `#1667B0` | `#4A9FE0` | Primary buttons, unread badges, links, active states |
 | `accentSoft` | `#E8F1F9` | `#1B2E40` | Accent backgrounds (selected chip, mention highlight) |
-| `onAccent` | `#FFFFFF` | `#FFFFFF` | Text/icons on accent |
-| `success` | `#2E7D5B` | `#5FB58C` | Done, sent ticks, on-track |
+| `onAccent` | `#FFFFFF` | `#0E1A26` | Text/icons on accent (dark ink in dark mode: white on `#4A9FE0` is 2.87:1) |
+| `onColor` | `#FFFFFF` | `#FFFFFF` | Text on fixed colours: avatars, photo overlays |
+| `success` | `#2A7253` | `#5FB58C` | Done, sent ticks, on-track |
 | `successSoft` | `#E6F2EC` | `#1B2F26` | |
-| `warning` | `#9A6B15` | `#D6A64F` | At risk, waiting, retrying |
+| `warning` | `#87600F` | `#D6A64F` | At risk, waiting, retrying |
 | `warningSoft` | `#FBF2DE` | `#332A17` | Offline banner |
 | `danger` | `#B8423A` | `#E0736A` | Failed, delayed, destructive |
 | `dangerSoft` | `#FBEAE8` | `#38201E` | |

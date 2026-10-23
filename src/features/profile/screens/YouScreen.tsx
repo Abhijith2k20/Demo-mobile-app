@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Badge, Button, Card, Pill, Segmented, type IconName } from '@/components/basics';
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
@@ -118,6 +118,8 @@ function YouScreen() {
           />
         </View>
 
+        {/* iOS follows the system appearance; Android users expect an in-app choice. */}
+        {Platform.OS === 'ios' ? null : (
         <View style={{ gap: space.sm }}>
           <T variant="label" color="textMuted">
             {t('you.theme', 'Theme')}
@@ -132,6 +134,7 @@ function YouScreen() {
             ]}
           />
         </View>
+        )}
 
         <View>
           <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>

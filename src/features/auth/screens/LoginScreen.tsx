@@ -47,7 +47,7 @@ function LoginScreen() {
   return (
     <AuthShell
       title={t('auth.signIn', 'Sign in')}
-      subtitle={t('auth.signInHint', "Enter your mobile number and we'll text you a 6-digit code.")}
+      subtitle={t('auth.signInHint', 'Enter your mobile number to get a 6-digit code by SMS.')}
       footer={
         <View style={{ alignItems: 'center', gap: space.md }}>
           <Pressable

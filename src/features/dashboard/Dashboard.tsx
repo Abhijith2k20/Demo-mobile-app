@@ -16,7 +16,7 @@ import { T } from '@/components/T';
 import { api } from '@/lib/api/client';
 import type { ColorToken } from '@/theme/colors';
 import { radius, space } from '@/theme/spacing';
-import { useTheme } from '@/theme/useTheme';
+import { useLargeText, useTheme } from '@/theme/useTheme';
 import type { DashboardResponse } from '@/types/models';
 import { firstName, shortProjectName, useStageLabel, useUsers } from '../shared';
 
@@ -51,10 +51,11 @@ function Section({ title, right, children }: { title: string; right?: string; ch
 /** One number with its label. The number stays in text ink; a small icon carries the state. */
 function Stat({ value, label, flag }: { value: number; label: string; flag?: { icon: IconName; color: ColorToken } }) {
   const { c } = useTheme();
+  const lines = useLargeText() ? 3 : 1;
   return (
     <View style={{ flexBasis: '47%', flexGrow: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: radius.card, paddingHorizontal: space.md, paddingVertical: space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <T variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={1}>
+        <T variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={lines}>
           {label}
         </T>
         {flag ? <Feather name={flag.icon} size={14} color={c[flag.color]} /> : null}
@@ -89,6 +90,9 @@ function Health({ delayDays }: { delayDays: number | null }) {
 
 export function Dashboard({ embedded }: { embedded?: boolean }) {
   const { c } = useTheme();
+  // At large text sizes, wrap instead of truncating (HIG: Supporting Dynamic Type).
+  const large = useLargeText();
+  const lines = large ? 3 : 1;
   const insets = useSafeAreaInsets();
   const users = useUsers();
   const stageLabel = useStageLabel();
@@ -178,12 +182,12 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
                         accessibilityRole="button"
                         onPress={() => router.push(`/project/${p.id}`)}
                         style={({ pressed }) => ({ padding: space.md, gap: space.sm, borderTopWidth: i ? 1 : 0, borderTopColor: c.border, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                          <T variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
+                        <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: space.sm }}>
+                          <T variant="bodyStrong" numberOfLines={lines} style={large ? { width: '100%' } : { flexShrink: 1 }}>
                             {shortProjectName(p.name)}
                           </T>
                           <StagePill stage={p.stage} label={stageLabel(p.stage)} />
-                          <View style={{ flex: 1 }} />
+                          {large ? null : <View style={{ flex: 1 }} />}
                           <Health delayDays={p.delayDays} />
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -195,7 +199,7 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
                           </T>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                          <T variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={1}>
+                          <T variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={lines}>
                             {p.doneTasks} of {plural(p.totalTasks, 'task', 'tasks')} done
                             {p.blocked > 0 ? ` · ${p.blocked} blocked` : ''}
                           </T>
@@ -237,10 +241,10 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
                         })}>
                         <Feather name="alert-circle" size={16} color={c.danger} />
                         <View style={{ flex: 1 }}>
-                          <T variant="body" numberOfLines={1}>
+                          <T variant="body" numberOfLines={lines}>
                             {task.name}
                           </T>
-                          <T variant="meta" color="textMuted" numberOfLines={1}>
+                          <T variant="meta" color="textMuted" numberOfLines={lines}>
                             {task.projectName}
                             {owner ? ` · ${firstName(owner.name)}` : ' · Unassigned'}
                           </T>
@@ -254,13 +258,14 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
             ) : null}
 
             <Section title="Pipeline" right="Projects in each stage">
-              <View style={{ flexDirection: 'row', gap: 2, borderRadius: radius.card, overflow: 'hidden', borderWidth: 1, borderColor: c.border, backgroundColor: c.border }}>
+              {/* Two rows of three so stage names fit at a readable size. */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 1, borderRadius: radius.card, overflow: 'hidden', borderWidth: 1, borderColor: c.border, backgroundColor: c.border }}>
                 {d.byStage.map((s) => (
-                  <View key={s.stage} accessibilityLabel={`${stageLabel(s.stage)}: ${s.count}`} style={{ flex: 1, alignItems: 'center', paddingVertical: space.md, backgroundColor: c.surface }}>
+                  <View key={s.stage} accessible accessibilityLabel={`${stageLabel(s.stage)}: ${s.count}`} style={{ flexGrow: 1, flexBasis: '32%', alignItems: 'center', paddingVertical: space.md, paddingHorizontal: space.xs, backgroundColor: c.surface }}>
                     <T variant="heading" color={s.count ? 'text' : 'textFaint'}>
                       {s.count}
                     </T>
-                    <T variant="meta" color={s.count ? 'textMuted' : 'textFaint'} style={{ fontSize: 10, lineHeight: 13 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.1}>
+                    <T variant="meta" color={s.count ? 'textMuted' : 'textFaint'} style={{ textAlign: 'center' }}>
                       {stageLabel(s.stage)}
                     </T>
                   </View>
@@ -284,7 +289,7 @@ export function Dashboard({ embedded }: { embedded?: boolean }) {
                         {who ? <Avatar id={who.id} name={who.name} size={28} /> : <View style={{ width: 28 }} />}
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                            <T variant="metaStrong" style={{ flex: 1 }} numberOfLines={1}>
+                            <T variant="metaStrong" style={{ flex: 1 }} numberOfLines={lines}>
                               {item.projectName}
                             </T>
                             <T variant="meta" color="textFaint">

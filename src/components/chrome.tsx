@@ -2,14 +2,14 @@
 import { router } from 'expo-router';
 import { Component, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import i18n from '@/lib/i18n';
 import { useSession } from '@/stores/session';
 import { useUi } from '@/stores/ui';
 import { motion, radius, space } from '@/theme/spacing';
-import { useTheme } from '@/theme/useTheme';
+import { useLargeText, useTheme } from '@/theme/useTheme';
 import { Banner, Button, EmptyState, IconButton } from './basics';
 import { T } from './T';
 
@@ -31,12 +31,13 @@ export function Header({
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const large = useLargeText();
   return (
     <View style={{ backgroundColor: c.surface, paddingTop: insets.top, borderBottomWidth: 1, borderBottomColor: c.border }}>
       <View style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.xs }}>
         {back ? (
           <IconButton
-            icon={close ? 'x' : 'arrow-left'}
+            icon={close ? 'x' : Platform.OS === 'ios' ? 'chevron-left' : 'arrow-left'}
             label={t('common.back', 'Back')}
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
           />
@@ -48,7 +49,7 @@ export function Header({
             {title}
           </T>
           {subtitle ? (
-            <T variant="meta" color="textMuted" numberOfLines={1}>
+            <T variant="meta" color="textMuted" numberOfLines={large ? 2 : 1}>
               {subtitle}
             </T>
           ) : null}

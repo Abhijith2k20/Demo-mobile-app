@@ -6,7 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from '@/components/T';
 import { useUi } from '@/stores/ui';
-import { motion, radius, space } from '@/theme/spacing';
+import { motion, radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 
 const PILL_W = 104;
@@ -75,18 +75,19 @@ export function DemoPill() {
         <Animated.View
           accessibilityRole="button"
           accessibilityLabel="Open demo panel"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: space.md, paddingRight: space.sm, height: 36 }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: space.md, paddingRight: space.sm, minHeight: touch.min }}>
           <Feather name="sliders" size={14} color={online ? c.onHeader : c.warning} />
-          <T variant="metaStrong" style={{ color: c.onHeader }} maxFontSizeMultiplier={1.1}>
+          <T variant="metaStrong" style={{ color: c.onHeader }} maxFontSizeMultiplier={1.5}>
             Demo
           </T>
         </Animated.View>
       </GestureDetector>
       <Pressable
+        accessibilityRole="button"
         accessibilityLabel="Hide demo pill"
         hitSlop={8}
         onPress={() => setUi({ demoPillHidden: true })}
-        style={{ height: 36, paddingRight: space.md, paddingLeft: 2, justifyContent: 'center' }}>
+        style={{ minHeight: touch.min, paddingRight: space.md, paddingLeft: 2, justifyContent: 'center' }}>
         <Feather name="x" size={14} color={c.textFaint} />
       </Pressable>
     </Animated.View>

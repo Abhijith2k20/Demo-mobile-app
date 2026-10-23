@@ -2,6 +2,7 @@
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, EmptyState, Skeleton } from '@/components/basics';
@@ -24,6 +25,7 @@ type Item = { kind: 'phase'; key: string; phase: string; done: number; total: nu
 
 export function ScheduleList({ project, header }: { project: Project; header?: React.ReactNode }) {
   const { c, type } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const me = useMe();
   const users = useUsers();
@@ -129,7 +131,7 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
                     alignItems: 'center',
                     backgroundColor: c.surfaceAlt,
                     paddingHorizontal: space.lg,
-                    height: 32,
+                    minHeight: 32,
                     borderBottomWidth: 1,
                     borderBottomColor: c.border,
                   }}>
@@ -137,7 +139,7 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
                     {item.phase}
                   </T>
                   <T variant="label" color={item.done === item.total ? 'success' : 'textMuted'}>
-                    {item.done}/{item.total} done
+                    {t('task.phaseDone', '{{done}}/{{total}} done', { done: item.done, total: item.total })}
                   </T>
                 </View>
               ) : (
@@ -171,9 +173,11 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
             paddingBottom: header ? space.sm : Math.max(space.sm, insets.bottom),
           }}>
           <Pressable
+            accessibilityRole="button"
             accessibilityLabel={`Phase: ${activePhase}. Change`}
+            hitSlop={{ top: 4, bottom: 4 }}
             onPress={() => setPhaseSheet(true)}
-            style={{ height: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: c.surfaceAlt, justifyContent: 'center', maxWidth: 120 }}>
+            style={{ minHeight: 36, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: c.surfaceAlt, justifyContent: 'center', maxWidth: 120 }}>
             <T variant="metaStrong" color="textMuted" numberOfLines={1}>
               {activePhase}
             </T>
@@ -190,7 +194,7 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
             style={[type.body, { flex: 1, color: c.text, minHeight: touch.min, paddingVertical: 8 }]}
           />
           {quick.trim() ? (
-            <Pressable accessibilityLabel="Add task" onPress={addQuick} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Add task" onPress={addQuick} style={{ width: touch.min, height: touch.min, borderRadius: touch.min / 2, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="plus" size={20} color={c.onAccent} />
             </Pressable>
           ) : null}

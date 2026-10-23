@@ -230,3 +230,19 @@ Not exercised on a device:
 - **14** (logout warning sheet) — code path only.
 - Camera capture (the emulator has no real camera), Hindi screens, iOS, a physical low-end phone,
   and the 60 fps / 500-message target in §16.
+
+## Accessibility pass (Apple HIG audit)
+
+| Change | Why |
+| --- | --- |
+| Text scales up to 200% (`T` default `maxFontSizeMultiplier` 2). Caps remain only on fixed shapes: badges, avatars, OTP boxes, the check-in progress scale (1.6), segmented controls (1.5, then shrink to fit) | HIG asks for at least 200% text enlargement |
+| At large text sizes (`useLargeText`, font scale ≥ 1.3) side-by-side layouts stack and labels wrap: key dates, dashboard rows and stats, task rows, check-in buttons, header subtitle | HIG: adapt layout to all font sizes, keep truncation to a minimum |
+| Tab bar labels don't scale (`tabBarAllowFontScaling: false`) | Five labels can't fit at 200%; the system tab bars also keep their labels small |
+| Stage stepper shows dots plus one line, "Stage 3 of 6 · Procurement"; dashboard pipeline is two rows of three | Six labels across a phone were 10 pt and shrank further |
+| Contrast fixes: `textFaint`, light `warning`/`success`, dark `onAccent`; new `onColor` token | Several pairs were below 4.5:1 (text) or 3:1 (bold) |
+| Task status uses shape as well as colour (alert icon for blocked, tick for done); late dates get an icon; rows have a full screen-reader label and "Mark done" / "Shift dates" accessibility actions | Don't convey information by colour alone; swipe-only actions were unreachable with VoiceOver/TalkBack |
+| Touch areas reach 44 pt (via `hitSlop` where the drawn size is smaller) | HIG minimum hit region |
+| iOS: no in-app theme switch (follows the system); back button is a chevron. Android keeps both as before | HIG: avoid an app-specific appearance setting; platform-familiar back control |
+| Sheets skip their slide animation when Reduce Motion is on | Motion should be optional |
+| Error copy no longer says "we"; task row text is translated | HIG writing guidance; CLAUDE.md translation rule |
+

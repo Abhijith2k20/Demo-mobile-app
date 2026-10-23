@@ -32,8 +32,9 @@ export function ScheduleToolbar({ filters, onChange, shown, total, onOpenFilters
           accessibilityRole="button"
           accessibilityLabel={more > 0 ? `Filters, ${more} active` : 'Filters'}
           onPress={onOpenFilters}
+          hitSlop={{ top: 5, bottom: 5 }}
           style={({ pressed }) => ({
-            height: 34,
+            minHeight: 34,
             paddingHorizontal: space.md,
             borderRadius: radius.pill,
             borderWidth: 1,
@@ -64,7 +65,7 @@ export function ScheduleToolbar({ filters, onChange, shown, total, onOpenFilters
           <T variant="meta" color="textMuted" style={{ flex: 1 }}>
             Showing {shown} of {total} {total === 1 ? 'task' : 'tasks'}
           </T>
-          <Pressable accessibilityRole="button" hitSlop={10} onPress={() => onChange(NO_FILTERS)}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear filters" hitSlop={14} onPress={() => onChange(NO_FILTERS)}>
             <T variant="metaStrong" color="accent">
               Clear
             </T>

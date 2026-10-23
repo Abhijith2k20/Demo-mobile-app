@@ -2,15 +2,16 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { memo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { Avatar, Pill } from '@/components/basics';
 import { T } from '@/components/T';
 import { isDone, shortDate, taskVarianceDays } from '@/shared/taskRules';
 import { space } from '@/theme/spacing';
-import { useTheme } from '@/theme/useTheme';
+import { useLargeText, useTheme } from '@/theme/useTheme';
 import type { Task, User } from '@/types/models';
-import { MiniTimeline, StatusDot } from './bits';
+import { MiniTimeline, StatusDot, useStatusLabel } from './bits';
 
 // Width of a revealed swipe action; pulling half of it is enough to trigger.
 const ACTION_WIDTH = 132;
@@ -35,8 +36,18 @@ interface RowProps {
 
 export const TaskRow = memo(function TaskRow({ task, owner, window, canDone, canShift, onDone, onShift }: RowProps) {
   const { c } = useTheme();
+  const { t } = useTranslation();
+  const statusLabel = useStatusLabel();
+  const large = useLargeText();
   const ref = useRef<SwipeableMethods>(null);
   const late = (taskVarianceDays(task) ?? 0) > 0 && !isDone(task.status);
+  const showDone = canDone && task.status !== 'done';
+  const doneLabel = task.status === 'done_pending_confirmation' ? t('task.confirmDone', 'Confirm done') : t('task.markDone', 'Mark done');
+  const shiftLabel = t('task.shiftDates', 'Shift dates');
+  const lateLabel = t('task.late', 'Late');
+  // Screen readers get the whole row in one sentence, and the swipe actions as named actions.
+  const a11yLabel = [task.name, statusLabel(task.status), `${task.percent}%`, owner?.name, dateRange(task), late ? lateLabel : null].filter(Boolean).join(', ');
+  const a11yActions = [...(showDone ? [{ name: 'done', label: doneLabel }] : []), ...(canShift ? [{ name: 'shift', label: shiftLabel }] : [])];
   const action = (label: string, icon: 'check' | 'calendar', bg: string, fg: string, align: 'flex-start' | 'flex-end') => (
     <View style={{ width: ACTION_WIDTH, backgroundColor: bg, justifyContent: 'center', alignItems: align, paddingHorizontal: space.lg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -50,6 +61,9 @@ export const TaskRow = memo(function TaskRow({ task, owner, window, canDone, can
   const body = (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityActions={a11yActions}
+      onAccessibilityAction={(e) => (e.nativeEvent.actionName === 'done' ? onDone(task) : e.nativeEvent.actionName === 'shift' ? onShift(task) : undefined)}
       onPress={() => router.push(`/task/${task.id}`)}
       style={({ pressed }) => ({
         backgroundColor: pressed ? c.surfaceAlt : c.bg,
@@ -59,19 +73,22 @@ export const TaskRow = memo(function TaskRow({ task, owner, window, canDone, can
       })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
         <StatusDot status={task.status} />
-        <T variant="body" numberOfLines={1} style={{ flex: 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }} color={task.status === 'done' ? 'textMuted' : 'text'}>
+        <T variant="body" numberOfLines={large ? 3 : 1} style={{ flex: 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }} color={task.status === 'done' ? 'textMuted' : 'text'}>
           {task.name}
         </T>
-        {task.status === 'done_pending_confirmation' ? <Pill label="Confirm" bg={c.warningSoft} fg={c.warning} /> : null}
+        {task.status === 'done_pending_confirmation' ? <Pill label={t('task.confirm', 'Confirm')} bg={c.warningSoft} fg={c.warning} /> : null}
         {owner ? <Avatar id={owner.id} name={owner.name} size={20} /> : null}
         <T variant="metaStrong" color={task.percent === 100 ? 'success' : 'textMuted'} style={{ minWidth: 38, textAlign: 'right' }}>
           {task.percent}%
         </T>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: 18 }}>
-        <T variant="meta" color={late ? 'danger' : 'textMuted'} style={{ width: 108 }} numberOfLines={1}>
-          {dateRange(task)}
-        </T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 108, flexShrink: 1 }}>
+          {late ? <Feather name="alert-triangle" size={12} color={c.danger} accessibilityLabel={lateLabel} /> : null}
+          <T variant="meta" color={late ? 'danger' : 'textMuted'} numberOfLines={1} style={{ flexShrink: 1 }}>
+            {dateRange(task)}
+          </T>
+        </View>
         <View style={{ flex: 1 }}>
           <MiniTimeline task={task} from={window.from} to={window.to} />
         </View>
@@ -87,8 +104,8 @@ export const TaskRow = memo(function TaskRow({ task, owner, window, canDone, can
       rightThreshold={ACTION_WIDTH / 2}
       overshootLeft={false}
       overshootRight={false}
-      renderLeftActions={canDone && task.status !== 'done' ? () => action(task.status === 'done_pending_confirmation' ? 'Confirm done' : 'Mark done', 'check', c.successSoft, c.success, 'flex-start') : undefined}
-      renderRightActions={canShift ? () => action('Shift dates', 'calendar', c.infoSoft, c.info, 'flex-end') : undefined}
+      renderLeftActions={showDone ? () => action(doneLabel, 'check', c.successSoft, c.success, 'flex-start') : undefined}
+      renderRightActions={canShift ? () => action(shiftLabel, 'calendar', c.infoSoft, c.info, 'flex-end') : undefined}
       onSwipeableWillOpen={(direction) => {
         ref.current?.close();
         // Swiping right reveals the left action.

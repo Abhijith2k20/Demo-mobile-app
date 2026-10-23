@@ -1,7 +1,8 @@
+import { Feather } from '@expo/vector-icons';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import { Pill } from '@/components/basics';
 import { T } from '@/components/T';
 import { taskVarianceDays } from '@/shared/taskRules';
@@ -24,10 +25,15 @@ export function statusColor(c: Colors, status: TaskStatus): string {
   }
 }
 
-export function StatusDot({ status, size = 10 }: { status: TaskStatus; size?: number }) {
+export function StatusDot({ status, size: base = 10 }: { status: TaskStatus; size?: number }) {
   const { c } = useTheme();
+  // Meaningful icons grow with the text (HIG: Supporting Dynamic Type).
+  const size = Math.round(base * Math.min(2, Math.max(1, useWindowDimensions().fontScale)));
   const color = statusColor(c, status);
   const hollow = status === 'not_started';
+  // Shape as well as colour: blocked and done must read without colour vision.
+  const icon = status === 'blocked' ? 'alert-circle' : status === 'done' || status === 'done_pending_confirmation' ? 'check-circle' : null;
+  if (icon) return <Feather name={icon} size={size + 4} color={color} style={{ marginHorizontal: -2 }} />;
   return (
     <View
       style={{
@@ -106,8 +112,10 @@ export function MiniTimeline({ task, from, to }: { task: Task; from: string; to:
 }
 
 /** Progress ring drawn with plain views (two rotating half discs), so no SVG library is needed. */
-export function ProgressRing({ percent, size = 72 }: { percent: number; size?: number }) {
+export function ProgressRing({ percent, size: base = 72 }: { percent: number; size?: number }) {
   const { c } = useTheme();
+  // Grow with the text size so the number inside still fits on one line.
+  const size = Math.round(base * Math.min(2, Math.max(1, useWindowDimensions().fontScale)));
   const p = Math.max(0, Math.min(100, Math.round(percent)));
   const deg = (p / 100) * 360;
   const half = size / 2;

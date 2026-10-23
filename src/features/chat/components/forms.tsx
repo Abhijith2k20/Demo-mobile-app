@@ -51,8 +51,9 @@ function PhotoPicker({ uris, onChange, max }: { uris: string[]; onChange: (next:
             <View key={uri} style={{ width: 72, height: 72 }}>
               <PhotoTile photo={{ id: uri, kind: 'image', uri, uploadId: null }} small />
               <Pressable
+                accessibilityRole="button"
                 accessibilityLabel={t('photos.remove', 'Remove photo')}
-                hitSlop={8}
+                hitSlop={11}
                 onPress={() => onChange(uris.filter((_, j) => j !== i))}
                 style={{
                   position: 'absolute',

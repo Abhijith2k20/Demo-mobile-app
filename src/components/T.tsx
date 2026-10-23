@@ -8,8 +8,8 @@ interface Props extends TextProps {
   color?: ColorToken;
 }
 
-/** Themed text. Every piece of copy in the app goes through this. */
-export function T({ variant = 'body', color = 'text', style, maxFontSizeMultiplier = 1.3, ...rest }: Props) {
+/** Themed text. Every piece of copy in the app goes through this. Scales up to 200% with the system text size. */
+export function T({ variant = 'body', color = 'text', style, maxFontSizeMultiplier = 2, ...rest }: Props) {
   const { c, type } = useTheme();
   return <Text maxFontSizeMultiplier={maxFontSizeMultiplier} style={[type[variant], { color: c[color] }, style]} {...rest} />;
 }

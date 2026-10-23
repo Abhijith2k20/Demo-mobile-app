@@ -31,14 +31,14 @@ export function PhotoTile({ photo, ratio = 1, more = 0, small }: { photo: Attach
       )}
       {photo.caption && !small ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.scrim, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <T variant="meta" style={{ color: c.onAccent, fontFamily: fonts.medium }} numberOfLines={1}>
+          <T variant="meta" style={{ color: c.onColor, fontFamily: fonts.medium }} numberOfLines={1}>
             {photo.caption}
           </T>
         </View>
       ) : null}
       {more > 0 ? (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.scrim, alignItems: 'center', justifyContent: 'center' }}>
-          <T variant="title" style={{ color: c.onAccent }}>
+          <T variant="title" style={{ color: c.onColor }}>
             +{more}
           </T>
         </View>
