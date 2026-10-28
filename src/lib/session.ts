@@ -1,49 +1,73 @@
-// Session lifecycle: sign in, sign out, wipe. Wires the API client, socket, sync and outbox together.
-import { isOnline } from '@/lib/api/transport';
+// Session lifecycle: sign in, restore on app start, sign out.
+// Kept on the phone: the sign-in (SecureStore), the last screens' data and the send queue (AsyncStorage).
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, setAuthLostHandler } from '@/lib/api/client';
-import { wipeLocalDb } from '@/lib/db/init';
-import { startOutbox, stopOutbox } from '@/lib/outbox/runner';
+import i18n from '@/lib/i18n';
+import { clearOutbox, loadOutbox } from '@/lib/outbox';
+import { forgetSession, loadSession, restoreCache, saveSession, startSavingCache, stopSavingCache, type SavedSession } from '@/lib/persist';
 import { queryClient } from '@/lib/queryClient';
 import { connectSocket, disconnectSocket } from '@/lib/realtime/socket';
-import { catchUp } from '@/lib/sync/catchup';
-import i18n from '@/lib/i18n';
 import { useSession } from '@/stores/session';
 import { toast, useUi } from '@/stores/ui';
-import type { User } from '@/types/models';
 
-export interface LoginResult {
-  accessToken: string;
-  refreshToken: string;
-  user: User;
+export type LoginResult = SavedSession;
+
+async function begin(s: SavedSession, restore: boolean): Promise<void> {
+  disconnectSocket();
+  stopSavingCache();
+  queryClient.clear(); // another person's data is never reused
+  if (restore) await restoreCache(s.user.id);
+  useUi.getState().set({ online: true });
+  useSession.getState().setSession(s);
+  startSavingCache(s.user.id);
+  connectSocket();
+  void loadOutbox(s.user.id);
 }
 
-/** Starts a session and runs the first sync. Local data from another user is never reused. */
+/** After a successful sign-in. */
 export async function startSession(res: LoginResult): Promise<void> {
-  stopOutbox();
-  disconnectSocket();
-  wipeLocalDb();
-  queryClient.clear();
-  useUi.getState().set({ online: isOnline(), lastSyncAt: null, syncFailed: false });
-  useSession.getState().setSession(res);
-  connectSocket(res.user.id);
-  startOutbox();
-  await catchUp({ full: true });
+  await begin(res, false);
+  await saveSession(res);
 }
 
-/** Ends the session and wipes everything stored on the phone. */
-export function endSession(): void {
-  stopOutbox();
+/** On app start: signed in last time? Show the saved screens at once, then refresh from the server. */
+export async function restoreSession(): Promise<void> {
+  const saved = await loadSession();
+  if (saved) await begin(saved, true);
+}
+
+/**
+ * Ends the session on this phone. `discardQueue` is for a deliberate log out (after the warning);
+ * when the session simply expires, unsent changes stay and go out at the next sign-in.
+ */
+export function endSession(opts: { discardQueue?: boolean } = {}): void {
+  const userId = useSession.getState().user?.id;
   disconnectSocket();
+  stopSavingCache();
   useSession.getState().clear();
-  wipeLocalDb();
   queryClient.clear();
+  void forgetSession(userId);
+  void clearOutbox(opts.discardQueue ? userId : undefined);
+}
+
+/** Demo reset: the server is back to the seed, so nothing saved on the phone means anything. */
+export async function wipeEverything(): Promise<void> {
+  endSession();
+  const keys = (await AsyncStorage.getAllKeys().catch(() => [] as readonly string[])).filter((k) => k.startsWith('siteline.'));
+  await AsyncStorage.multiRemove(keys).catch(() => {});
 }
 
 /** Demo shortcut used by the login chips and the Demo panel's "Who am I". */
-export async function signInWithPhone(phone: string, code = '123456'): Promise<void> {
-  const res = await api<LoginResult>('POST', '/auth/otp/verify', { phone, code });
-  await startSession(res);
+export async function signInWithEmail(email: string, code = '123456'): Promise<void> {
+  await startSession(await api<LoginResult>('POST', '/auth/otp/verify', { email, code }));
 }
+
+// A refreshed token or profile is saved too, so the next app start stays signed in.
+useSession.subscribe((st, prev) => {
+  if (!st.user || !st.accessToken || !st.refreshToken) return;
+  if (st.accessToken === prev.accessToken && st.user === prev.user && st.permissions === prev.permissions && st.simpleMode === prev.simpleMode) return;
+  void saveSession({ accessToken: st.accessToken, refreshToken: st.refreshToken, user: st.user, permissions: st.permissions, simpleMode: st.simpleMode });
+});
 
 setAuthLostHandler(() => {
   if (!useSession.getState().user) return;

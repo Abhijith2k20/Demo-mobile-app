@@ -8,9 +8,10 @@ import { Avatar, Badge, Button, Card, Pill, Segmented, type IconName } from '@/c
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { formatPhone } from '@/features/auth/api';
-import { logOut, sendNow } from '@/features/profile/api';
-import { shortProjectName, useAllProjectMembers, useMe, useProjects, useUnsentCount } from '@/features/shared';
+import { useUnsentCount } from '@/lib/outbox';
+import { logOut } from '@/features/profile/api';
+import { InviteSheet } from '@/features/people/components/InviteSheet';
+import { shortProjectName, useAllProjectMembers, useCan, useCompany, useMe, useProjects, useRoleLabels } from '@/features/shared';
 import { useUi, type Language, type ThemePref } from '@/stores/ui';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -22,7 +23,7 @@ function SettingRow({ icon, label, right, onPress }: { icon: IconName; label: st
       accessibilityRole={onPress ? 'button' : undefined}
       onPress={onPress}
       disabled={!onPress}
-      style={({ pressed }) => ({ minHeight: touch.worker, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
+      style={({ pressed }) => ({ minHeight: touch.large, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
       <Feather name={icon} size={18} color={c.textMuted} />
       <T variant="body" style={{ flex: 1 }}>
         {label}
@@ -37,18 +38,22 @@ function YouScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const me = useMe();
+  const can = useCan();
   const projects = useProjects();
   const memberships = useAllProjectMembers().filter((m) => m.userId === me.id);
-  const unsent = useUnsentCount();
   const ui = useUi();
+  const [inviting, setInviting] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const unsent = useUnsentCount();
   const total = unsent.waiting + unsent.failed;
-  const roleLabel = me.companyRole === 'owner' ? t('you.owner', 'Owner') : me.companyRole === 'admin' ? t('you.admin', 'Admin') : t('you.member', 'Member');
+  const labels = useRoleLabels();
+  const company = useCompany();
+  const roleLabel = labels.company(me.companyRole);
   const line = <View style={{ height: 1, backgroundColor: c.border }} />;
 
   return (
     <Screen>
-      <OfflineBanner waiting={unsent.waiting} />
+      <OfflineBanner />
       {/* Keeps scrolled content from showing through the status bar. */}
       <View style={{ height: insets.top, backgroundColor: c.bg }} />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxl * 2 }}>
@@ -57,9 +62,9 @@ function YouScreen() {
           <View style={{ flex: 1, gap: 2 }}>
             <T variant="title">{me.name}</T>
             <T variant="meta" color="textMuted">
-              +91 {formatPhone(me.phone)}
+              {me.email}
             </T>
-            <Pill label={`Paliath Interiors · ${roleLabel}`} bg={c.surfaceAlt} fg={c.textMuted} />
+            <Pill label={`${company?.name ?? ''} · ${roleLabel}`} bg={c.surfaceAlt} fg={c.textMuted} />
           </View>
         </View>
 
@@ -92,7 +97,7 @@ function YouScreen() {
                         {shortProjectName(p.name)}
                       </T>
                       <T variant="meta" color="textMuted">
-                        {m.role === 'manager' ? t('you.manager', 'Manager') : t('you.member', 'Member')} · {t(`jobTitle.${m.jobTitle}`, m.jobTitle)}
+                        {labels.project(m.role)} · {labels.jobTitle(m.jobTitle)}
                       </T>
                     </View>
                     <Feather name="chevron-right" size={18} color={c.textFaint} />
@@ -101,6 +106,27 @@ function YouScreen() {
               })
             )}
           </Card>
+        </View>
+
+        <View>
+          <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
+            {t('you.company', 'Company')}
+          </T>
+          <Card style={{ padding: 0 }}>
+            <SettingRow icon="users" label={t('people.title', 'People')} onPress={() => router.push('/people')} right={<Feather name="chevron-right" size={18} color={c.textFaint} />} />
+            {can('user.invite') ? (
+              <>
+                {line}
+                <SettingRow
+                  icon="user-plus"
+                  label={t('invite.title', 'Invite person')}
+                  onPress={() => setInviting(true)}
+                  right={<Feather name="chevron-right" size={18} color={c.textFaint} />}
+                />
+              </>
+            ) : null}
+          </Card>
+          <InviteSheet me={me} visible={inviting} onClose={() => setInviting(false)} />
         </View>
 
         <View style={{ gap: space.sm }}>
@@ -168,32 +194,25 @@ function YouScreen() {
           </Card>
         </View>
 
-        <View>
-          <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-            {t('you.sending', 'Sending')}
-          </T>
-          <Card style={{ padding: 0 }}>
-            <SettingRow
-              icon="inbox"
-              label={t('unsent.title', 'Unsent items')}
-              onPress={() => router.push('/unsent')}
-              right={
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                  {unsent.failed > 0 ? <Badge count={unsent.failed} /> : <Badge count={unsent.waiting} muted />}
-                  <Feather name="chevron-right" size={18} color={c.textFaint} />
-                </View>
-              }
-            />
-            {line}
-            <SettingRow icon="send" label={t('you.sendNow', 'Send now')} onPress={sendNow} right={<Feather name="chevron-right" size={18} color={c.textFaint} />} />
-            {ui.demoPillHidden ? (
-              <>
-                {line}
-                <SettingRow icon="sliders" label={t('you.showDemo', 'Show the Demo button')} onPress={() => ui.set({ demoPillHidden: false })} />
-              </>
-            ) : null}
-          </Card>
-        </View>
+        <Card style={{ padding: 0 }}>
+          <SettingRow
+            icon="inbox"
+            label={t('unsent.title', 'Unsent items')}
+            onPress={() => router.push('/unsent')}
+            right={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                {unsent.failed > 0 ? <Badge count={unsent.failed} /> : <Badge count={unsent.waiting} muted />}
+                <Feather name="chevron-right" size={18} color={c.textFaint} />
+              </View>
+            }
+          />
+          {ui.demoPillHidden ? (
+            <>
+              {line}
+              <SettingRow icon="sliders" label={t('you.showDemo', 'Show the Demo button')} onPress={() => ui.set({ demoPillHidden: false })} />
+            </>
+          ) : null}
+        </Card>
 
         <Button kind="secondary" icon="log-out" label={t('you.logout', 'Log out')} onPress={() => (total > 0 ? setConfirmLogout(true) : logOut())} />
         <T variant="meta" color="textFaint" style={{ textAlign: 'center' }}>
@@ -203,9 +222,7 @@ function YouScreen() {
 
       <Sheet visible={confirmLogout} onClose={() => setConfirmLogout(false)} title={t('you.logoutTitle', 'Log out?')}>
         <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
-          {total === 1
-            ? t('you.logoutWarningOne', "1 change hasn't been sent yet. Log out anyway?")
-            : t('you.logoutWarning', "{{count}} changes haven't been sent yet. Log out anyway?", { count: total })}
+          {t('you.logoutWarning', "{{count}} changes haven't been sent yet. Logging out deletes them.", { count: total })}
         </T>
         <Button
           kind="danger"

@@ -11,7 +11,7 @@ import { T } from './T';
 /** One photo. Seeded "photos" are material-coloured tiles; real ones show the picture. */
 export function PhotoTile({ photo, ratio = 1, more = 0, small }: { photo: Attachment; ratio?: number; more?: number; small?: boolean }) {
   const { c } = useTheme();
-  const tone = photoTones[photo.tone ?? 'concrete'];
+  const tone = photoTones[photo.tone ?? 'stone'];
   return (
     <View
       accessibilityLabel={photo.caption ?? 'Photo'}

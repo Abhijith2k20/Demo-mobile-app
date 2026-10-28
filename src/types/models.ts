@@ -2,25 +2,15 @@ export type ID = string; // UUIDv7
 
 export type CompanyRole = 'owner' | 'admin' | 'member';
 export type ProjectRole = 'manager' | 'member';
-export type JobTitle = 'Project Manager' | 'Designer' | 'QS' | 'Supervisor' | 'Worker';
-export type Stage = 'design' | 'approval' | 'procurement' | 'execution' | 'finishing' | 'handover';
-
-export const STAGES: Stage[] = ['design', 'approval', 'procurement', 'execution', 'finishing', 'handover'];
-export const PHASES = [
-  'Civil',
-  'Electrical',
-  'Plumbing',
-  'False ceiling',
-  'Carpentry',
-  'Painting',
-  'Finishing',
-  'Handover',
-] as const;
+/** Job titles and stages are the company's own words (its setup on the server, sent in /meta). */
+export type JobTitle = string;
+/** A stage key from the company's setup. */
+export type Stage = string;
 
 export interface User {
   id: ID;
   name: string;
-  phone: string;
+  email: string;
   companyRole: CompanyRole;
   avatarColor: string;
   isActive: boolean;
@@ -81,7 +71,8 @@ export type MessageType =
   | 'status_card'
   | 'system';
 
-export type MessageStatus = 'pending' | 'sending' | 'sent' | 'failed';
+/** 'pending' and 'failed' only exist on the phone, for messages still in the send queue. */
+export type MessageStatus = 'sent' | 'pending' | 'failed';
 
 export interface Message {
   id: ID;
@@ -148,11 +139,13 @@ export interface Checkin {
   userId: ID;
   askedAt: string;
   answer: null | CheckinAnswer;
+  /** The answer is in the send queue on this phone. */
+  sending?: boolean;
 }
 
 // ---- Additions beyond the spec's model list (see DECISIONS.md) ----
 
-export type PhotoTone = 'plywood' | 'concrete' | 'tile' | 'sage';
+export type PhotoTone = 'sand' | 'stone' | 'linen' | 'sage';
 
 export interface Attachment {
   id: ID;
@@ -187,100 +180,136 @@ export interface Activity {
   createdAt: string;
 }
 
-// ---- Outbox ----
+// ---- What the API returns: records plus fields the server works out for the viewer ----
 
-export type OutboxKind =
-  | 'send_message'
-  | 'edit_message'
-  | 'delete_message'
-  | 'set_reaction'
-  | 'mark_read'
-  | 'create_task'
-  | 'update_task'
-  | 'checkin_answer'
-  | 'upload_file'
-  | 'project_stage'
-  | 'lock_baseline'
-  | 'member_add'
-  | 'member_update'
-  | 'member_remove'
-  // demo additions, see DECISIONS.md
-  | 'create_dm'
-  | 'create_project'
-  // project settings
-  | 'update_project'
-  | 'create_channel'
-  | 'update_channel'
-  | 'delete_channel'
-  | 'join_channel'
-  | 'archive_project'
-  | 'delete_project';
+/** What the server says the viewer may do in a project (the app's hook adds helpers: `useProjectAccess`). */
+export interface ProjectAccessInfo {
+  role: ProjectRole | null;
+  jobTitle: JobTitle | null;
+  /** Actions the viewer may take in this project right now (e.g. 'task.edit_any', 'project.archive'). */
+  permissions: string[];
+}
+export interface ProjectView extends Project {
+  /** Days behind (positive) or ahead (negative) of the locked baseline; 0 without one. */
+  delayDays: number;
+  /** The stage after this one in the company's setup; null at the last stage. */
+  nextStage: Stage | null;
+  /** Finished tasks out of all of them. */
+  progress: { done: number; total: number; percent: number };
+  members: ProjectMember[];
+  access: ProjectAccessInfo;
+}
 
-export interface OutboxItem {
+export interface MessageView extends Message {
+  replyCount: number;
+  lastReplyAt: string | null;
+  canEdit: boolean;
+  canDelete: boolean;
+  canPin: boolean;
+}
+
+export interface ChannelView extends Channel {
+  /** People listed as members (for project channels: project members only). */
+  memberIds: ID[];
+  /** The other person in a DM. */
+  peerId: ID | null;
+  joined: boolean;
+  unreadCount: number;
+  lastReadMessageId: ID | null;
+  /** Server time of the last read message: the "new" divider starts after it. */
+  lastReadAt: string | null;
+  lastMessage: MessageView | null;
+  canPost: boolean;
+  /** Only in "Browse channels". */
+  memberCount?: number;
+}
+
+export interface TaskView extends Task {
+  /** Positive = finishing later than baseline; null without a baseline. */
+  varianceDays: number | null;
+  /** Not done and its finish date has passed. */
+  isLate: boolean;
+  /** Not done and planned to finish later than its baseline. */
+  isDelayed: boolean;
+}
+
+/** The schedule as the server filtered it. Everything but `tasks` covers the whole project. */
+export interface TaskList {
+  /** Matching tasks, in phase order. */
+  tasks: TaskView[];
+  total: number;
+  /** Phases the project uses, in order, with whole-phase progress. */
+  phases: { name: string; done: number; total: number }[];
+  /** Phases a new task can go in. */
+  phaseChoices: string[];
+  /** Where work is happening now (quick add targets it). */
+  currentPhase: string | null;
+  /** Date span the timeline bars are drawn against. */
+  window: { from: string; to: string };
+}
+
+/** What a new task form starts with. */
+export interface TaskDefaults {
+  phase: string;
+  plannedStart: string;
+  plannedFinish: string;
+  /** Phases to offer: the project's own, then the company's. */
+  phaseChoices: string[];
+}
+
+export interface Company {
   id: ID;
-  kind: OutboxKind;
-  lane: string;
-  entityId: ID;
-  payload: string;
-  dependsOn: ID | null;
-  status: 'pending' | 'sending' | 'failed';
-  attempts: number;
-  nextAttemptAt: number;
-  lastErrorCode: string | null;
-  createdAt: number;
+  name: string;
 }
 
-// ---- API payloads ----
-
-export interface SyncResponse {
-  serverTime: string;
-  users: User[];
-  projects: Project[];
-  projectMembers: ProjectMember[];
-  channels: Channel[];
-  channelMembers: ChannelMember[];
-  messages: Message[];
-  tasks: Task[];
-  taskHistory: TaskHistory[];
-  checkins: Checkin[];
-  activities: Activity[];
-  removed: { projects: ID[]; channels: ID[]; tasks: ID[]; messages: ID[] };
-  hasMore: boolean;
-  cursor: number | null;
+/** Demo build: one sign-in per role. */
+export interface DemoAccount {
+  email: string;
+  name: string;
+  companyRole: CompanyRole;
+  /** Already in the reader's language. */
+  jobTitle: string | null;
 }
 
-export interface DashboardResponse {
-  generatedAt: string;
-  stats: { activeProjects: number; delayed: number; dueThisWeek: number; blocked: number };
-  byStage: { stage: Stage; count: number }[];
-  /** Every active project, most delayed first. `delayDays` is negative when ahead; null without a baseline. */
-  projects: {
-    id: ID;
-    name: string;
-    stage: Stage;
-    delayDays: number | null;
-    percent: number;
-    doneTasks: number;
-    totalTasks: number;
-    blocked: number;
-    pmId: ID | null;
-  }[];
-  blockedTasks: { id: ID; name: string; projectName: string; ownerId: ID | null }[];
-  todayOnSites: {
-    id: ID;
-    projectName: string;
-    userId: ID;
-    text: string;
-    at: string;
-    attachments: Attachment[];
-  }[];
+export interface UserView extends User {
+  /** Whether the viewer may deactivate this person. */
+  canDeactivate?: boolean;
+  /** False for the Owner and Admins: they see every project already, so they're never added to one. */
+  joinsProjects?: boolean;
+}
+
+export interface ActivityView extends Activity {
+  read: boolean;
+}
+
+export interface Meta {
+  /** In order, with labels in the reader's language. */
+  stages: { key: Stage; label: string }[];
+  phases: string[];
+  jobTitles: { name: JobTitle; label: string; managersOnly: boolean }[];
+  /** Job title a new project member starts with. */
+  defaultJobTitle: JobTitle;
+  /** Quick picks for problems; `inCheckins: false` ones aren't offered in bot check-ins. "Other" is added by the app. */
+  problemTypes: { key: string; label: string; inCheckins: boolean }[];
+  percentSteps: number[];
+  editWindowMs: number;
+  deleteWindowMs: number;
+  /** role → job title → channel names a new member joins by default */
+  defaultChannels: Record<ProjectRole, Record<JobTitle, string[]>>;
+  /** Project roles that are always in every channel of their project. */
+  rolesInEveryChannel: ProjectRole[];
 }
 
 export type ServerEvent =
   | { type: 'message.new' | 'message.updated' | 'message.deleted'; message: Message }
   | { type: 'task.updated' | 'task.created'; task: Task; history: TaskHistory[] }
   | { type: 'channel.updated'; channel: Channel }
+  | { type: 'channel.deleted'; channelId: ID }
   | { type: 'channel.member_added' | 'channel.member_removed'; channelId: ID; userId: ID }
+  | { type: 'channel.read'; channelId: ID; userId: ID }
   | { type: 'project.updated'; project: Project }
+  | { type: 'project.deleted'; projectId: ID }
   | { type: 'checkin.new'; checkin: Checkin }
-  | { type: 'activity.new'; activity: Activity };
+  | { type: 'activity.new'; activity: Activity }
+  | { type: 'activity.read' }
+  | { type: 'user.updated'; user: User };

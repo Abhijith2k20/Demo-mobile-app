@@ -4,10 +4,11 @@ import { View } from 'react-native';
 import { Button, Card } from '@/components/basics';
 import { Field, Input } from '@/components/form';
 import { T } from '@/components/T';
-import { projectDetailsSchema } from '@/shared/schemas';
+import { projectDetailsSchema } from '@/contract/schemas';
 import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
 import type { Project } from '@/types/models';
+import { fieldErrors } from '@/lib/mutations';
 import { updateProjectDetails } from '../../api';
 
 export function DetailsForm({ project, canEdit }: { project: Project; canEdit: boolean }) {
@@ -17,7 +18,7 @@ export function DetailsForm({ project, canEdit }: { project: Project; canEdit: b
   const value = draft ?? { name: project.name, client: project.client, address: project.address };
   const set = (patch: Partial<typeof value>) => setDraft({ ...value, ...patch });
 
-  const save = () => {
+  const save = async () => {
     const parsed = projectDetailsSchema.safeParse(value);
     if (!parsed.success) {
       const next: Record<string, string> = {};
@@ -25,7 +26,11 @@ export function DetailsForm({ project, canEdit }: { project: Project; canEdit: b
       setErrors(next);
       return;
     }
-    updateProjectDetails(project, parsed.data);
+    const res = await updateProjectDetails(project, parsed.data);
+    if ('error' in res) {
+      setErrors(fieldErrors(res.error));
+      return;
+    }
     setDraft(null);
     setErrors({});
     toast('Project details saved.', 'success');
@@ -58,7 +63,7 @@ export function DetailsForm({ project, canEdit }: { project: Project; canEdit: b
       {draft ? (
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <View style={{ flex: 1 }}>
-            <Button label="Save details" onPress={save} />
+            <Button label="Save details" onPress={() => void save()} />
           </View>
           <Button
             kind="secondary"

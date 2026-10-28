@@ -1,31 +1,19 @@
 // "Browse channels": public channels of a project that the user has not joined yet.
 import { Feather } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { Button, EmptyState, Skeleton } from '@/components/basics';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { api } from '@/lib/api/client';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { Channel, ID } from '@/types/models';
+import type { ID } from '@/types/models';
 import { joinChannel } from '../api';
-import { useProjectChannels } from '../hooks';
-
-type Listed = Channel & { joined: boolean; memberCount: number };
+import { useBrowseChannels } from '../hooks';
 
 export function BrowseChannels({ projectId, visible, onClose }: { projectId: ID; visible: boolean; onClose: () => void }) {
   const { c } = useTheme();
-  const mine = useProjectChannels(projectId);
-  // Not offline data: the list of channels you are *not* in only exists on the server.
-  const q = useQuery({
-    queryKey: ['project-channels', projectId],
-    queryFn: async () => (await api<{ channels: Listed[] }>('GET', `/projects/${projectId}/channels`)).channels,
-    enabled: visible,
-    staleTime: 0,
-  });
-  const joinedIds = new Set(mine.map((ch) => ch.id));
-  const open = (q.data ?? []).filter((ch) => !ch.isPrivate && !joinedIds.has(ch.id));
+  const q = useBrowseChannels(projectId, visible);
+  const open = (q.data?.channels ?? []).filter((ch) => !ch.isPrivate && !ch.joined);
 
   return (
     <Sheet visible={visible} onClose={onClose} title="Browse channels" subtitle="Public channels in this project you can join">
@@ -44,7 +32,7 @@ export function BrowseChannels({ projectId, visible, onClose }: { projectId: ID;
                 {ch.name}
               </T>
               <T variant="meta" color="textMuted">
-                {ch.memberCount} {ch.memberCount === 1 ? 'person' : 'people'}
+                {ch.memberCount ?? 0} {ch.memberCount === 1 ? 'person' : 'people'}
               </T>
             </View>
             <Button small full={false} label="Join" onPress={() => joinChannel(ch)} />

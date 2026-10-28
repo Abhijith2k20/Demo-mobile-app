@@ -6,6 +6,7 @@ import { Platform, Pressable, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import i18n from '@/lib/i18n';
+import { useUnsentCount } from '@/lib/outbox';
 import { useSession } from '@/stores/session';
 import { useUi } from '@/stores/ui';
 import { motion, radius, space } from '@/theme/spacing';
@@ -65,14 +66,17 @@ export function Screen({ children }: { children: ReactNode }) {
   return <View style={{ flex: 1, backgroundColor: c.bg }}>{children}</View>;
 }
 
-export function OfflineBanner({ waiting }: { waiting: number }) {
+/** Shown when the server can't be reached. Messages and task updates wait in the send queue. */
+export function OfflineBanner() {
   const online = useUi((s) => s.online);
+  const unsent = useUnsentCount();
   const { t } = useTranslation();
   if (online) return null;
+  const waiting = unsent.waiting + unsent.failed;
   return (
     <Banner
       icon="wifi-off"
-      text={t('offline.banner', "You're offline. Changes will send automatically.")}
+      text={t('offline.queued', "You're offline. Messages and task updates will send when you're back.")}
       right={waiting > 0 ? t('offline.waiting', '{{count}} waiting', { count: waiting }) : undefined}
     />
   );

@@ -1,102 +1,92 @@
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { addDays, format } from 'date-fns';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { db } from '@/lib/db/client';
-import { checkins, projectMembers, taskHistory, tasks, users } from '@/lib/db/schema';
-import { isDone, todayIso } from '@/shared/taskRules';
-import { PHASES, type Checkin, type ID, type ProjectMember, type Task, type TaskHistory, type User } from '@/types/models';
-import { useMe } from '../shared';
+import { useOutbox } from '@/lib/outbox';
+import { get, keys } from '@/lib/queries';
+import type { Checkin, ID, TaskDefaults, TaskHistory, TaskList, TaskView } from '@/types/models';
+import { filterQuery, NO_FILTERS, type TaskFilters } from './filters';
 
-export function useProjectTasks(projectId: ID | null | undefined): { tasks: Task[]; loading: boolean } {
-  const q = useLiveQuery(
-    db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.projectId, projectId ?? ''), isNull(tasks.deletedAt)))
-      .orderBy(asc(tasks.plannedStart), asc(tasks.plannedFinish), asc(tasks.id)),
-    [projectId],
-  );
-  return { tasks: q.data, loading: !q.updatedAt };
+const EMPTY: TaskList = { tasks: [], total: 0, phases: [], phaseChoices: [], currentPhase: null, window: { from: '', to: '' } };
+
+/** A project's schedule, filtered, grouped and counted by the server. */
+export function useProjectTasks(projectId: ID | null | undefined, filters: TaskFilters = NO_FILTERS): TaskList & { loading: boolean; failed: boolean } {
+  const query = filterQuery(filters);
+  const q = useQuery({
+    queryKey: [...keys.tasks(projectId ?? ''), query],
+    queryFn: get<TaskList>(`/projects/${projectId}/tasks${query ? `?${query}` : ''}`),
+    enabled: !!projectId,
+    placeholderData: keepPreviousData, // keep the list on screen while a new filter loads
+  });
+  return { ...(q.data ?? EMPTY), loading: q.isPending && !q.isError, failed: q.isError && !q.data };
 }
 
-export function useTask(id: ID | null | undefined): { task: Task | null; loading: boolean } {
-  const q = useLiveQuery(db.select().from(tasks).where(eq(tasks.id, id ?? '')), [id]);
-  return { task: q.data[0] ?? null, loading: !q.updatedAt };
+/** What a new task form starts with (the server picks the phase and dates). */
+export function useTaskDefaults(projectId: ID | null | undefined, phase: string | null, enabled = true): TaskDefaults | undefined {
+  return useQuery({
+    queryKey: keys.taskDefaults(projectId ?? '', phase ?? ''),
+    queryFn: get<TaskDefaults>(`/projects/${projectId}/task-defaults${phase ? `?phase=${encodeURIComponent(phase)}` : ''}`),
+    enabled: !!projectId && enabled,
+  }).data;
 }
 
-export function useTasksByIds(ids: ID[]): Task[] {
+function useTaskQuery(id: ID | null | undefined) {
+  return useQuery({
+    queryKey: keys.task(id ?? ''),
+    queryFn: get<{ task: TaskView; history: TaskHistory[] }>(`/tasks/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useTask(id: ID | null | undefined): { task: TaskView | null; loading: boolean } {
+  const q = useTaskQuery(id);
+  return { task: q.data?.task ?? null, loading: q.isPending && !!id };
+}
+
+export function useTasksByIds(ids: ID[]): TaskView[] {
   const key = ids.join(',');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stable = useMemo(() => ids, [key]);
-  return useLiveQuery(db.select().from(tasks).where(inArray(tasks.id, stable.length ? stable : [''])), [key]).data;
+  const q = useQuery({ queryKey: keys.tasksByIds(key), queryFn: get<{ tasks: TaskView[] }>(`/tasks?ids=${key}`), enabled: ids.length > 0 });
+  return q.data?.tasks ?? [];
 }
 
 export function useTaskHistory(taskId: ID): TaskHistory[] {
-  return useLiveQuery(
-    db.select().from(taskHistory).where(eq(taskHistory.taskId, taskId)).orderBy(desc(taskHistory.createdAt), desc(taskHistory.id)),
-    [taskId],
-  ).data;
+  return useTaskQuery(taskId).data?.history ?? [];
+}
+
+export function useMyCheckins(): { checkins: Checkin[]; loading: boolean } {
+  const q = useQuery({ queryKey: keys.checkins, queryFn: get<{ checkins: Checkin[] }>('/me/checkins') });
+  const items = useOutbox((st) => st.items);
+  // An answer still in the send queue shows as the user gave it, marked as sending.
+  const checkins = useMemo(() => {
+    const queued = new Map(items.flatMap((i) => (i.kind === 'checkin' && i.state !== 'failed' ? [[i.checkinId, { answer: i.answer, at: i.createdAt }] as const] : [])));
+    return (q.data?.checkins ?? []).map((c) => {
+      const mine = c.answer ? undefined : queued.get(c.id);
+      return mine ? { ...c, answer: { ...mine.answer, at: mine.at }, sending: true } : c;
+    });
+  }, [q.data, items]);
+  return { checkins, loading: q.isPending };
+}
+
+/** True while a change to this task waits in the send queue on this phone. */
+export function useTaskSending(taskId: ID | null | undefined): boolean {
+  return useOutbox((st) => st.items.some((i) => (i.kind === 'task' || i.kind === 'checkin') && i.state !== 'failed' && i.taskId === taskId));
 }
 
 export function useCheckin(id: ID | null | undefined): Checkin | null {
-  return useLiveQuery(db.select().from(checkins).where(eq(checkins.id, id ?? '')), [id]).data[0] ?? null;
+  const { checkins } = useMyCheckins();
+  return checkins.find((c) => c.id === id) ?? null;
 }
 
 /** Phases in build order, then any custom ones the project uses. */
-export function orderedPhases(list: Task[]): string[] {
-  const known: string[] = [...PHASES];
-  const present = new Set(list.map((t) => t.phase));
-  const custom = [...present].filter((p) => !known.includes(p));
-  return [...custom, ...known.filter((p) => present.has(p))];
-}
-
 export interface MyTasks {
-  today: Task[];
-  week: Task[];
-  done: Task[];
+  today: TaskView[];
+  week: TaskView[];
+  done: TaskView[];
   loading: boolean;
+  /** Couldn't load and nothing saved to show. */
+  failed: boolean;
 }
 
-/** The worker's task home: what's on now, what's coming this week, what was finished recently. */
+/** Someone's own task home, grouped by the server: on now, this week, recently finished. */
 export function useMyTasks(): MyTasks {
-  const me = useMe();
-  const q = useLiveQuery(
-    db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.ownerId, me.id), isNull(tasks.deletedAt)))
-      .orderBy(asc(tasks.plannedFinish)),
-    [me.id],
-  );
-  return useMemo(() => {
-    const today = todayIso();
-    const weekEnd = format(addDays(new Date(), 7), 'yyyy-MM-dd');
-    const recent = format(addDays(new Date(), -14), 'yyyy-MM-dd');
-    const open = q.data.filter((t) => !isDone(t.status));
-    return {
-      today: open.filter((t) => t.plannedStart <= today),
-      week: open.filter((t) => t.plannedStart > today && t.plannedStart <= weekEnd),
-      done: q.data.filter((t) => isDone(t.status) && (t.actualFinish ?? t.plannedFinish) >= recent).reverse(),
-      loading: !q.updatedAt,
-    };
-  }, [q.data, q.updatedAt]);
-}
-
-export interface MemberRow {
-  member: ProjectMember;
-  user: User;
-}
-
-export function useProjectMembers(projectId: ID | null | undefined): MemberRow[] {
-  const q = useLiveQuery(
-    db
-      .select({ member: projectMembers, user: users })
-      .from(projectMembers)
-      .innerJoin(users, eq(users.id, projectMembers.userId))
-      .where(eq(projectMembers.projectId, projectId ?? ''))
-      .orderBy(asc(projectMembers.role), asc(users.name)),
-    [projectId],
-  );
-  return q.data;
+  const q = useQuery({ queryKey: keys.myTasks, queryFn: get<Omit<MyTasks, 'loading'>>('/me/tasks') });
+  return { today: q.data?.today ?? [], week: q.data?.week ?? [], done: q.data?.done ?? [], loading: q.isPending && !q.isError, failed: q.isError && !q.data };
 }

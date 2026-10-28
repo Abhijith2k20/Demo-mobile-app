@@ -3,28 +3,26 @@ import type { User } from '@/types/models';
 
 interface SessionState {
   user: User | null;
+  /** Company-level actions the server allows this user (e.g. 'project.create', 'user.invite'). */
+  permissions: string[];
+  /** Big-button layout for job titles the company marked simple (decided by the server). */
+  simpleMode: boolean;
   accessToken: string | null;
   refreshToken: string | null;
-  /** True when every project membership of the user has the job title Worker. */
-  workerMode: boolean;
-  /** False until the first sync after login has finished (or failed). */
-  ready: boolean;
-  setSession: (s: { user: User; accessToken: string; refreshToken: string }) => void;
+  setSession: (s: { user: User; permissions: string[]; simpleMode: boolean; accessToken: string; refreshToken: string }) => void;
+  setMe: (s: { user: User; permissions: string[]; simpleMode: boolean }) => void;
   setAccessToken: (token: string) => void;
-  setWorkerMode: (v: boolean) => void;
-  setReady: (v: boolean) => void;
   clear: () => void;
 }
 
 export const useSession = create<SessionState>((set) => ({
   user: null,
+  permissions: [],
+  simpleMode: false,
   accessToken: null,
   refreshToken: null,
-  workerMode: false,
-  ready: false,
-  setSession: ({ user, accessToken, refreshToken }) => set({ user, accessToken, refreshToken, ready: false }),
+  setSession: ({ user, permissions, simpleMode, accessToken, refreshToken }) => set({ user, permissions, simpleMode, accessToken, refreshToken }),
+  setMe: ({ user, permissions, simpleMode }) => set({ user, permissions, simpleMode }),
   setAccessToken: (accessToken) => set({ accessToken }),
-  setWorkerMode: (workerMode) => set((s) => (s.workerMode === workerMode ? s : { workerMode })),
-  setReady: (ready) => set({ ready }),
-  clear: () => set({ user: null, accessToken: null, refreshToken: null, workerMode: false, ready: false }),
+  clear: () => set({ user: null, permissions: [], simpleMode: false, accessToken: null, refreshToken: null }),
 }));

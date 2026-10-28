@@ -9,12 +9,12 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
-import type { ID, Message } from '@/types/models';
-import { BotProgress } from '../../bot/BotProgress';
+import type { ID, Message, MessageView } from '@/types/models';
+import { BotProgress } from '../../bot/components/BotProgress';
 import { CheckinQueueProvider } from '../../bot/queue';
 import { leaveChannel } from '../../projects/api';
 import { StageBanner } from '../../projects/components/StageBanner';
-import { firstName, useMe, useProject, useProjectAccess, useUnsentCount, useUsers } from '../../shared';
+import { firstName, useMe, useProject, useProjectAccess, useUsers } from '../../shared';
 import { ChatContext, type ChatContextValue } from '../context';
 import { useChannelInfo, useChannelMessages, usePinned, type ListItem } from '../hooks';
 import { Composer, ReadOnlyBar, type FormKind } from './Composer';
@@ -36,10 +36,9 @@ export function Conversation({ channelId }: { channelId: ID }) {
   const info = useChannelInfo(channelId);
   const project = useProject(info.channel?.projectId);
   const access = useProjectAccess(info.channel?.projectId);
-  const { items, loading, loadOlder, loadingOlder } = useChannelMessages(channelId);
-  const unsent = useUnsentCount();
+  const { items, loading, failed, loadOlder, loadingOlder } = useChannelMessages(channelId);
   const pinned = usePinned(channelId);
-  const [menu, setMenu] = useState<Message | null>(null);
+  const [menu, setMenu] = useState<MessageView | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [form, setForm] = useState<FormKind | null>(null);
   const [taskName, setTaskName] = useState<string | undefined>(undefined);
@@ -82,7 +81,7 @@ export function Conversation({ channelId }: { channelId: ID }) {
             </View>
           }
         />
-        <OfflineBanner waiting={unsent.waiting} />
+        <OfflineBanner />
         {project && info.channel?.kind === 'project' ? <StageBanner project={project} /> : null}
         {info.isBot ? <BotProgress /> : null}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
@@ -99,11 +98,19 @@ export function Conversation({ channelId }: { channelId: ID }) {
               </View>
             ) : items.length === 0 ? (
               <View style={{ flex: 1, justifyContent: 'center' }}>
-                <EmptyState
-                  icon="message-circle"
-                  title={t('chat.emptyTitle', 'No messages yet.')}
-                  hint={t('chat.emptyHint', 'Share an update or a photo from site.')}
-                />
+                {failed ? (
+                  <EmptyState
+                    icon="cloud-off"
+                    title={t('chat.loadFailed', "Couldn't load messages")}
+                    hint={t('chat.loadFailedHint', 'They will appear when the connection is back.')}
+                  />
+                ) : (
+                  <EmptyState
+                    icon="message-circle"
+                    title={t('chat.emptyTitle', 'No messages yet.')}
+                    hint={t('chat.emptyHint', 'Share an update or a photo from site.')}
+                  />
+                )}
               </View>
             ) : (
               <FlashList

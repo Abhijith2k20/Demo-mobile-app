@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { ID, JobTitle, Message, User } from '@/types/models';
+import type { ID, JobTitle, MessageView as Message, User } from '@/types/models';
 
 export interface ChatContextValue {
   me: User;
@@ -21,6 +21,3 @@ export function useChat(): ChatContextValue {
   if (!ctx) throw new Error('ChatContext missing');
   return ctx;
 }
-
-export const BOT_PHONE = '0000000000';
-export const isBotUser = (u: User | undefined): boolean => u?.phone === BOT_PHONE;

@@ -8,14 +8,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, EmptyState, Skeleton } from '@/components/basics';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { isDone, todayIso } from '@/shared/taskRules';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import { PHASES, type Project, type Task } from '@/types/models';
-import { useMe, useProjectAccess, useUsers } from '../../shared';
-import { confirmTask, createTask, quickAddDefaults, shiftTask, updateTask } from '../api';
-import { matchesFilters, NO_FILTERS, type TaskFilters } from '../filters';
-import { orderedPhases, useProjectMembers, useProjectTasks } from '../hooks';
+import type { Project, TaskView as Task } from '@/types/models';
+import { useMe, useProjectAccess, useProjectMembers, useUsers } from '../../shared';
+import { confirmTask, createTask, shiftTask, updateTask } from '../api';
+import { NO_FILTERS, type TaskFilters } from '../filters';
+import { useProjectTasks } from '../hooks';
 import { ScheduleMenu } from './Baseline';
 import { FilterSheet } from './FilterSheet';
 import { ScheduleToolbar } from './ScheduleToolbar';
@@ -30,8 +29,8 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
   const me = useMe();
   const users = useUsers();
   const access = useProjectAccess(project.id);
-  const { tasks, loading } = useProjectTasks(project.id);
   const [filters, setFilters] = useState<TaskFilters>(NO_FILTERS);
+  const { tasks, total, phases, phaseChoices, currentPhase, window, loading, failed } = useProjectTasks(project.id, filters);
   const [filterSheet, setFilterSheet] = useState(false);
   const [menu, setMenu] = useState(false);
   const members = useProjectMembers(project.id);
@@ -40,56 +39,33 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
   const [phase, setPhase] = useState<string | null>(null);
   const [phaseSheet, setPhaseSheet] = useState(false);
 
-  const phases = useMemo(() => orderedPhases(tasks), [tasks]);
-  // Quick add targets the phase that is being worked on now, unless the user picked one.
-  const activePhase = phase ?? tasks.find((t) => t.status === 'in_progress' || t.status === 'blocked')?.phase ?? phases.find((p) => tasks.some((t) => t.phase === p && !isDone(t.status))) ?? phases[0] ?? PHASES[0];
+  // Quick add targets the phase being worked on now (the server's pick), unless the user picked one.
+  const activePhase = phase ?? currentPhase ?? phaseChoices[0] ?? '';
 
-  const window = useMemo(() => {
-    let to = project.plannedFinish;
-    for (const t of tasks) {
-      if (t.plannedFinish > to) to = t.plannedFinish;
-      if (t.baselineFinish && t.baselineFinish > to) to = t.baselineFinish;
-    }
-    let from = project.startDate;
-    for (const t of tasks) if (t.plannedStart < from) from = t.plannedStart;
-    return { from, to };
-  }, [tasks, project.plannedFinish, project.startDate]);
-
-  const { items, sticky, shown } = useMemo(() => {
-    const today = todayIso();
-    const match = (t: Task) => matchesFilters(t, filters, me.id, today);
-    let count = 0;
+  // The server sends matching tasks in phase order; each phase gets a sticky header with its progress.
+  const { items, sticky } = useMemo(() => {
     const out: Item[] = [];
     const stickyIdx: number[] = [];
     for (const p of phases) {
-      const all = tasks.filter((t) => t.phase === p);
-      const shown = all.filter(match);
-      if (shown.length === 0) continue;
+      const inPhase = tasks.filter((t) => t.phase === p.name);
+      if (inPhase.length === 0) continue;
       stickyIdx.push(out.length);
-      out.push({ kind: 'phase', key: `phase-${p}`, phase: p, done: all.filter((t) => t.status === 'done').length, total: all.length });
-      for (const t of shown) out.push({ kind: 'task', key: t.id, task: t });
-      count += shown.length;
+      out.push({ kind: 'phase', key: `phase-${p.name}`, phase: p.name, done: p.done, total: p.total });
+      for (const t of inPhase) out.push({ kind: 'task', key: t.id, task: t });
     }
-    return { items: out, sticky: stickyIdx, shown: count };
-  }, [tasks, phases, filters, me.id]);
+    return { items: out, sticky: stickyIdx };
+  }, [tasks, phases]);
 
   const onDone = (t: Task) => {
     if (t.status === 'done_pending_confirmation' && access.can('task.confirm')) confirmTask(t);
-    else updateTask(t, { status: 'done' }, access.isManager);
+    else updateTask(t, { status: 'done' });
   };
 
   const addQuick = () => {
     const name = quick.trim();
-    if (!name) return;
-    createTask({
-      projectId: project.id,
-      name,
-      phase: activePhase,
-      ownerId: null,
-      description: null,
-      channelId: null,
-      ...quickAddDefaults(tasks, activePhase),
-    });
+    if (!name || !activePhase) return;
+    // No dates: the server places it after the phase's last task.
+    createTask({ projectId: project.id, name, phase: activePhase, ownerId: null, description: null, channelId: null });
     setQuick('');
   };
 
@@ -99,8 +75,8 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
       <ScheduleToolbar
         filters={filters}
         onChange={setFilters}
-        shown={shown}
-        total={tasks.length}
+        shown={tasks.length}
+        total={total}
         onOpenFilters={() => setFilterSheet(true)}
         onOpenMenu={access.can('task.baseline') ? () => setMenu(true) : undefined}
       />
@@ -108,12 +84,14 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
       <View style={{ flex: 1 }}>
         {loading ? (
           <Skeleton rows={7} avatar={false} />
+        ) : failed ? (
+          <EmptyState icon="cloud-off" title={t('task.loadFailed', "Couldn't load the schedule")} hint={t('chat.loadFailedHint', 'They will appear when the connection is back.')} />
         ) : items.length === 0 ? (
           <EmptyState
             icon="check-square"
-            title={tasks.length === 0 ? 'No tasks yet' : 'Nothing here'}
-            hint={tasks.length === 0 ? 'Add the first task below to start the schedule.' : 'No tasks match these filters.'}
-            action={tasks.length > 0 ? <Button small full={false} kind="secondary" label="Clear filters" onPress={() => setFilters(NO_FILTERS)} /> : undefined}
+            title={total === 0 ? 'No tasks yet' : 'Nothing here'}
+            hint={total === 0 ? 'Add the first task below to start the schedule.' : 'No tasks match these filters.'}
+            action={total > 0 ? <Button small full={false} kind="secondary" label="Clear filters" onPress={() => setFilters(NO_FILTERS)} /> : undefined}
           />
         ) : (
           <FlashList
@@ -209,7 +187,7 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
                 kind="secondary"
                 label={`${d > 0 ? '+' : '−'}${Math.abs(d)} ${Math.abs(d) === 1 ? 'day' : 'days'}`}
                 onPress={() => {
-                  if (shift) shiftTask(shift, d, access.isManager);
+                  if (shift) shiftTask(shift, d);
                   setShift(null);
                 }}
               />
@@ -223,7 +201,7 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
 
       <Sheet visible={phaseSheet} onClose={() => setPhaseSheet(false)} title="Add new tasks to">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {[...new Set([...phases, ...PHASES])].map((p) => (
+          {phaseChoices.map((p) => (
             <Chip
               key={p}
               large
@@ -244,9 +222,9 @@ export function ScheduleList({ project, header }: { project: Project; header?: R
         filters={filters}
         onChange={setFilters}
         members={members}
-        phases={phases}
+        phases={phases.map((p) => p.name)}
         hasBaseline={project.baselineLocked}
-        shown={shown}
+        shown={tasks.length}
       />
       <ScheduleMenu project={project} visible={menu} onClose={() => setMenu(false)} />
     </KeyboardAvoidingView>

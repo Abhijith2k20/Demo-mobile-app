@@ -1,7 +1,8 @@
 import { uuidv7 } from 'uuidv7';
-import type { ApiErrorBody } from '@/shared/errorCodes';
+import type { ApiErrorBody } from '@/contract/errorCodes';
 import { useDemo } from '@/stores/demo';
 import { useSession } from '@/stores/session';
+import { useUi } from '@/stores/ui';
 import { request, TransportError, type TransportRequest } from './transport';
 
 export type ErrorKind =
@@ -49,16 +50,18 @@ export function setAuthLostHandler(fn: () => void): void {
   onAuthLost = fn;
 }
 
-async function send<T>(method: TransportRequest['method'], path: string, body: unknown): Promise<T> {
+async function send<T>(method: TransportRequest['method'], path: string, body: unknown, form?: FormData): Promise<T> {
   const requestId = `req_${uuidv7()}`;
   const token = useSession.getState().accessToken;
-  const headers: Record<string, string> = { 'X-Request-Id': requestId };
+  // The language picks the labels of the company's own setup (stages, job titles).
+  const headers: Record<string, string> = { 'X-Request-Id': requestId, 'Accept-Language': useUi.getState().language };
   if (token) headers.Authorization = `Bearer ${token}`;
   const started = Date.now();
   const log = (status: number | 'offline' | 'timeout', code?: string) =>
     useDemo.getState().logApi({ method, path, status, ms: Date.now() - started, requestId, code });
   try {
-    const res = await request({ method, path, body, headers });
+    const res = await request({ method, path, body, form, headers });
+    useUi.getState().set({ online: true });
     if (res.status >= 200 && res.status < 300) {
       log(res.status);
       return res.body as T;
@@ -74,6 +77,7 @@ async function send<T>(method: TransportRequest['method'], path: string, body: u
     );
   } catch (e) {
     if (e instanceof TransportError) {
+      if (e.kind === 'offline') useUi.getState().set({ online: false });
       log(e.kind);
       throw new AppError(e.kind, e.kind === 'offline' ? 'OFFLINE' : 'TIMEOUT', e.kind, {}, requestId);
     }
@@ -108,9 +112,9 @@ function refreshOnce(): Promise<boolean> {
 }
 
 /** The one function every feature uses to talk to the server. */
-export async function api<T>(method: TransportRequest['method'], path: string, body?: unknown): Promise<T> {
+export async function api<T>(method: TransportRequest['method'], path: string, body?: unknown, form?: FormData): Promise<T> {
   try {
-    return await send<T>(method, path, body);
+    return await send<T>(method, path, body, form);
   } catch (e) {
     if (!isAppError(e) || e.kind !== 'auth' || path.startsWith('/auth/')) throw e;
     const ok = await refreshOnce();
@@ -119,7 +123,7 @@ export async function api<T>(method: TransportRequest['method'], path: string, b
       throw e;
     }
     try {
-      return await send<T>(method, path, body);
+      return await send<T>(method, path, body, form);
     } catch (again) {
       if (isAppError(again) && again.kind === 'auth') onAuthLost();
       throw again;

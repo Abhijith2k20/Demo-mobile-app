@@ -246,3 +246,231 @@ Not exercised on a device:
 | Sheets skip their slide animation when Reduce Motion is on | Motion should be optional |
 | Error copy no longer says "we"; task row text is translated | HIG writing guidance; CLAUDE.md translation rule |
 
+
+## Sign-in by work email (2026-10-26)
+
+The owner asked to sign in with the **work email** the company gives each person, instead of a
+mobile number. The spec now says email everywhere it said phone.
+
+| Change | Where |
+|---|---|
+| `User.phone` is now `User.email` (local `users.email` column too) | `src/types/models.ts`, `src/lib/db/schema.ts`, `src/lib/db/init.ts` |
+| Login has one email field (email keyboard, no capitals, autofill as username); invalid address shows "Enter a valid work email" | `LoginScreen.tsx` |
+| Code screen says "Sent by email to name@company.com"; the code is still `123456` | `OtpScreen.tsx` |
+| Server finds the user by email, ignoring case and spaces; same generic reply for unknown addresses | `src/mock/routes/auth.ts`, `src/shared/schemas.ts` |
+| Seed and demo accounts use `firstname@paliath.in`; the bot is `bot@siteline.app` | `seed.ts`, `demoUsers.ts` |
+| The bot is recognised with `isBotUser()` everywhere, not a hard-coded number | Home search, New message, Add member |
+| You tab shows the email under the name | `YouScreen.tsx` |
+
+Not changed: there is no phone number on a person at all now. Kannada and Hindi have no sign-in
+strings yet, so the sign-in screens stay in English in those languages, as before.
+
+## Invite person (2026-10-26)
+
+The spec left "adding people to the company" out of scope; the owner asked for it.
+
+- **Where:** You → Company → **Invite person**, shown to the Owner and Admins only. Fields: name,
+  work email and, for the Owner only, Member or Admin. Admins can invite Members only
+  (`canInviteAs` in `src/shared/permissions.ts`, enforced by the server).
+- **How it is saved:** like a new project. The person is added to the local directory at once and
+  an `invite_user` item goes through the outbox to `POST /users`. If the server refuses, the local
+  row is removed and the reason is shown.
+- **Server:** new `POST /users` in `src/mock/routes/misc.ts`, idempotent by id. It adds the person
+  to both company channels and creates their bot DM, so they start like everyone else. A duplicate
+  email returns the new error `EMAIL_TAKEN` (409); the app also checks its local directory first,
+  so the error shows straight away, even offline.
+- **Not built:** removing or deactivating people, changing a person's role, resending an invite
+  email (there are no real emails in the demo). Other signed-in people see the new person after
+  their next sync, not live.
+
+## People screen and deactivating people (2026-10-26)
+
+- **People** (You → Company → People, route `app/people.tsx`): everyone in the company, searchable
+  by name or email, deactivated people in their own section. Everyone can open it. Tapping a person
+  shows their company role, their projects and a **Message** button.
+- **Projects on a person:** a Member's phone only holds the projects that Member is on, so for a
+  Member the list is labelled "Projects you share" and shows the overlap only. Owner and Admins see
+  the full list.
+- **Deactivate** ("archive, never delete"): Owner deactivates anyone except themselves; an Admin
+  deactivates Members only; nobody deactivates the Owner (`canDeactivate`, enforced by the server
+  at `POST /users/:id/deactivate`). The person's sessions end, they can't sign in (the sign-in
+  screen shows the usual "code isn't right" message, so it doesn't reveal who has an account),
+  and they disappear from Home search, New message, Add member and every task-owner picker. Their
+  messages, tasks and history keep their name. Their email can be used for a new invite.
+- **Saved like other changes:** local first, then the `deactivate_user` outbox item; a refusal
+  restores the person and shows the reason.
+- **Translated** the project Members screen (it was English-only), including Remove from project.
+- **Not built:** reactivating someone, changing a company role, the Demo panel's "Who am I" still
+  lists deactivated demo users (switching to one fails like a wrong code).
+
+## Fully online app, FastAPI backend (2026-10-26)
+
+The owner asked for a FastAPI mock backend that works like a real one, with a "dumb" app where
+the backend does everything, and chose: **fully online, no local data**, FastAPI **replaces** the
+in-app mock, build now.
+
+**What changed**
+- **New `backend/`** (FastAPI, Pydantic, uvicorn, pytest). In-memory store seeded from the same
+  demo data, real HTTP routes, WebSocket live events, real photo uploads (saved to
+  `backend/uploads/`), Demo panel controls under `/internal/*`. 37 tests cover the rules and routes.
+- **All rules moved to the server** (`backend/app/rules.py`, `views.py`): permissions, task
+  consequences (percent ↔ status, waiting for confirmation, actual dates), variance and project
+  delay, unread counts, "My tasks" grouping, worker mode, default channels, edit/delete windows,
+  message actions per viewer, who may deactivate whom, Activity read state. The app's
+  `src/shared/permissions.ts` and `taskRules.ts` are deleted; only display helpers remain
+  (`src/lib/format.ts`). Zod form schemas stay for instant feedback; the server checks again.
+- **Removed from the app:** the SQLite database (`expo-sqlite`, `drizzle-orm`), the outbox, sync,
+  the Unsent screen, "Send now", the logout warning about unsent changes, the outbox inspector
+  and the in-app mock (`src/mock`). Reads are TanStack Query calls, one endpoint each; writes call
+  the API and refresh what changed; WebSocket events say what is stale.
+- **New endpoints** the thin app needs: `/me`, `/meta`, `/projects`, `/channels`,
+  `/channels/:id/pins`, `/messages/:id/thread`, `/dms/:userId`, `/projects/:id/tasks`,
+  `/tasks/:id`, `/tasks?ids=`, `/tasks/:id/shift`, `/me/tasks`, `/me/checkins`, `/activity` +
+  `/activity/read`, `/projects/:id/updates`, `/projects/:id/files`, `/auth/logout`, multipart
+  `/uploads` + `/files/:id`. `/sync` is gone.
+
+**Behaviour that changed for the user**
+- Without a connection the app shows "Can't reach Siteline"; screens already loaded stay visible,
+  but nothing can be saved. A message that fails to send goes back into the composer.
+- Error messages no longer promise automatic retries (en/kn/hi updated).
+- Opening a DM creates it on the server; the server hides a DM with no messages from both
+  people's lists, so the "no empty conversations" rule still holds.
+- Own messages no longer show a clock/tick/red status icon: everything on screen is saved.
+- Demo panel: server Online/Slow/Flaky + a "Phone offline" switch; the outbox and sync sections
+  are replaced by "Refresh"; reset restarts the server data.
+
+**Shortcuts (known limits)**
+- One process, data in memory: a restart loses everything (by design for a demo).
+- Uploaded files are served by an unguessable id without auth; a real deployment needs signed URLs.
+- `/internal/*` has no auth; turn it off with `SITELINE_DEMO=0` anywhere public.
+- The earlier "Invite person" and "Deactivate" notes above describe the outbox; they now call the
+  API directly with the same rules.
+
+## No dashboard; "My tasks" for everyone (2026-10-26)
+
+The owner asked for five tabs only: **Home, DMs, My tasks, Activity, You**.
+- The Owner/Admin **Dashboard** is removed: the tab, the `/dashboard` screen, the
+  `GET /dashboard` endpoint, its test and the `dashboard.view` permission.
+- The third tab is now **My tasks** for every role (tasks assigned to that person, from
+  `GET /me/tasks`). Before, managers got a schedule list with a project switcher and Owner/Admin
+  got the dashboard there; the switcher is removed.
+- Managers still plan schedules in each project's **Tasks** tab (filters, quick add, swipe to
+  shift, baseline), unchanged.
+
+## Code audit fixes (2026-10-26)
+
+- Asking for a new sign-in code no longer resets the 5-wrong-codes lock.
+- A task's owner must be on its project when edited, not only when created.
+- Photo links in messages always come from the server's own upload record; a message can't
+  point phones at an outside address.
+- Read markers are remembered per person, so a user switch can't leave unread badges stuck.
+- Scripted teammates post only while someone has the app open.
+- The app no longer fetches everything twice at sign-in.
+- Removed dead leftovers of the offline design (sync fields, unused error list, a second
+  directory hook, unused "is manager" arguments, a refresh banner that could never show).
+
+## Send queue and saved screens (2026-10-27)
+
+The owner asked for a properly built outbox after we compared Slack's approach. Built Slack-style:
+the server still decides everything; the phone only holds changes until the server takes them.
+- **Send queue** (`src/lib/outbox.ts`) for site actions only: messages with photos, check-in
+  answers, task progress/status. Saved per user in AsyncStorage, survives closing the app, ids
+  made on the phone (no duplicates), oldest first, photos upload once before their message,
+  repeat task updates merge, retries 2/5/10/20 s, refusals become "Not sent" with Retry/Discard.
+  6 tests in `src/lib/__tests__/outbox.test.ts` (order, retry, refusal, merge, photo once, restart).
+- **Not built back:** a local database, rules on the phone, guessed results, or queueing for
+  office actions (settings, members, invites) — those stay online-only. This keeps the gaps of
+  the old outbox out (rules in two places, untested rollbacks).
+- **Saved screens** (`src/lib/persist.ts`): last successful API replies saved per user for up to
+  7 days and shown at app start; sign-in kept in SecureStore so the app opens signed in.
+- Unsent screen, "Unsent items" on You, log-out warning and the offline banner's "N waiting" are back.
+- Lists that fail to load now say so ("Couldn't load your tasks") instead of looking empty.
+- New Expo Go packages: `@react-native-async-storage/async-storage`, `expo-secure-store`.
+
+## Architecture cleanup (2026-10-27)
+
+- **No import loops between features.** There were five (chat↔tasks, chat↔home, chat↔bot,
+  projects↔home, projects↔members). The small pieces that caused them moved to
+  `src/features/shared/` (was `shared.ts`): `isBotUser`, `byChannelOrder`, `useUnreadCounts`,
+  `useRefresh`, `pickPhotos`, and sending a message (`sendMessage`, `extractMentions`).
+  The activity feed hooks moved to `features/activity`. The `members` feature (one component and
+  one screen, both for a project's Members tab) merged into `features/projects`.
+  `src/features/__tests__/boundaries.test.ts` fails on any new loop or a feature import in shared.
+- **Split by job:** `components/basics.tsx` (488 lines) → `components/basics/` with identity,
+  controls, layout and states; `chat/components/forms.tsx` (372 lines) → one file per form plus
+  shared parts. Both keep an `index.ts`, so imports didn't change.
+
+## One job per file and folder (2026-10-27)
+
+- **Backend:** business actions moved out of route files into `app/services/` — `messaging.py`
+  (`post_message`), `tasks.py` (`apply_task_changes`, `recompute_project`, `set_baseline`),
+  `people.py` (`deactivate_user`, `expire_access_tokens`). Routers now only translate HTTP, and the
+  imports hidden inside functions to dodge circular imports are gone. Visibility checks moved out of
+  `store.py` into `access.py`. `tests/test_layers.py` fails if anything but `main.py` imports a router.
+- **App:** `lib/queries.ts` (reading) and `lib/mutations.ts` (online-only writes) are separate;
+  `features/shared` is split into session, data and display; the Overview and Files tabs moved out of
+  `ProjectScreen` (now a 67-line tab shell) and the New project sheet out of `HomeScreen`; message-list
+  layout moved from `chat/hooks.ts` to `chat/messageList.ts`; `tasks/components/bits.tsx` renamed
+  `TaskIndicators.tsx`.
+- **Found while checking on the device:** the project Files tab returned a server error (an import
+  inside a function still pointed at the old `store.py`; now fixed and tested), and the Files,
+  schedule and Activity lists showed "nothing yet" when they had failed to load; they now say so.
+
+## Second audit fixes (2026-10-27)
+
+- **Reusing an id never leaks data.** Create routes (messages, tasks, projects, channels, people)
+  check permission first, and return an existing record only for a real retry (same sender and
+  channel, or same project). Any other reuse is `VALIDATION_FAILED` on `id`.
+- **Messages are ordered by server time** (`createdAt`, then id), not by the client-made id. Unread
+  counts, `before` paging and read markers all use that order; the app's "New" divider uses the
+  channel's `lastReadAt`. A message from a phone with a wrong clock still counts as unread.
+- **Send queue:** photos are copied into the app's document folder (`outbox/`) when queued, so the
+  OS clearing its cache can't lose them; a missing file fails the item. An item that gets a server
+  error 5 times is marked failed instead of blocking the queue forever. New Expo Go package:
+  `expo-file-system`.
+- **Server memory:** wrong-code locks expire after 15 minutes; refreshing a session drops its old
+  access tokens; logout ends the session's tokens. Channel lists count unread in one pass.
+- Smaller: a test for saved screens (`lib/__tests__/persist.test.ts`), one import path for
+  `sendMessage` (`features/shared`), and `ProjectAccess` renamed `ProjectAccessInfo`.
+
+## Frontend architecture review fixes (2026-10-27)
+
+- **Language and theme are saved on the phone** (`stores/ui.ts`, zustand `persist`, key `prefs`), with
+  the notification toggles and the hidden Demo button. Drafts and screen state are not saved. The
+  splash screen waits for them (`prefsLoaded`), so the app never starts in the wrong language.
+- **Two rules moved to the server:** "managers are in every channel" is `rolesInEveryChannel` in
+  `/meta` (used by the member and channel editors), and "the Owner and Admins are never added to a
+  project" is `joinsProjects` on each person, now also refused by `POST /projects/:id/members`.
+  The app no longer checks a channel name for duplicates itself; the server's `CHANNEL_NAME_TAKEN`
+  shows on the field.
+- **Moved to where they belong:** invite and deactivate (`features/people/api.ts`, `InviteSheet`);
+  `useProjectMembers` (`features/shared`, was in tasks); `ThreadScreen` (`features/chat`, the
+  `threads` feature is gone); bot and Demo components into `components/` folders.
+- **One `useRoleLabels`** (`shared/display.ts`) for Owner/Admin/Member, Manager/Member and job
+  titles; message rows now show translated role chips.
+- `src/shared` (zod schemas and error codes shared with the server) renamed `src/contract`, so it
+  isn't confused with `src/features/shared`.
+
+## Any industry; remaining logic moved to the server (2026-10-28)
+
+- **No industry in code.** Stages, task phases, job titles (default channels, managers-only, simple
+  mode), standard project channels, the channel task cards go to (`workChannel`) and problem types
+  are the company's **setup** on the server (`S().company["setup"]`; Paliath's is `PALIATH_SETUP` in
+  `seed.py`). Labels come in the reader's language: the app sends `Accept-Language`, `/meta`
+  answers with labels. `rules.py` takes the setup as data; `tests/test_rules.py` runs the rules
+  against an event-planning company to prove nothing assumes interior design.
+- Removed from the app: the `STAGES`/`PHASES`/job-title lists, the channel order, stage colours by
+  name (now by position), "Paliath Interiors" (now `GET /company`, public for the sign-in screen),
+  the demo sign-in list (now `GET /auth/demo-accounts`, one per role), stage/job-title/problem
+  translations in `kn.json`/`hi.json` (now in the setup). "Worker mode" is now `simpleMode`.
+  Photo placeholder tones are plain colours (sand, stone, linen, sage).
+- **Moved to the server:** schedule filtering (`GET /projects/:id/tasks?status=&owner=&due=&delayed=&phase=`,
+  which also returns per-phase progress, phase choices, the current phase and the timeline window);
+  new-task defaults (`GET /projects/:id/task-defaults`, and `POST` fills missing dates); project
+  progress (`ProjectView.progress`) and `nextStage`; `TaskView.isDelayed`; channel display order
+  (`GET /channels`). The app's DM list now follows the server's order (latest first) on Home too.
+- **Trade-off:** a schedule filter the phone hasn't loaded before needs the connection.
+- **Still in the app, on purpose:** the "Other" problem type (always offered, needs a note) and
+  whether to show "Mark done" on a row (`access` permissions plus "is it my task").
+- Not changed: the seed and scripted teammates (`seed.py`, `actors.py`) are Paliath's demo data, and
+  the daily report still stores its head count as `workers`.

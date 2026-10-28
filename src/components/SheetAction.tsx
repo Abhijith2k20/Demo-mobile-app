@@ -24,7 +24,7 @@ export function SheetAction({
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: touch.worker,
+        minHeight: touch.large,
         flexDirection: 'row',
         alignItems: 'center',
         gap: space.md,

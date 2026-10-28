@@ -1,4 +1,4 @@
-// The worker's task home: big rows, three big buttons, no baseline or variance.
+// Someone's own task home: big rows, three big buttons, no baseline or variance.
 import { Feather } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { router } from 'expo-router';
@@ -10,17 +10,14 @@ import { Card, Chip, EmptyState, SectionHeader, Skeleton, type IconName } from '
 import { OfflineBanner } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { ISSUE_PRESETS } from '@/shared/schemas';
-import { shortDate, todayIso } from '@/shared/taskRules';
+import { shortDate, todayIso } from '@/lib/format';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Task } from '@/types/models';
-import { sendMessage } from '../../chat/api';
-import { useRefresh } from '../../home/hooks';
-import { firstName, shortProjectName, useMe, useProjects, useUnsentCount } from '../../shared';
+import { firstName, sendMessage, shortProjectName, useMe, useProblemTypes, useProjects, useRefresh } from '../../shared';
 import { updateTask } from '../api';
 import { useMyTasks } from '../hooks';
-import { StatusDot, useStatusLabel } from './bits';
+import { StatusDot, useStatusLabel, SendingNote } from './TaskIndicators';
 
 function BigAction({ icon, label, onPress, tone, active }: { icon: IconName; label: string; onPress: () => void; tone: 'plain' | 'danger'; active?: boolean }) {
   const { c, type } = useTheme();
@@ -33,7 +30,7 @@ function BigAction({ icon, label, onPress, tone, active }: { icon: IconName; lab
       onPress={onPress}
       style={({ pressed }) => ({
         flex: 1,
-        minHeight: touch.worker + 8,
+        minHeight: touch.large + 8,
         borderRadius: radius.input,
         borderWidth: 1,
         borderColor: active ? c.success : tone === 'danger' ? c.dangerSoft : c.border,
@@ -55,6 +52,7 @@ function BigAction({ icon, label, onPress, tone, active }: { icon: IconName; lab
 export function MyTasks() {
   const { c } = useTheme();
   const { t } = useTranslation();
+  const problems = useProblemTypes();
   const insets = useSafeAreaInsets();
   const me = useMe();
   const all = useMyTasks();
@@ -62,7 +60,6 @@ export function MyTasks() {
   // Work in archived projects is parked, so it is not on anyone's list.
   const live = (t: Task) => !projects.byId.get(t.projectId)?.archivedAt;
   const my = { ...all, today: all.today.filter(live), week: all.week.filter(live), done: all.done.filter(live) };
-  const unsent = useUnsentCount();
   const statusLabel = useStatusLabel();
   const { refreshing, refresh } = useRefresh();
   const [percentFor, setPercentFor] = useState<Task | null>(null);
@@ -75,7 +72,7 @@ export function MyTasks() {
 
   const reportProblem = (task: Task, reason: string) => {
     // Members may set their own task to blocked; the issue card tells the team why.
-    updateTask(task, { status: 'blocked' }, false);
+    updateTask(task, { status: 'blocked' });
     if (task.channelId) {
       sendMessage({
         channelId: task.channelId,
@@ -112,19 +109,21 @@ export function MyTasks() {
           {format(new Date(), 'EEEE, d MMMM')}
         </T>
       </View>
-      <OfflineBanner waiting={unsent.waiting} />
+      <OfflineBanner />
       <ScrollView
         contentContainerStyle={{ paddingBottom: space.xxl * 2 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.accent} colors={[c.accent]} progressBackgroundColor={c.surface} />}>
         <SectionHeader title={t('my.today', 'Today')} />
         {my.loading ? (
           <Skeleton rows={3} avatar={false} />
+        ) : my.failed ? (
+          <EmptyState icon="cloud-off" title={t('my.loadFailed', "Couldn't load your tasks")} hint={t('chat.loadFailedHint', 'They will appear when the connection is back.')} />
         ) : my.today.length === 0 ? (
           <EmptyState icon="sun" title={t('my.emptyTitle', 'Nothing due today.')} hint={t('my.emptyHint', 'Enjoy the calm.')} />
         ) : (
           <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
             {my.today.map((task) => {
-              const overdue = task.plannedFinish < today;
+              const overdue = task.isLate; // worked out by the server
               return (
                 <Card key={task.id}>
                   <Pressable onPress={() => router.push(`/task/${task.id}`)} accessibilityRole="button">
@@ -145,6 +144,7 @@ export function MyTasks() {
                         {task.percent}%
                       </T>
                     </View>
+                    <SendingNote taskId={task.id} />
                   </Pressable>
                   <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
                     <BigAction
@@ -152,7 +152,7 @@ export function MyTasks() {
                       tone="plain"
                       active={task.status === 'in_progress'}
                       label={task.status === 'in_progress' ? t('my.startedDone', 'Started') : t('my.started', 'Started')}
-                      onPress={() => updateTask(task, { status: 'in_progress' }, false)}
+                      onPress={() => updateTask(task, { status: 'in_progress' })}
                     />
                     <BigAction icon="trending-up" tone="plain" label={t('my.updatePercent', 'Update %')} onPress={() => setPercentFor(task)} />
                     <BigAction icon="alert-octagon" tone="danger" label={t('my.problem', 'Problem')} onPress={() => setProblemFor(task)} />
@@ -186,7 +186,7 @@ export function MyTasks() {
               selected={percentFor?.percent === p}
               label={p === 100 ? t('checkin.done', 'Done') : `${p}%`}
               onPress={() => {
-                if (percentFor) updateTask(percentFor, { percent: p }, false);
+                if (percentFor) updateTask(percentFor, { percent: p });
                 setPercentFor(null);
               }}
             />
@@ -196,16 +196,16 @@ export function MyTasks() {
 
       <Sheet visible={!!problemFor} onClose={() => setProblemFor(null)} title={t('checkin.whatProblem', "What's the problem?")} subtitle={problemFor?.name}>
         <View style={{ gap: space.sm }}>
-          {ISSUE_PRESETS.map((reason) => (
+          {problems.all.map(({ key, label }) => (
             <Pressable
-              key={reason}
+              key={key}
               accessibilityRole="button"
               onPress={() => {
-                if (problemFor) reportProblem(problemFor, reason);
+                if (problemFor) reportProblem(problemFor, key);
                 setProblemFor(null);
               }}
-              style={{ minHeight: touch.worker + 4, borderRadius: radius.input, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-              <T variant="button">{t(`issue.preset.${reason}`, reason)}</T>
+              style={{ minHeight: touch.large + 4, borderRadius: radius.input, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+              <T variant="button">{label}</T>
             </Pressable>
           ))}
         </View>

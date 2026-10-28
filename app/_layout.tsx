@@ -4,24 +4,22 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastHost } from '@/components/chrome';
-import { DemoPill } from '@/features/demo/DemoPill';
-import { initDb } from '@/lib/db/init';
+import { DemoPill } from '@/features/demo/components/DemoPill';
 import i18n from '@/lib/i18n';
 import { queryClient } from '@/lib/queryClient';
-import '@/lib/session';
-import { catchUp } from '@/lib/sync/catchup';
+import { runOutbox } from '@/lib/outbox';
+import { restoreSession } from '@/lib/session';
+import { keys, refresh, refreshAll } from '@/lib/queries';
 import { useSession } from '@/stores/session';
-import { useUi } from '@/stores/ui';
+import { prefsLoaded, useUi } from '@/stores/ui';
 import { useTheme } from '@/theme/useTheme';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
-// Tables must exist before the first live query runs.
-initDb();
 
 /** Sends signed-out users to login and signed-in users away from it. */
 function useAuthGate(ready: boolean): void {
@@ -38,7 +36,11 @@ function useAuthGate(ready: boolean): void {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
-  const ready = fontsLoaded || !!fontError;
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    void Promise.all([prefsLoaded, restoreSession()]).finally(() => setRestored(true));
+  }, []);
+  const ready = (fontsLoaded || !!fontError) && restored;
   const { c, mode } = useTheme();
   const language = useUi((s) => s.language);
   useAuthGate(ready);
@@ -49,16 +51,21 @@ export default function RootLayout() {
 
   useEffect(() => {
     void i18n.changeLanguage(language);
+    // Labels from the company's setup come from the server in the chosen language.
+    void refresh(keys.meta, keys.demoAccounts);
   }, [language]);
 
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
   }, [c.bg]);
 
-  // Catch up whenever the app comes back to the foreground.
+  // Back in the foreground: what's on screen may be out of date, so fetch it again.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && useSession.getState().user) void catchUp();
+      if (state === 'active' && useSession.getState().user) {
+        void refreshAll();
+        void runOutbox();
+      }
     });
     return () => sub.remove();
   }, []);

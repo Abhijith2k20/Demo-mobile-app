@@ -9,6 +9,7 @@ import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CompanyTile } from '@/components/CompanyTile';
 import { T } from '@/components/T';
+import { useCompany } from '@/features/shared';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 
@@ -26,6 +27,7 @@ export function AuthShell({ back, title, subtitle, children, footer }: Props) {
   const { c } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const company = useCompany();
 
   return (
     <View style={{ flex: 1, backgroundColor: c.header }}>
@@ -47,10 +49,10 @@ export function AuthShell({ back, title, subtitle, children, footer }: Props) {
               ) : null}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.lg }}>
-              <CompanyTile size={48} />
+              <CompanyTile name={company?.name ?? ''} size={48} />
               <View style={{ flex: 1 }}>
                 <T variant="title" style={{ color: c.onHeader }} numberOfLines={1}>
-                  Paliath Interiors
+                  {company?.name ?? ''}
                 </T>
                 <T variant="meta" style={{ color: c.onHeader, opacity: 0.65 }}>
                   {t('auth.workspace', 'Siteline workspace')}

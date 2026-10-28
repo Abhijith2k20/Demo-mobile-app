@@ -9,7 +9,7 @@ import type { TextStyle } from 'react-native';
 export interface Theme {
   c: Colors;
   mode: 'light' | 'dark';
-  worker: boolean;
+  simple: boolean;
   type: Record<TypeVariant, TextStyle>;
 }
 
@@ -18,11 +18,11 @@ export function useTheme(): Theme {
   const stored = useUi((s) => s.theme);
   // iOS apps follow the system appearance only (HIG: no app-specific appearance setting).
   const pref = Platform.OS === 'ios' ? 'system' : stored;
-  const worker = useSession((s) => s.workerMode);
+  const simple = useSession((s) => s.simpleMode);
   const mode: 'light' | 'dark' = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
   return useMemo(
-    () => ({ c: mode === 'dark' ? dark : light, mode, worker, type: typography(worker) }),
-    [mode, worker],
+    () => ({ c: mode === 'dark' ? dark : light, mode, simple, type: typography(simple) }),
+    [mode, simple],
   );
 }
 

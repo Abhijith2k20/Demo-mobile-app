@@ -182,8 +182,8 @@ export function Stepper({ value, onChange, min = 0, max = 99 }: { value: number;
       accessibilityLabel={label}
       onPress={() => onChange(Math.max(min, Math.min(max, next)))}
       style={{
-        width: touch.worker,
-        height: touch.worker,
+        width: touch.large,
+        height: touch.large,
         borderRadius: radius.input,
         backgroundColor: c.surfaceAlt,
         alignItems: 'center',

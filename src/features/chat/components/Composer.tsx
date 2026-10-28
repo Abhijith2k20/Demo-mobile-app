@@ -10,8 +10,8 @@ import { useUi } from '@/stores/ui';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { ID, Message, User } from '@/types/models';
-import { editMessage, extractMentions, sendMessage } from '../api';
-import { pickPhotos } from '../photos';
+import { editMessage } from '../api';
+import { extractMentions, pickPhotos, sendMessage } from '@/features/shared';
 
 export type FormKind = 'task' | 'issue' | 'report';
 
@@ -36,8 +36,8 @@ function Tile({ icon, label, onPress }: { icon: IconName; label: string; onPress
     <Pressable accessibilityRole="button" onPress={onPress} style={{ width: '25%', alignItems: 'center', paddingVertical: space.md, gap: 6 }}>
       <View
         style={{
-          width: touch.worker,
-          height: touch.worker,
+          width: touch.large,
+          height: touch.large,
           borderRadius: radius.card,
           backgroundColor: c.surfaceAlt,
           alignItems: 'center',
@@ -54,7 +54,7 @@ function Tile({ icon, label, onPress }: { icon: IconName; label: string; onPress
 
 export function Composer(props: Props) {
   const { channelId, threadParentId, projectId, members, editing } = props;
-  const { c, type, worker } = useTheme();
+  const { c, type, simple } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const draftKey = threadParentId ? `thread:${threadParentId}` : `channel:${channelId}`;
@@ -190,14 +190,14 @@ export function Composer(props: Props) {
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.xs, paddingHorizontal: space.sm, paddingTop: space.sm }}>
           {editing ? null : round('plus', t('chat.more', 'More options'), () => setPlus(true), false)}
-          {worker && !editing ? (
+          {simple && !editing ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('plus.camera', 'Camera')}
               onPress={() => void sendPhotos('camera')}
               style={{
-                width: touch.worker,
-                height: touch.worker,
+                width: touch.large,
+                height: touch.large,
                 borderRadius: radius.card,
                 borderWidth: 2,
                 borderColor: c.accent,
@@ -226,7 +226,7 @@ export function Composer(props: Props) {
                 paddingHorizontal: space.lg,
                 paddingTop: 10,
                 paddingBottom: 10,
-                minHeight: worker ? touch.worker : touch.min,
+                minHeight: simple ? touch.large : touch.min,
                 maxHeight: 132,
               },
             ]}

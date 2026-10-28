@@ -1,53 +1,46 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, EmptyState } from '@/components/basics';
 import { appScreen, Header, OfflineBanner, Screen } from '@/components/chrome';
-import { Sheet, SheetInput } from '@/components/Sheet';
+import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { discardItem, editFailedMessage, retryItem } from '@/features/unsent/api';
-import { useUnsentItems, type UnsentRow } from '@/features/unsent/hooks';
+import { useChannels, useMe, useUsers } from '@/features/shared';
+import { errorText } from '@/lib/i18n';
+import { discardItem, retryItem, sendNow, useOutbox, type OutboxItem } from '@/lib/outbox';
 import { space } from '@/theme/spacing';
-import type { OutboxItem } from '@/types/models';
 
+/** Changes saved on this phone that haven't reached the server yet. */
 function UnsentScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { failed, stale, waiting } = useUnsentItems();
-  const [editing, setEditing] = useState<OutboxItem | null>(null);
-  const [text, setText] = useState('');
+  const me = useMe();
+  const channels = useChannels();
+  const users = useUsers();
+  const items = useOutbox((st) => st.items).filter((i) => i.userId === me.id);
+  const failed = items.filter((i) => i.state === 'failed');
+  const waiting = items.filter((i) => i.state !== 'failed');
+  const [discarding, setDiscarding] = useState<OutboxItem | null>(null);
 
-  const row = (r: UnsentRow, isFailed: boolean) => (
-    <Card key={r.item.id} style={{ gap: space.sm }}>
-      <T variant="bodyStrong">{r.title}</T>
-      <T variant="meta" color={isFailed ? 'danger' : 'textMuted'}>
-        {r.reason}
+  const title = (i: OutboxItem): string => {
+    if (i.kind === 'checkin') return t('unsent.checkin', 'Check-in: {{task}}', { task: i.taskName });
+    if (i.kind === 'task') return t('unsent.taskChange', 'Task update: {{task}}', { task: i.taskName });
+    const ch = channels.byId.get(i.channelId);
+    const where = ch?.kind === 'dm' ? (users.byId.get(ch.peerId ?? '')?.name ?? '') : ch?.kind === 'bot' ? 'Siteline Bot' : `#${ch?.name ?? ''}`;
+    const what = i.body ? `“${i.body.slice(0, 60)}”` : i.photos.length ? t('unsent.photos', '{{count}} photos', { count: i.photos.length }) : '';
+    return `${t('unsent.message', 'Message in {{where}}', { where })}${what ? `: ${what}` : ''}`;
+  };
+
+  const row = (i: OutboxItem) => (
+    <Card key={i.id} style={{ gap: space.sm }}>
+      <T variant="bodyStrong">{title(i)}</T>
+      <T variant="meta" color={i.state === 'failed' ? 'danger' : 'textMuted'}>
+        {i.state === 'failed' && i.error ? errorText(i.error) : i.state === 'sending' ? t('unsent.sendingNow', 'Sending now…') : t('unsent.waitingReason', 'Waiting for a connection.')}
       </T>
       <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
-        <Button small full={false} icon="refresh-cw" label={t('unsent.retry', 'Retry')} onPress={() => retryItem(r.item)} />
-        {r.edit ? (
-          <Button
-            small
-            full={false}
-            kind="secondary"
-            icon="edit-2"
-            label={t('chat.edit', 'Edit')}
-            onPress={() => {
-              if (r.edit?.kind === 'message') {
-                setText(r.edit.body);
-                setEditing(r.item);
-              } else if (r.edit?.kind === 'task') {
-                // The change was rolled back; open the task so it can be entered again.
-                const taskId = r.edit.taskId;
-                discardItem(r.item);
-                router.push(`/task/${taskId}`);
-              }
-            }}
-          />
-        ) : null}
-        <Button small full={false} kind="danger" icon="trash-2" label={t('unsent.discard', 'Discard')} onPress={() => discardItem(r.item)} />
+        {i.state === 'failed' ? <Button small full={false} icon="refresh-cw" label={t('unsent.retry', 'Retry')} onPress={() => retryItem(i.id)} /> : null}
+        <Button small full={false} kind="secondary" icon="trash-2" label={t('unsent.discard', 'Discard')} onPress={() => setDiscarding(i)} />
       </View>
     </Card>
   );
@@ -55,53 +48,41 @@ function UnsentScreen() {
   return (
     <Screen>
       <Header title={t('unsent.title', 'Unsent items')} />
-      <OfflineBanner waiting={waiting} />
+      <OfflineBanner />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: insets.bottom + space.xl }}>
-        {failed.length === 0 && stale.length === 0 ? (
-          <EmptyState
-            icon="check-circle"
-            title={t('unsent.emptyTitle', 'Nothing is stuck')}
-            hint={
-              waiting > 0
-                ? t('unsent.emptyWaiting', '{{count}} changes are waiting and will send automatically.', { count: waiting })
-                : t('unsent.emptyHint', 'Everything you did has reached the server.')
-            }
-          />
+        {items.length === 0 ? (
+          <EmptyState icon="check-circle" title={t('unsent.emptyTitle', 'Everything has been sent.')} />
         ) : null}
-        {failed.length > 0 ? (
+        {failed.length ? (
+          <T variant="label" color="danger">
+            {t('unsent.failed', 'Not sent')}
+          </T>
+        ) : null}
+        {failed.map(row)}
+        {waiting.length ? (
           <>
             <T variant="label" color="textMuted">
-              {t('unsent.failed', "Couldn't be sent")}
+              {t('unsent.waiting', 'Waiting to send')}
             </T>
-            {failed.map((r) => row(r, true))}
+            {waiting.map(row)}
+            <Button kind="secondary" icon="send" label={t('unsent.sendNow', 'Try sending now')} onPress={sendNow} />
           </>
-        ) : null}
-        {stale.length > 0 ? (
-          <>
-            <T variant="label" color="textMuted" style={{ marginTop: space.md }}>
-              {t('unsent.stale', 'Waiting more than a day')}
-            </T>
-            {stale.map((r) => row(r, false))}
-          </>
-        ) : null}
-        {(failed.length > 0 || stale.length > 0) && waiting > 0 ? (
-          <T variant="meta" color="textMuted">
-            {t('unsent.emptyWaiting', '{{count}} changes are waiting and will send automatically.', { count: waiting })}
-          </T>
         ) : null}
       </ScrollView>
 
-      <Sheet visible={!!editing} onClose={() => setEditing(null)} title={t('unsent.editTitle', 'Edit and send again')}>
-        <SheetInput value={text} onChangeText={setText} multiline style={{ minHeight: 80, textAlignVertical: 'top', marginBottom: space.lg }} />
+      <Sheet visible={!!discarding} onClose={() => setDiscarding(null)} title={t('unsent.discardTitle', 'Discard this change?')}>
+        <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
+          {t('unsent.discardBody', "It hasn't reached the server and will be lost.")}
+        </T>
         <Button
-          label={t('chat.send', 'Send')}
-          icon="send"
-          disabled={!text.trim()}
+          kind="danger"
+          label={t('unsent.discard', 'Discard')}
           onPress={() => {
-            if (editing) editFailedMessage(editing, text.trim());
-            setEditing(null);
+            if (discarding) discardItem(discarding.id);
+            setDiscarding(null);
           }}
         />
+        <Button kind="ghost" label={t('common.cancel', 'Cancel')} onPress={() => setDiscarding(null)} />
       </Sheet>
     </Screen>
   );

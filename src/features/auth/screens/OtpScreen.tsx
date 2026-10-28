@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { withBoundary } from '@/components/chrome';
 import { T } from '@/components/T';
-import { formatPhone, requestOtp, verifyOtp } from '@/features/auth/api';
+import { requestOtp, verifyOtp } from '@/features/auth/api';
 import { AuthShell } from '@/features/auth/components/AuthShell';
 import { isAppError } from '@/lib/api/client';
 import { errorText } from '@/lib/i18n';
@@ -16,7 +16,7 @@ import { useTheme } from '@/theme/useTheme';
 const LENGTH = 6;
 const BOX_HEIGHT = 60;
 
-function OtpScreen({ phone }: { phone: string }) {
+function OtpScreen({ email }: { email: string }) {
   const { c } = useTheme();
   const { t } = useTranslation();
   const [code, setCode] = useState('');
@@ -40,7 +40,7 @@ function OtpScreen({ phone }: { phone: string }) {
     setBusy(true);
     setError(null);
     try {
-      await verifyOtp(phone, value); // the auth gate moves us to Home
+      await verifyOtp(email, value); // the auth gate moves us to Home
     } catch (e) {
       if (!mounted.current) return;
       setError(isAppError(e) ? errorText(e) : errorText('UNKNOWN'));
@@ -62,7 +62,7 @@ function OtpScreen({ phone }: { phone: string }) {
 
   const resend = async () => {
     try {
-      await requestOtp(phone);
+      await requestOtp(email);
       setSeconds(30);
       setError(null);
     } catch (e) {
@@ -102,8 +102,8 @@ function OtpScreen({ phone }: { phone: string }) {
       title={t('auth.enterCode', 'Enter the code')}
       subtitle={
         <>
-          {t('auth.codeSentTo', 'Sent by text to')}{' '}
-          <T variant="bodyStrong">+91 {formatPhone(phone)}</T>
+          {t('auth.codeSentTo', 'Sent by email to')}{' '}
+          <T variant="bodyStrong">{email}</T>
           {'  '}
           <T variant="bodyStrong" color="accent" onPress={() => (router.canGoBack() ? router.back() : router.replace('/login'))} accessibilityRole="link">
             {t('auth.change', 'Change')}

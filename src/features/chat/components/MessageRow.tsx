@@ -3,36 +3,20 @@ import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { Avatar } from '@/components/basics';
 import { T } from '@/components/T';
 import { motion, radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Message } from '@/types/models';
 import { toggleReaction } from '../api';
-import { isBotUser, useChat } from '../context';
+import { useChat } from '../context';
+
 import type { ListItem } from '../hooks';
 import { renderers, UnknownMessage } from './renderers';
+import { isBotUser, useRoleLabels } from '@/features/shared';
 
 const AVATAR = 36;
-
-/** Outbox status on own messages: clock (pending/sending), check (sent), red alert (failed). */
-function StatusIcon({ status }: { status: Message['status'] }) {
-  const { c } = useTheme();
-  const { t } = useTranslation();
-  const map = {
-    pending: { icon: 'clock', color: c.info, label: t('chat.statusPending', 'Waiting to send') },
-    sending: { icon: 'clock', color: c.info, label: t('chat.statusPending', 'Waiting to send') },
-    sent: { icon: 'check', color: c.success, label: t('chat.statusSent', 'Sent') },
-    failed: { icon: 'alert-circle', color: c.danger, label: t('chat.statusFailed', 'Not sent') },
-  } as const;
-  const s = map[status];
-  return (
-    <Animated.View key={s.icon} entering={FadeIn.duration(motion.fast)} accessibilityLabel={s.label}>
-      <Feather name={s.icon} size={13} color={s.color} />
-    </Animated.View>
-  );
-}
 
 function Reactions({ message }: { message: Message }) {
   const { c } = useTheme();
@@ -76,6 +60,7 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
   const { message: m, grouped, replies, lastReplyAt } = item;
   const { c } = useTheme();
   const { t } = useTranslation();
+  const labels = useRoleLabels();
   const chat = useChat();
   const reduced = useReducedMotion();
   const sender = chat.users.get(m.senderId);
@@ -113,7 +98,13 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
   }
 
   const jobTitle = chat.jobTitles.get(m.senderId);
-  const chip = bot ? t('chat.bot', 'Bot') : (jobTitle ?? (sender?.companyRole === 'owner' ? 'Owner' : sender?.companyRole === 'admin' ? 'Admin' : null));
+  const chip = bot
+    ? t('chat.bot', 'Bot')
+    : jobTitle
+      ? labels.jobTitle(jobTitle)
+      : sender && sender.companyRole !== 'member'
+        ? labels.company(sender.companyRole)
+        : null;
 
   const body = m.deletedAt ? (
     <T variant="body" color="textFaint" style={{ fontStyle: 'italic' }}>
@@ -153,27 +144,25 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
               <T variant="meta" color="textMuted">
                 {format(parseISO(m.createdAt), 'h:mm a')}
               </T>
-              {mine ? <StatusIcon status={m.status} /> : null}
             </View>
           )}
-          {grouped && mine && m.status !== 'sent' ? (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-              <View style={{ flex: 1 }}>{body}</View>
-              <View style={{ paddingTop: 5 }}>
-                <StatusIcon status={m.status} />
-              </View>
+          {body}
+          {m.status === 'pending' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 2 }} accessibilityLabel={t('chat.sending', 'Sending…')}>
+              <Feather name="clock" size={12} color={c.textFaint} />
+              <T variant="meta" color="textFaint">
+                {t('chat.sending', 'Sending…')}
+              </T>
             </View>
-          ) : (
-            body
-          )}
-          {m.deletedAt ? null : <Reactions message={m} />}
-          {m.status === 'failed' ? (
-            <Pressable onPress={() => chat.onLongPress(m)} hitSlop={8} style={{ paddingVertical: 4 }}>
+          ) : m.status === 'failed' ? (
+            <Pressable onPress={() => chat.onLongPress(m)} hitSlop={8} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 2 }}>
+              <Feather name="alert-circle" size={12} color={c.danger} />
               <T variant="meta" color="danger">
-                {t('chat.failedHint', "Couldn't send. Tap for options.")}
+                {t('chat.notSent', 'Not sent · tap for options')}
               </T>
             </Pressable>
           ) : null}
+          {m.deletedAt ? null : <Reactions message={m} />}
           {replies > 0 && !chat.inThread ? (
             <Pressable onPress={() => chat.onOpenThread(m)} hitSlop={6} style={{ paddingVertical: 6, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
               <Feather name="message-square" size={14} color={c.accent} />

@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router/js-tabs';
 import { useTranslation } from 'react-i18next';
-import { useDmList, useUnreadActivityCount, useUnreadCounts } from '@/features/home/hooks';
-import { isCompanyAdmin } from '@/shared/permissions';
+import { useUnreadActivityCount } from '@/features/activity/hooks';
+import { useDmList } from '@/features/home/hooks';
+import { useMeSync, useUnreadCounts } from '@/features/shared';
 import { useSession } from '@/stores/session';
 import { fonts } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
@@ -10,8 +11,7 @@ import { useTheme } from '@/theme/useTheme';
 function TabsForUser() {
   const { c } = useTheme();
   const { t } = useTranslation();
-  const user = useSession((s) => s.user);
-  const admin = !!user && isCompanyAdmin(user);
+  useMeSync();
   const unread = useUnreadCounts();
   const dms = useDmList();
   const activity = useUnreadActivityCount();
@@ -54,9 +54,8 @@ function TabsForUser() {
       <Tabs.Screen
         name="tasks"
         options={{
-          // Owner/Admin get the company Dashboard in place of the Tasks tab.
-          title: admin ? t('tabs.dashboard', 'Dashboard') : t('tabs.tasks', 'Tasks'),
-          tabBarIcon: ({ color }) => <Feather name={admin ? 'bar-chart-2' : 'check-square'} size={22} color={color} />,
+          title: t('tabs.myTasks', 'My tasks'),
+          tabBarIcon: ({ color }) => <Feather name="check-square" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

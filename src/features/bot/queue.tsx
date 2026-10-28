@@ -1,11 +1,8 @@
 // The check-in queue: which cards are waiting, and which single one is open right now.
 // Only one card is expanded at a time, so the bot asks one question at a time.
-import { asc } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { db } from '@/lib/db/client';
-import { checkins } from '@/lib/db/schema';
 import { useNow } from '@/lib/useNow';
+import { useMyCheckins } from '@/features/tasks/hooks';
 import type { ID } from '@/types/models';
 
 /** Check-ins asked within this window count as "this round" for the progress bar. */
@@ -25,8 +22,8 @@ interface Queue {
 const QueueContext = createContext<Queue | null>(null);
 
 export function CheckinQueueProvider({ children }: { children: ReactNode }) {
-  // Only the signed-in user's check-ins are ever stored on the phone.
-  const all = useLiveQuery(db.select().from(checkins).orderBy(asc(checkins.askedAt), asc(checkins.id))).data;
+  // The server returns only the signed-in user's check-ins, oldest first.
+  const all = useMyCheckins().checkins;
   const [picked, setPicked] = useState<ID | null>(null);
   const now = useNow(60_000);
   const value = useMemo<Queue>(() => {

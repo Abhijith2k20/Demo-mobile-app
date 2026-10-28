@@ -5,22 +5,17 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Badge, Button, EmptyState, Row, SectionHeader, Skeleton, StagePill } from '@/components/basics';
+import { Avatar, Badge, EmptyState, Row, SectionHeader, Skeleton, StagePill } from '@/components/basics';
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
 import { CompanyTile } from '@/components/CompanyTile';
-import { Field } from '@/components/form';
-import { Sheet, SheetInput } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { useHome, useRefresh } from '@/features/home/hooks';
-import { createProject } from '@/features/projects/api';
-import { shortProjectName, useMe, useStageLabel, useUnsentCount, useUsers } from '@/features/shared';
-import { isCompanyAdmin } from '@/shared/permissions';
-import { projectCreateSchema } from '@/shared/schemas';
-import { projectDelayDays } from '@/shared/taskRules';
+import { useHome } from '@/features/home/hooks';
+import { isBotUser, shortProjectName, useCan, useCompany, useMe, useRefresh, useStages, useUsers } from '@/features/shared';
 import { useUi } from '@/stores/ui';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Channel } from '@/types/models';
+import { NewProjectSheet } from '@/features/home/components/NewProjectSheet';
 
 function ChannelGlyph({ channel, strong }: { channel: Channel; strong: boolean }) {
   const { c } = useTheme();
@@ -58,12 +53,13 @@ function HomeScreen() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const me = useMe();
-  const admin = isCompanyAdmin(me);
+  const admin = useCan()('project.create');
   const home = useHome();
   const users = useUsers();
-  const unsent = useUnsentCount();
-  const stageLabel = useStageLabel();
-  const { refreshing, refresh, failed } = useRefresh();
+  const company = useCompany();
+  const stages = useStages();
+  const stageLabel = stages.label;
+  const { refreshing, refresh } = useRefresh();
   const collapsed = useUi((s) => s.collapsed);
   const toggle = useUi((s) => s.toggleCollapsed);
   const [query, setQuery] = useState('');
@@ -77,7 +73,7 @@ function HomeScreen() {
       channels: [...home.projects.flatMap((p) => p.channels.map((ch) => ({ ch, where: shortProjectName(p.project.name) }))), ...home.company.map((ch) => ({ ch, where: t('home.company', 'Company') }))].filter(
         (x) => x.ch.name.toLowerCase().includes(q),
       ),
-      people: users.list.filter((u) => u.id !== me.id && u.phone !== '0000000000' && u.name.toLowerCase().includes(q)),
+      people: users.list.filter((u) => u.id !== me.id && u.isActive && !isBotUser(u) && u.name.toLowerCase().includes(q)),
     };
   }, [q, home.projects, home.company, users.list, me.id, t]);
 
@@ -89,7 +85,7 @@ function HomeScreen() {
   const projectRow = ({ project, channels, unread }: (typeof home.projects)[number]) => {
                 const key = `project:${project.id}`;
                 const open = !(collapsed[key] ?? false);
-                const delay = projectDelayDays(project);
+                const delay = project.delayDays;
                 return (
                   <View key={project.id}>
                     <Pressable
@@ -108,7 +104,7 @@ function HomeScreen() {
                       <T variant={unread > 0 ? 'bodyStrong' : 'body'} numberOfLines={1} style={{ flexShrink: 1 }}>
                         {shortProjectName(project.name)}
                       </T>
-                      <StagePill stage={project.stage} label={stageLabel(project.stage)} />
+                      <StagePill index={stages.index(project.stage)} label={stageLabel(project.stage)} />
                       {delay > 0 ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('home.daysBehind', '{{count}} days behind', { count: delay })}>
                           <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.danger }} />
@@ -145,12 +141,12 @@ function HomeScreen() {
   return (
     <Screen>
       {focused ? <StatusBar style="light" /> : null}
-      {/* Workspace header: ink block with the company, like a drawing's title block. */}
+      {/* Workspace header: ink block with the company's name. */}
       <View style={{ backgroundColor: c.header, paddingTop: insets.top + space.sm, paddingHorizontal: space.lg, paddingBottom: space.md, gap: space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-          <CompanyTile size={36} />
+          <CompanyTile name={company?.name ?? ''} size={36} />
           <T variant="title" style={{ color: c.onHeader, flexShrink: 1 }} numberOfLines={1}>
-            Paliath Interiors
+            {company?.name ?? ''}
           </T>
           <Feather name="chevron-down" size={18} color={c.onHeader} style={{ opacity: 0.7 }} />
         </View>
@@ -171,14 +167,7 @@ function HomeScreen() {
           ) : null}
         </View>
       </View>
-      <OfflineBanner waiting={unsent.waiting} />
-      {failed ? (
-        <Pressable onPress={refresh} style={{ alignSelf: 'center', marginTop: space.sm, backgroundColor: c.warningSoft, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 }}>
-          <T variant="metaStrong" color="warning">
-            {t('common.couldntRefresh', "Couldn't refresh")} · {t('common.tryAgain', 'Try again')}
-          </T>
-        </Pressable>
-      ) : null}
+      <OfflineBanner />
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -270,44 +259,6 @@ function HomeScreen() {
       ) : null}
       <NewProjectSheet visible={newProject} onClose={() => setNewProject(false)} />
     </Screen>
-  );
-}
-
-function NewProjectSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
-  const [name, setName] = useState('');
-  const [client, setClient] = useState('');
-  const [address, setAddress] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const submit = () => {
-    const parsed = projectCreateSchema.omit({ id: true }).safeParse({ name, client, address });
-    if (!parsed.success) {
-      const next: Record<string, string> = {};
-      for (const issue of parsed.error.issues) next[String(issue.path[0])] = issue.message;
-      setErrors(next);
-      return;
-    }
-    const id = createProject(parsed.data);
-    setName('');
-    setClient('');
-    setAddress('');
-    setErrors({});
-    onClose();
-    router.push(`/project/${id}`);
-  };
-  return (
-    <Sheet visible={visible} onClose={onClose} title={t('home.newProject', 'New project')} full>
-      <Field label={t('project.name', 'Project name')} error={errors.name}>
-        <SheetInput value={name} onChangeText={setName} placeholder="Rao Apartment – HSR Layout" />
-      </Field>
-      <Field label={t('project.client', 'Client')} error={errors.client}>
-        <SheetInput value={client} onChangeText={setClient} />
-      </Field>
-      <Field label={t('project.address', 'Site address')} error={errors.address}>
-        <SheetInput value={address} onChangeText={setAddress} />
-      </Field>
-      <Button label={t('project.create', 'Create project')} onPress={submit} />
-    </Sheet>
   );
 }
 

@@ -1,8 +1,8 @@
 {
   "errors": {
     "UNKNOWN": "Something went wrong. Please try again.",
-    "OFFLINE": "You're offline. This will send when you're back online.",
-    "TIMEOUT": "The network is slow. Retrying automatically.",
+    "OFFLINE": "You're offline. Nothing was saved; try again when you're connected.",
+    "TIMEOUT": "The server took too long. It may not have saved; check and try again.",
     "DEPENDENCY_FAILED": "A photo couldn't be uploaded, so this wasn't sent.",
     "OTP_INVALID": "That code isn't right. Check it and try again.",
     "OTP_EXPIRED": "That code has expired. Ask for a new one.",
@@ -15,29 +15,14 @@
     "MESSAGE_EDIT_WINDOW_PASSED": "It's too late to change this message.",
     "CHANNEL_READ_ONLY": "Only admins can post here.",
     "RATE_LIMITED": "Too many requests. Wait a moment and try again.",
-    "INTERNAL_ERROR": "Server problem. Retrying automatically.",
-    "SERVICE_UNAVAILABLE": "The service is busy. Retrying shortly.",
+    "INTERNAL_ERROR": "Server problem. Nothing was saved; try again.",
+    "SERVICE_UNAVAILABLE": "The server is busy. Try again in a moment.",
     "sessionEnded": "You were signed out. Please sign in again.",
     "removedFromProject": "You no longer have access to {{name}}.",
     "taskNotSaved": "Couldn't save your change to {{name}}: {{reason}}",
     "CHANNEL_NAME_TAKEN": "This project already has a channel with that name.",
     "CHANNEL_PRIVATE": "This channel is private. Ask a manager to add you.",
-    "PROJECT_ARCHIVED": "This project is archived. Unarchive it to make changes."
-  },
-  "issue": {
-    "preset": {
-      "Material not arrived": "Material not arrived",
-      "Waiting for design": "Waiting for design",
-      "Labour short": "Labour short",
-      "Damage": "Damage",
-      "Other": "Other"
-    }
-  },
-  "jobTitle": {
-    "Project Manager": "Project Manager",
-    "Designer": "Designer",
-    "QS": "QS",
-    "Supervisor": "Supervisor",
-    "Worker": "Worker"
+    "PROJECT_ARCHIVED": "This project is archived. Unarchive it to make changes.",
+    "EMAIL_TAKEN": "Someone already uses this email."
   }
 }

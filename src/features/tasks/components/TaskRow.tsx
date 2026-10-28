@@ -7,11 +7,11 @@ import { Pressable, View } from 'react-native';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { Avatar, Pill } from '@/components/basics';
 import { T } from '@/components/T';
-import { isDone, shortDate, taskVarianceDays } from '@/shared/taskRules';
+import { shortDate } from '@/lib/format';
 import { space } from '@/theme/spacing';
 import { useLargeText, useTheme } from '@/theme/useTheme';
-import type { Task, User } from '@/types/models';
-import { MiniTimeline, StatusDot, useStatusLabel } from './bits';
+import type { Task, TaskView, User } from '@/types/models';
+import { MiniTimeline, StatusDot, useStatusLabel } from './TaskIndicators';
 
 // Width of a revealed swipe action; pulling half of it is enough to trigger.
 const ACTION_WIDTH = 132;
@@ -25,13 +25,13 @@ export function dateRange(task: Task): string {
 }
 
 interface RowProps {
-  task: Task;
+  task: TaskView;
   owner: User | undefined;
   window: { from: string; to: string };
   canDone: boolean;
   canShift: boolean;
-  onDone: (t: Task) => void;
-  onShift: (t: Task) => void;
+  onDone: (t: TaskView) => void;
+  onShift: (t: TaskView) => void;
 }
 
 export const TaskRow = memo(function TaskRow({ task, owner, window, canDone, canShift, onDone, onShift }: RowProps) {
@@ -40,7 +40,7 @@ export const TaskRow = memo(function TaskRow({ task, owner, window, canDone, can
   const statusLabel = useStatusLabel();
   const large = useLargeText();
   const ref = useRef<SwipeableMethods>(null);
-  const late = (taskVarianceDays(task) ?? 0) > 0 && !isDone(task.status);
+  const late = task.isDelayed; // worked out by the server
   const showDone = canDone && task.status !== 'done';
   const doneLabel = task.status === 'done_pending_confirmation' ? t('task.confirmDone', 'Confirm done') : t('task.markDone', 'Mark done');
   const shiftLabel = t('task.shiftDates', 'Shift dates');

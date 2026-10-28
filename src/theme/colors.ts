@@ -1,4 +1,3 @@
-import type { Stage } from '@/types/models';
 
 // Neutral palette in the style of mainstream work-chat apps: white (light) or charcoal (dark)
 // surfaces, grey hairlines, near-black text and one blue accent. Status colours stay muted:
@@ -23,8 +22,8 @@ export const light = {
   dangerSoft: '#FBEAE8',
   info: '#2F6F99',
   infoSoft: '#E6F0F6',
-  execution: '#5E55A6',
-  executionSoft: '#ECEAF6',
+  violet: '#5E55A6',
+  violetSoft: '#ECEAF6',
   onAccent: '#FFFFFF',
   /** Text on fixed colours that don't change with the theme (avatars, photo overlays). */
   onColor: '#FFFFFF',
@@ -56,8 +55,8 @@ export const dark: Colors = {
   dangerSoft: '#38201E',
   info: '#6FA9CC',
   infoSoft: '#1A2A35',
-  execution: '#A39BDD',
-  executionSoft: '#28253D',
+  violet: '#A39BDD',
+  violetSoft: '#28253D',
   // Dark ink: white on the lighter dark-mode blue is only 2.87:1.
   onAccent: '#0E1A26',
   onColor: '#FFFFFF',
@@ -84,27 +83,24 @@ export function avatarTone(id: string): string {
   return avatarTones[h % avatarTones.length];
 }
 
-export type PhotoTone = 'plywood' | 'concrete' | 'tile' | 'sage';
+export type PhotoTone = 'sand' | 'stone' | 'linen' | 'sage';
 export const photoTones: Record<PhotoTone, { bg: string; ink: string }> = {
-  plywood: { bg: '#D9B98A', ink: '#5E4320' },
-  concrete: { bg: '#A9A9A4', ink: '#3C3C39' },
-  tile: { bg: '#E4E0D8', ink: '#57534A' },
+  sand: { bg: '#D9B98A', ink: '#5E4320' },
+  stone: { bg: '#A9A9A4', ink: '#3C3C39' },
+  linen: { bg: '#E4E0D8', ink: '#57534A' },
   sage: { bg: '#A9B8A0', ink: '#39472F' },
 };
 
-export function stageColors(c: Colors, stage: Stage): { bg: string; fg: string } {
-  switch (stage) {
-    case 'design':
-      return { bg: c.infoSoft, fg: c.info };
-    case 'approval':
-      return { bg: c.accentSoft, fg: c.accent };
-    case 'procurement':
-      return { bg: c.warningSoft, fg: c.warning };
-    case 'execution':
-      return { bg: c.executionSoft, fg: c.execution };
-    case 'finishing':
-      return { bg: c.successSoft, fg: c.success };
-    case 'handover':
-      return { bg: c.surfaceAlt, fg: c.textMuted };
-  }
+/** Stages are coloured by their position, so any company's stages get distinct colours. */
+export function stageColors(c: Colors, index: number): { bg: string; fg: string } {
+  const tones: [string, string][] = [
+    [c.infoSoft, c.info],
+    [c.accentSoft, c.accent],
+    [c.warningSoft, c.warning],
+    [c.violetSoft, c.violet],
+    [c.successSoft, c.success],
+    [c.surfaceAlt, c.textMuted],
+  ];
+  const [bg, fg] = tones[Math.max(0, index) % tones.length];
+  return { bg, fg };
 }

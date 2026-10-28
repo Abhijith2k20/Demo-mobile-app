@@ -9,11 +9,10 @@ import { EmptyState, Skeleton, type IconName } from '@/components/basics';
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
 import { T } from '@/components/T';
 import { markActivityRead, useActivity } from '@/features/activity/hooks';
-import { useRefresh } from '@/features/home/hooks';
-import { useUnsentCount } from '@/features/shared';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Activity, ActivityKind } from '@/types/models';
+import { useRefresh } from '@/features/shared';
 
 const ICON: Record<ActivityKind, IconName> = {
   mention: 'at-sign',
@@ -38,8 +37,7 @@ function ActivityScreen() {
   const { c } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { items, loading } = useActivity();
-  const unsent = useUnsentCount();
+  const { items, loading, failed } = useActivity();
   const { refreshing, refresh } = useRefresh();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -55,12 +53,14 @@ function ActivityScreen() {
       <View style={{ paddingTop: insets.top + space.lg, paddingHorizontal: space.lg, paddingBottom: space.md, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border }}>
         <T variant="title">{t('tabs.activity', 'Activity')}</T>
       </View>
-      <OfflineBanner waiting={unsent.waiting} />
+      <OfflineBanner />
       <ScrollView
         contentContainerStyle={{ paddingBottom: space.xxl * 2 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.accent} colors={[c.accent]} progressBackgroundColor={c.surface} />}>
         {loading ? (
           <Skeleton rows={6} />
+        ) : failed ? (
+          <EmptyState icon="cloud-off" title={t('activity.loadFailed', "Couldn't load activity")} hint={t('chat.loadFailedHint', 'They will appear when the connection is back.')} />
         ) : items.length === 0 ? (
           <EmptyState
             icon="bell"
@@ -69,7 +69,7 @@ function ActivityScreen() {
           />
         ) : (
           items.map((a) => {
-            const unread = !a.readAt;
+            const unread = !a.read;
             const batched = a.lines.length > 1;
             const isOpen = !!expanded[a.id];
             return (

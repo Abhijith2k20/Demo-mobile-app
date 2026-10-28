@@ -1,19 +1,20 @@
-import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { format, isToday, isYesterday, parseISO } from 'date-fns';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState } from 'react-native';
-import { db } from '@/lib/db/client';
-import { channelMembers, channels, messages, projectMembers, users } from '@/lib/db/schema';
-import { canPost } from '@/shared/permissions';
-import type { Channel, ID, JobTitle, Message, User } from '@/types/models';
-import { shortProjectName, useMe, useProject } from '../shared';
-import { discardEmptyDm, fetchOlderMessages, markRead, openDm } from './api';
+import { api } from '@/lib/api/client';
+import { useOutbox, type OutboxItem } from '@/lib/outbox';
+import { get, keys } from '@/lib/queries';
+import type { ChannelView, ID, JobTitle, MessageView, User } from '@/types/models';
+import { shortProjectName, useChannels, useMe, useProject, useUsers } from '../shared';
+import { markRead } from './api';
+import { buildItems } from './messageList';
+
+export type { ListItem } from './messageList';
 
 export interface ChannelInfo {
-  channel: Channel | null;
+  channel: ChannelView | null;
   loading: boolean;
   title: string;
   subtitle: string;
@@ -26,29 +27,27 @@ export interface ChannelInfo {
   jobTitles: Map<ID, JobTitle>;
 }
 
+export function useChannel(channelId: ID) {
+  const list = useChannels();
+  return useQuery({
+    queryKey: keys.channel(channelId),
+    queryFn: get<ChannelView>(`/channels/${channelId}`),
+    placeholderData: list.byId.get(channelId),
+    enabled: !!channelId,
+  });
+}
+
 export function useChannelInfo(channelId: ID): ChannelInfo {
-  const me = useMe();
   const { t } = useTranslation();
-  const ch = useLiveQuery(db.select().from(channels).where(eq(channels.id, channelId)), [channelId]);
-  const channel = ch.data[0] ?? null;
+  const q = useChannel(channelId);
+  const list = useChannels();
+  // If the fetch fails (e.g. no connection), show what the channel list already has.
+  const channel = q.data ?? list.byId.get(channelId) ?? null;
   const project = useProject(channel?.projectId);
-  const memberRows = useLiveQuery(
-    db
-      .select({ user: users })
-      .from(channelMembers)
-      .innerJoin(users, eq(users.id, channelMembers.userId))
-      .where(eq(channelMembers.channelId, channelId))
-      .orderBy(asc(users.name)),
-    [channelId],
-  );
-  const pm = useLiveQuery(db.select().from(projectMembers).where(eq(projectMembers.projectId, channel?.projectId ?? '')), [
-    channel?.projectId,
-  ]);
+  const users = useUsers();
   return useMemo(() => {
-    const all = memberRows.data.map((r) => r.user);
-    // Owner/Admin can read every project channel but are not listed as project members.
-    const members = channel?.kind === 'project' ? all.filter((u) => pm.data.some((m) => m.userId === u.id)) : all;
-    const peer = channel?.kind === 'dm' ? (all.find((u) => u.id !== me.id) ?? null) : null;
+    const members = (channel?.memberIds ?? []).map((id) => users.byId.get(id)).filter((u): u is User => !!u);
+    const peer = channel?.peerId ? (users.byId.get(channel.peerId) ?? null) : null;
     const isBot = channel?.kind === 'bot';
     const projectName = project ? shortProjectName(project.name) : null;
     const title = isBot ? 'Siteline Bot' : channel?.kind === 'dm' ? (peer?.name ?? '') : channel ? `# ${channel.name}` : '';
@@ -64,140 +63,96 @@ export function useChannelInfo(channelId: ID): ChannelInfo {
           : `${t('home.company', 'Company')} · ${count}`;
     return {
       channel,
-      loading: !ch.updatedAt,
+      loading: q.isPending && !channel,
       title,
       subtitle,
       members,
       peer,
       isBot,
-      canPost: !!channel && !isBot && canPost(me, channel),
+      canPost: !!channel?.canPost,
       projectName,
-      jobTitles: new Map(pm.data.map((m) => [m.userId, m.jobTitle])),
+      jobTitles: new Map((project?.members ?? []).map((m) => [m.userId, m.jobTitle])),
     };
-  }, [channel, ch.updatedAt, memberRows.data, pm.data, project, me, t]);
+  }, [channel, q.isPending, users.byId, project, t]);
 }
 
-export type ListItem =
-  | { kind: 'day'; key: string; label: string }
-  | { kind: 'new'; key: string }
-  | { kind: 'message'; key: string; message: Message; grouped: boolean; replies: number; lastReplyAt: string | null };
+type Page = { messages: MessageView[]; hasMore: boolean };
 
-const GROUP_WINDOW_MS = 5 * 60 * 1000;
-const GROUPABLE = new Set(['text', 'image', 'voice', 'file']);
-
-export function dayLabel(iso: string, today: string, yesterday: string): string {
-  const d = parseISO(iso);
-  if (isToday(d)) return today;
-  if (isYesterday(d)) return yesterday;
-  return format(d, 'EEE d MMM');
+/** A queued message, shown as the user wrote it until the server has it. */
+function queuedView(i: Extract<OutboxItem, { kind: 'message' }>): MessageView {
+  const attachments = i.photos.map((p) => ({ id: p.attachmentId, kind: 'image' as const, uri: p.url ?? p.uri, uploadId: p.uploadId ?? null }));
+  return {
+    id: i.id,
+    channelId: i.channelId,
+    senderId: i.userId,
+    type: i.type,
+    body: i.body,
+    data: attachments.length ? { ...(i.data ?? {}), attachments } : i.data,
+    threadParentId: i.threadParentId,
+    reactions: {},
+    status: i.state === 'failed' ? 'failed' : 'pending',
+    createdAt: i.createdAt,
+    updatedAt: i.createdAt,
+    deletedAt: null,
+    replyCount: 0,
+    lastReplyAt: null,
+    canEdit: false,
+    canDelete: false,
+    canPin: false,
+  };
 }
 
-function buildItems(
-  list: Message[],
-  replyInfo: Map<ID, { count: number; last: string }>,
-  newAfter: ID | null | undefined,
-  meId: ID,
-  labels: { today: string; yesterday: string },
-): ListItem[] {
-  const items: ListItem[] = [];
-  let prev: Message | null = null;
-  let newShown = newAfter === undefined; // undefined = don't show a divider at all
-  for (const m of list) {
-    const day = m.createdAt.slice(0, 10);
-    const localDay = format(parseISO(m.createdAt), 'yyyy-MM-dd');
-    const prevDay = prev ? format(parseISO(prev.createdAt), 'yyyy-MM-dd') : null;
-    let brokeGroup = false;
-    if (localDay !== prevDay) {
-      items.push({ kind: 'day', key: `day-${localDay}-${day}`, label: dayLabel(m.createdAt, labels.today, labels.yesterday) });
-      brokeGroup = true;
-    }
-    if (!newShown && m.senderId !== meId && (newAfter === null || m.id > (newAfter as ID))) {
-      // Only worth a divider when something older is on screen above it.
-      if (prev) items.push({ kind: 'new', key: 'new-divider' });
-      newShown = true;
-      brokeGroup = true;
-    }
-    const grouped =
-      !brokeGroup &&
-      !!prev &&
-      prev.senderId === m.senderId &&
-      GROUPABLE.has(m.type) &&
-      GROUPABLE.has(prev.type) &&
-      !prev.deletedAt &&
-      Date.parse(m.createdAt) - Date.parse(prev.createdAt) < GROUP_WINDOW_MS;
-    const info = replyInfo.get(m.id);
-    items.push({ kind: 'message', key: m.id, message: m, grouped, replies: info?.count ?? 0, lastReplyAt: info?.last ?? null });
-    prev = m;
-  }
-  return items;
+/** Messages for a channel (or one thread) still waiting in the send queue. */
+export function useQueuedMessages(channelId: ID, threadParentId: ID | null): MessageView[] {
+  const items = useOutbox((st) => st.items);
+  return useMemo(
+    () =>
+      items
+        .filter((i): i is Extract<OutboxItem, { kind: 'message' }> => i.kind === 'message' && i.channelId === channelId)
+        .filter((i) => (threadParentId ? i.threadParentId === threadParentId : !i.threadParentId || !!i.data?.alsoToChannel))
+        .map(queuedView),
+    [items, channelId, threadParentId],
+  );
 }
-
-const PAGE = 50;
 
 export function useChannelMessages(channelId: ID) {
   const me = useMe();
   const { t } = useTranslation();
-  const [limit, setLimit] = useState(PAGE);
-  const [loadingOlder, setLoadingOlder] = useState(false);
-  const [serverHasMore, setServerHasMore] = useState(true);
+  const channel = useChannel(channelId);
+  const q = useInfiniteQuery({
+    queryKey: keys.messages(channelId),
+    queryFn: ({ pageParam }) =>
+      api<Page>('GET', `/channels/${channelId}/messages?limit=50${pageParam ? `&before=${encodeURIComponent(pageParam)}` : ''}`),
+    initialPageParam: '',
+    getNextPageParam: (last) => (last.hasMore ? last.messages[last.messages.length - 1]?.id : undefined),
+    enabled: !!channelId,
+  });
 
-  const q = useLiveQuery(
-    db
-      .select()
-      .from(messages)
-      .where(
-        and(
-          eq(messages.channelId, channelId),
-          or(isNull(messages.threadParentId), sql`json_extract(${messages.data}, '$.alsoToChannel') = 1`),
-        ),
-      )
-      .orderBy(desc(messages.createdAt), desc(messages.id))
-      .limit(limit),
-    [channelId, limit],
-  );
-  const replies = useLiveQuery(
-    db
-      .select({
-        parentId: messages.threadParentId,
-        count: sql<number>`count(*)`,
-        last: sql<string>`max(${messages.createdAt})`,
-      })
-      .from(messages)
-      .where(and(eq(messages.channelId, channelId), isNotNull(messages.threadParentId), isNull(messages.deletedAt)))
-      .groupBy(messages.threadParentId),
-    [channelId],
-  );
-  const myRow = useLiveQuery(
-    db
-      .select()
-      .from(channelMembers)
-      .where(and(eq(channelMembers.channelId, channelId), eq(channelMembers.userId, me.id))),
-    [channelId, me.id],
-  );
+  // Pages arrive newest first; the list shows oldest first, then anything still being sent.
+  const fromServer = useMemo(() => (q.data?.pages ?? []).flatMap((p) => p.messages).reverse(), [q.data]);
+  const queued = useQueuedMessages(channelId, null);
+  const ordered = useMemo(() => {
+    const known = new Set(fromServer.map((m) => m.id));
+    return [...fromServer, ...queued.filter((m) => !known.has(m.id))];
+  }, [fromServer, queued]);
 
   // Remember where "new" started when the screen opened, so the divider stays put while reading.
   // undefined = no divider; null = everything is new.
-  const [newAfter, setNewAfter] = useState<{ value: ID | null | undefined } | null>(null);
-  if (!newAfter && myRow.updatedAt && q.updatedAt) {
-    const marker = myRow.data[0]?.lastReadMessageId ?? null;
-    const hasUnread = q.data.some((m) => m.senderId !== me.id && (marker === null || m.id > marker));
+  const [newAfter, setNewAfter] = useState<{ value: string | null | undefined } | null>(null);
+  if (!newAfter && channel.data && !channel.isPlaceholderData && q.data) {
+    // Compared by the server's clock, like the unread count (message ids come from phones).
+    const marker = channel.data.lastReadAt;
+    const hasUnread = ordered.some((m) => m.senderId !== me.id && (marker === null || m.createdAt > marker));
     setNewAfter({ value: hasUnread ? marker : undefined });
   }
 
-  const ordered = useMemo(() => [...q.data].reverse(), [q.data]);
-  const items = useMemo(() => {
-    const info = new Map<ID, { count: number; last: string }>();
-    for (const r of replies.data) if (r.parentId) info.set(r.parentId, { count: r.count, last: r.last });
-    return buildItems(ordered, info, newAfter?.value, me.id, {
-      today: t('common.today', 'Today'),
-      yesterday: t('common.yesterday', 'Yesterday'),
-    });
-  }, [ordered, replies.data, me.id, t, newAfter]);
+  const items = useMemo(
+    () => buildItems(ordered, newAfter?.value, me.id, { today: t('common.today', 'Today'), yesterday: t('common.yesterday', 'Yesterday') }),
+    [ordered, me.id, t, newAfter],
+  );
 
-  // Mark read up to the newest message while the channel is open.
-  const newest = ordered.length ? ordered[ordered.length - 1] : null;
-  // Only while the user can actually see it: not when a task or thread is on top of this
-  // channel, and not while the app is in the background.
+  // Mark read up to the newest message, only while the user can actually see the channel.
+  const newest = fromServer.length ? fromServer[fromServer.length - 1] : null;
   const focused = useIsFocused();
   const [appActive, setAppActive] = useState(() => AppState.currentState === 'active');
   useEffect(() => {
@@ -205,69 +160,53 @@ export function useChannelMessages(channelId: ID) {
     return () => sub.remove();
   }, []);
   useEffect(() => {
-    if (focused && appActive && newest && newest.status === 'sent') markRead(channelId, newest.id);
+    if (focused && appActive && newest) markRead(channelId, newest.id);
   }, [channelId, newest, focused, appActive]);
 
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = q;
   const loadOlder = useCallback(async () => {
-    if (loadingOlder || ordered.length === 0) return;
-    if (q.data.length >= limit) {
-      setLimit((l) => l + PAGE); // more may already be stored on the phone
-      return;
-    }
-    if (!serverHasMore) return;
-    setLoadingOlder(true);
-    try {
-      // Everything local is shown: ask the server for an older page.
-      const more = await fetchOlderMessages(channelId, ordered[0].id);
-      setServerHasMore(more);
-      setLimit((l) => l + PAGE);
-    } catch {
-      // Offline or failed: keep what we have; scrolling up again retries.
-    } finally {
-      setLoadingOlder(false);
-    }
-  }, [loadingOlder, q.data.length, limit, serverHasMore, ordered, channelId]);
+    if (hasNextPage && !isFetchingNextPage) await fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  return { items, loading: !q.updatedAt, loadOlder, loadingOlder, count: ordered.length };
+  return { items, loading: q.isPending, failed: q.isError, loadOlder, loadingOlder: isFetchingNextPage, count: ordered.length };
 }
 
 export function useThread(parentId: ID) {
-  const parent = useLiveQuery(db.select().from(messages).where(eq(messages.id, parentId)), [parentId]);
-  const replies = useLiveQuery(
-    db.select().from(messages).where(eq(messages.threadParentId, parentId)).orderBy(asc(messages.createdAt), asc(messages.id)),
-    [parentId],
-  );
-  return { parent: parent.data[0] ?? null, replies: replies.data, loading: !parent.updatedAt };
-}
-
-export function usePinned(channelId: ID): Message[] {
-  const q = useLiveQuery(
-    db
-      .select()
-      .from(messages)
-      .where(and(eq(messages.channelId, channelId), sql`json_extract(${messages.data}, '$.pinned') = 1`, isNull(messages.deletedAt)))
-      .orderBy(desc(messages.createdAt)),
-    [channelId],
-  );
-  return q.data;
-}
-
-/** Resolves the DM channel for a person (creating it locally if needed) or the bot DM. */
-export function useDmChannelId(userId: string): ID | null {
-  const bot = useLiveQuery(db.select().from(channels).where(eq(channels.kind, 'bot')));
-  // Runs once per screen: opening a DM may create the conversation on this phone.
-  const [dm] = useState<ID | null>(() => {
-    if (userId === 'bot') return null;
-    try {
-      return openDm(userId);
-    } catch {
-      return null;
-    }
+  const q = useQuery({
+    queryKey: keys.thread(parentId),
+    queryFn: get<{ parent: MessageView; replies: MessageView[] }>(`/messages/${parentId}/thread`),
   });
-  // A conversation opened and left without a message is removed again.
-  useEffect(() => {
-    if (!dm) return;
-    return () => discardEmptyDm(dm);
-  }, [dm]);
-  return userId === 'bot' ? (bot.data[0]?.id ?? null) : dm;
+  const queued = useQueuedMessages(q.data?.parent.channelId ?? '', parentId);
+  const replies = useMemo(() => {
+    const list = q.data?.replies ?? [];
+    const known = new Set(list.map((m) => m.id));
+    return [...list, ...queued.filter((m) => !known.has(m.id))];
+  }, [q.data?.replies, queued]);
+  return { parent: q.data?.parent ?? null, replies, loading: q.isPending };
+}
+
+export function usePinned(channelId: ID): MessageView[] {
+  const q = useQuery({ queryKey: keys.pins(channelId), queryFn: get<{ messages: MessageView[] }>(`/channels/${channelId}/pins`) });
+  return q.data?.messages ?? [];
+}
+
+/**
+ * The conversation with a person (`/dm/<userId>`) or the bot (`/dm/bot`): its id, `undefined`
+ * while the server is asked, or `null` when it can't be opened. An existing conversation comes
+ * from the channel list; a new one is created by the server, which keeps it out of everyone's
+ * list until the first message, so opening and leaving shows nothing to anyone.
+ */
+export function useDmChannelId(userId: string): ID | null | undefined {
+  const channels = useChannels();
+  const known =
+    userId === 'bot' ? channels.list.find((c) => c.kind === 'bot') : channels.list.find((c) => c.kind === 'dm' && c.peerId === userId);
+  const q = useQuery({
+    queryKey: keys.dm(userId),
+    queryFn: async () => (await api<{ channel: ChannelView }>('POST', '/dms', { userId })).channel.id,
+    enabled: userId !== 'bot' && !channels.loading && !known,
+    staleTime: Infinity,
+  });
+  if (known) return known.id;
+  if (channels.loading || q.isPending) return userId === 'bot' && !channels.loading ? null : undefined;
+  return q.data ?? null;
 }

@@ -8,7 +8,7 @@ import { T } from '@/components/T';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Channel, ID } from '@/types/models';
-import type { MemberRow } from '../../../tasks/hooks';
+import { useInEveryChannel, type MemberRow } from '../../../shared';
 
 /** The one channel every project keeps: it cannot be renamed, made private or deleted. */
 export const HOME_CHANNEL = 'general';
@@ -33,6 +33,7 @@ export function ChannelEditor({
   error?: string;
 }) {
   const { c } = useTheme();
+  const inEveryChannel = useInEveryChannel();
   const home = draft.channel?.name === HOME_CHANNEL;
   const toggle = (id: ID) =>
     onChange({ ...draft, memberIds: draft.memberIds.includes(id) ? draft.memberIds.filter((x) => x !== id) : [...draft.memberIds, id] });
@@ -48,7 +49,7 @@ export function ChannelEditor({
           <SheetInput
             value={draft.name}
             onChangeText={(v) => onChange({ ...draft, name: v.toLowerCase().replace(/\s+/g, '-') })}
-            placeholder="e.g. electrical"
+            placeholder="e.g. suppliers"
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={30}
@@ -57,7 +58,7 @@ export function ChannelEditor({
       </Field>
 
       <View style={{ marginTop: -space.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: touch.worker }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: touch.large }}>
           <Feather name={draft.isPrivate ? 'lock' : 'hash'} size={18} color={c.textMuted} />
           <T variant="bodyStrong" style={{ flex: 1 }}>
             Private channel
@@ -85,7 +86,7 @@ export function ChannelEditor({
           People in this channel
         </T>
         {members.map(({ user, member }) => {
-          const manager = member.role === 'manager';
+          const manager = inEveryChannel(member.role);
           const on = manager || home || draft.memberIds.includes(user.id);
           const locked = manager || home;
           return (

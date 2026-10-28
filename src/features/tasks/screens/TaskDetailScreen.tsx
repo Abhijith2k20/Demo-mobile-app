@@ -10,11 +10,11 @@ import { appScreen } from '@/components/chrome';
 import { DateField } from '@/components/form';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { firstName, shortProjectName, useChannels, useMe, useProject, useProjectAccess, useUsers } from '@/features/shared';
+import { firstName, shortProjectName, useChannels, useMe, useMeta, useProject, useProjectAccess, useProjectMembers, useUsers } from '@/features/shared';
 import { confirmTask, updateTask } from '@/features/tasks/api';
-import { statusColor, useStatusLabel, VarianceChip } from '@/features/tasks/components/bits';
-import { useProjectMembers, useTask, useTaskHistory } from '@/features/tasks/hooks';
-import { PERCENT_STEPS, shortDate } from '@/shared/taskRules';
+import { SendingNote, statusColor, useStatusLabel, VarianceChip } from '@/features/tasks/components/TaskIndicators';
+import { useTask, useTaskHistory } from '@/features/tasks/hooks';
+import { shortDate } from '@/lib/format';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { ID, Task, TaskHistory, TaskStatus, User } from '@/types/models';
@@ -24,6 +24,8 @@ const STATUSES: TaskStatus[] = ['not_started', 'in_progress', 'blocked', 'done']
 /** Progress slider that snaps to 0/25/50/75/90/100 and saves when the finger lifts. */
 function PercentSlider({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
   const { c } = useTheme();
+  // The steps the server accepts for progress.
+  const PERCENT_STEPS = useMeta()?.percentSteps ?? [0, 100];
   const [width, setWidth] = useState(0);
   const [drag, setDrag] = useState<number | null>(null);
   const shown = drag ?? value;
@@ -156,7 +158,7 @@ function TaskDetail({ taskId: id }: { taskId: string }) {
   const canProgress = !!task && (isManager || (task.ownerId === me.id && access.can('task.update_own')));
   const owner = task?.ownerId ? users.byId.get(task.ownerId) : undefined;
   const channel = task?.channelId ? channels.byId.get(task.channelId) : undefined;
-  const save = (t: Task, input: Parameters<typeof updateTask>[1]) => updateTask(t, input, isManager);
+  const save = (t: Task, input: Parameters<typeof updateTask>[1]) => updateTask(t, input);
   const range = (a: string | null, b: string | null) => (a && b ? `${shortDate(a)} – ${shortDate(b)}` : a ? `${shortDate(a)} – …` : 'Not yet');
 
   return (
@@ -206,6 +208,7 @@ function TaskDetail({ taskId: id }: { taskId: string }) {
             ) : (
               <T variant="title">{task.name}</T>
             )}
+            <SendingNote taskId={task.id} />
 
             {task.status === 'done_pending_confirmation' ? (
               <View style={{ backgroundColor: c.warningSoft, borderRadius: radius.input, padding: space.md, marginTop: space.md, gap: space.sm }}>

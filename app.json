@@ -23,10 +23,10 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite",
       "expo-image",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-secure-store"
     ],
     "scheme": "siteline",
     "experiments": {

@@ -9,10 +9,10 @@ import { appScreen, Header, OfflineBanner, Screen } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { createChannel, deleteChannel, updateChannel } from '@/features/projects/api';
+import { fieldErrors } from '@/lib/mutations';
 import { useChannelMembership, useProjectChannels } from '@/features/projects/hooks';
-import { shortProjectName, useProject, useProjectAccess, useUnsentCount } from '@/features/shared';
-import { useProjectMembers } from '@/features/tasks/hooks';
-import { channelCreateSchema, normalizeChannelName } from '@/shared/schemas';
+import { shortProjectName, useProject, useInEveryChannel, useProjectAccess, useProjectMembers } from '@/features/shared';
+import { channelCreateSchema, normalizeChannelName } from '@/contract/schemas';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Channel, ID } from '@/types/models';
@@ -28,7 +28,6 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
   const channels = useProjectChannels(id);
   const members = useProjectMembers(id);
   const membership = useChannelMembership(id);
-  const unsent = useUnsentCount();
   const [draft, setDraft] = useState<ChannelDraft | null>(null);
   const [shown, setShown] = useState<ChannelDraft | null>(null);
   const [nameError, setNameError] = useState<string | undefined>();
@@ -39,7 +38,11 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
   const canChannels = access.can('channel.manage');
   const canEdit = access.can('project.edit');
   const canMembers = access.can('project.members');
-  const managerIds = useMemo(() => members.filter((m) => m.member.role === 'manager').map((m) => m.user.id), [members]);
+  const inEveryChannel = useInEveryChannel();
+  const managerIds = useMemo(
+    () => members.filter((m) => inEveryChannel(m.member.role)).map((m) => m.user.id),
+    [members, inEveryChannel],
+  );
   const projectUserIds = useMemo(() => new Set(members.map((m) => m.user.id)), [members]);
   const inChannel = (channelId: ID) => members.filter((m) => (membership.get(m.user.id) ?? []).includes(channelId)).map((m) => m.user.id);
 
@@ -60,7 +63,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
     if (target) edit(target);
   }
 
-  const save = () => {
+  const save = async () => {
     const d = draft;
     if (!d || !project) return;
     const name = d.channel?.name === HOME_CHANNEL ? HOME_CHANNEL : normalizeChannelName(d.name);
@@ -69,21 +72,20 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
       setNameError(parsed.error.issues[0]?.message);
       return;
     }
-    if (channels.some((ch) => ch.name === name && ch.id !== d.channel?.id)) {
-      setNameError('This project already has a channel with that name.');
-      return;
-    }
     const memberIds = [...new Set([...d.memberIds, ...managerIds])];
-    if (d.channel) {
-      const before = inChannel(d.channel.id);
-      const sameMembers = before.length === memberIds.length && before.every((x) => memberIds.includes(x));
-      updateChannel(d.channel, {
-        ...(name !== d.channel.name ? { name } : {}),
-        ...(d.isPrivate !== d.channel.isPrivate ? { isPrivate: d.isPrivate } : {}),
-        ...(sameMembers ? {} : { memberIds }),
-      });
-    } else {
-      createChannel({ projectId: project.id, name, isPrivate: d.isPrivate, memberIds });
+    const before = d.channel ? inChannel(d.channel.id) : [];
+    const sameMembers = before.length === memberIds.length && before.every((x) => memberIds.includes(x));
+    const res = d.channel
+      ? await updateChannel(d.channel, {
+          ...(name !== d.channel.name ? { name } : {}),
+          ...(d.isPrivate !== d.channel.isPrivate ? { isPrivate: d.isPrivate } : {}),
+          ...(sameMembers ? {} : { memberIds }),
+        })
+      : await createChannel({ projectId: project.id, name, isPrivate: d.isPrivate, memberIds });
+    if ('error' in res) {
+      const fields = fieldErrors(res.error);
+      setNameError(fields.name ?? fields.isPrivate);
+      return;
     }
     setDraft(null);
   };
@@ -94,7 +96,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
   return (
     <Screen>
       <Header title="Project settings" subtitle={project ? shortProjectName(project.name) : undefined} />
-      <OfflineBanner waiting={unsent.waiting} />
+      <OfflineBanner />
       {!project ? (
         <EmptyState icon="folder" title="This project isn't available" hint="You may no longer have access to it." />
       ) : !anything ? (
@@ -224,7 +226,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
         {d ? (
           <View style={{ gap: space.lg }}>
             <ChannelEditor draft={d} members={members} onChange={setDraft} error={nameError} />
-            <Button label={d.channel ? 'Save' : 'Create channel'} onPress={save} />
+            <Button label={d.channel ? 'Save' : 'Create channel'} onPress={() => void save()} />
           </View>
         ) : null}
       </Sheet>

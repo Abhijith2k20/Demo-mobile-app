@@ -8,8 +8,8 @@ import { space, touch } from '@/theme/spacing';
 import type { TaskStatus } from '@/types/models';
 import { firstName } from '../../shared';
 import { isFiltering, NO_FILTERS, type DueFilter, type OwnerFilter, type TaskFilters } from '../filters';
-import type { MemberRow } from '../hooks';
-import { useStatusLabel } from './bits';
+import type { MemberRow } from '../../shared';
+import { useStatusLabel } from './TaskIndicators';
 
 const STATUSES: TaskStatus[] = ['not_started', 'in_progress', 'blocked', 'done_pending_confirmation', 'done'];
 const DUE: { value: DueFilter; label: string }[] = [

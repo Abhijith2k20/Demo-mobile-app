@@ -1,50 +1,43 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { db } from '@/lib/db/client';
-import { channelMembers, channels, messages } from '@/lib/db/schema';
-import type { Attachment, Channel, ID, Message } from '@/types/models';
+import { get, keys } from '@/lib/queries';
+import type { Attachment, ChannelView, ID, MessageView } from '@/types/models';
+import { useChannels } from '../shared';
 
-const ORDER = ['general', 'design', 'site-work', 'qs'];
-const rank = (name: string) => (ORDER.includes(name) ? ORDER.indexOf(name) : ORDER.length);
-/** The four standard channels first, then custom ones by name. */
-export const byChannelOrder = (a: Channel, b: Channel): number => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name);
 
-export function useProjectChannels(projectId: ID | null | undefined): Channel[] {
-  const q = useLiveQuery(db.select().from(channels).where(eq(channels.projectId, projectId ?? '')), [projectId]);
-  return useMemo(() => [...q.data].sort(byChannelOrder), [q.data]);
+/** The project's channels the user can read, in standard order. */
+export function useProjectChannels(projectId: ID | null | undefined): ChannelView[] {
+  const channels = useChannels();
+  return useMemo(() => channels.list.filter((c) => c.projectId === projectId), [channels.list, projectId]);
 }
 
 /** Which of the project's channels each person is in. */
 export function useChannelMembership(projectId: ID | null | undefined): Map<ID, ID[]> {
-  const q = useLiveQuery(
-    db
-      .select({ channelId: channelMembers.channelId, userId: channelMembers.userId })
-      .from(channelMembers)
-      .innerJoin(channels, eq(channels.id, channelMembers.channelId))
-      .where(eq(channels.projectId, projectId ?? '')),
-    [projectId],
-  );
+  const list = useProjectChannels(projectId);
   return useMemo(() => {
     const map = new Map<ID, ID[]>();
-    for (const r of q.data) map.set(r.userId, [...(map.get(r.userId) ?? []), r.channelId]);
+    for (const c of list) for (const uid of c.memberIds) map.set(uid, [...(map.get(uid) ?? []), c.id]);
     return map;
-  }, [q.data]);
+  }, [list]);
+}
+
+/** Every channel in a project the user may know about, joined or not ("Browse channels"). */
+export function useBrowseChannels(projectId: ID, enabled = true) {
+  return useQuery({
+    queryKey: keys.browse(projectId),
+    queryFn: get<{ channels: ChannelView[] }>(`/projects/${projectId}/channels`),
+    enabled,
+  });
 }
 
 /** Last few status cards (check-in results, escalations) across the project's channels. */
-export function useRecentUpdates(projectId: ID | null | undefined): Message[] {
-  const q = useLiveQuery(
-    db
-      .select({ message: messages })
-      .from(messages)
-      .innerJoin(channels, eq(channels.id, messages.channelId))
-      .where(and(eq(channels.projectId, projectId ?? ''), eq(messages.type, 'status_card'), isNull(messages.deletedAt)))
-      .orderBy(desc(messages.createdAt))
-      .limit(5),
-    [projectId],
-  );
-  return useMemo(() => q.data.map((r) => r.message), [q.data]);
+export function useRecentUpdates(projectId: ID | null | undefined): MessageView[] {
+  const q = useQuery({
+    queryKey: keys.updates(projectId ?? ''),
+    queryFn: get<{ messages: MessageView[] }>(`/projects/${projectId}/updates`),
+    enabled: !!projectId,
+  });
+  return q.data?.messages ?? [];
 }
 
 export interface ProjectFile {
@@ -57,34 +50,11 @@ export interface ProjectFile {
 }
 
 /** Every photo and file posted in the project's channels, newest first. */
-export function useProjectFiles(projectId: ID | null | undefined): { files: ProjectFile[]; loading: boolean } {
-  const q = useLiveQuery(
-    db
-      .select({ message: messages })
-      .from(messages)
-      .innerJoin(channels, eq(channels.id, messages.channelId))
-      .where(
-        and(
-          eq(channels.projectId, projectId ?? ''),
-          inArray(messages.type, ['image', 'file', 'issue_card', 'daily_report']),
-          isNull(messages.deletedAt),
-        ),
-      )
-      .orderBy(desc(messages.createdAt))
-      .limit(120),
-    [projectId],
-  );
-  return useMemo(() => {
-    const files: ProjectFile[] = [];
-    for (const { message: m } of q.data) {
-      if (m.type === 'file') {
-        files.push({ key: m.id, kind: 'file', name: String(m.data?.name ?? 'File'), at: m.createdAt, senderId: m.senderId });
-        continue;
-      }
-      for (const a of (m.data?.attachments as Attachment[] | undefined) ?? []) {
-        files.push({ key: `${m.id}-${a.id}`, kind: 'photo', photo: a, at: m.createdAt, senderId: m.senderId });
-      }
-    }
-    return { files, loading: !q.updatedAt };
-  }, [q.data, q.updatedAt]);
+export function useProjectFiles(projectId: ID | null | undefined): { files: ProjectFile[]; loading: boolean; failed: boolean } {
+  const q = useQuery({
+    queryKey: keys.files(projectId ?? ''),
+    queryFn: get<{ files: ProjectFile[] }>(`/projects/${projectId}/files`),
+    enabled: !!projectId,
+  });
+  return { files: q.data?.files ?? [], loading: q.isPending && !q.isError, failed: q.isError && !q.data };
 }

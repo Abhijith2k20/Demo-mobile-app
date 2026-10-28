@@ -1,7 +1,5 @@
-// Task list filters. Pure functions, so they are easy to test.
-import { addDays, format, parseISO } from 'date-fns';
-import { isDone, taskVarianceDays } from '@/shared/taskRules';
-import type { ID, Task, TaskStatus } from '@/types/models';
+// What the schedule's filter controls hold. The server does the filtering (GET /projects/:id/tasks).
+import type { ID, TaskStatus } from '@/types/models';
 
 export type OwnerFilter = 'any' | 'me' | 'unassigned' | ID;
 export type DueFilter = 'any' | 'overdue' | 'week' | 'month';
@@ -39,19 +37,13 @@ export function advancedCount(f: TaskFilters): number {
 export const isFiltering = (f: TaskFilters): boolean =>
   f.statuses.length > 0 || f.owner !== 'any' || f.due !== 'any' || f.delayed || f.phases.length > 0;
 
-export function matchesFilters(task: Task, f: TaskFilters, meId: ID, today: string): boolean {
-  if (f.statuses.length > 0 && !f.statuses.includes(task.status)) return false;
-  if (f.owner === 'me' && task.ownerId !== meId) return false;
-  if (f.owner === 'unassigned' && task.ownerId !== null) return false;
-  if (f.owner !== 'any' && f.owner !== 'me' && f.owner !== 'unassigned' && task.ownerId !== f.owner) return false;
-  if (f.phases.length > 0 && !f.phases.includes(task.phase)) return false;
-  if (f.delayed && !((taskVarianceDays(task) ?? 0) > 0 && !isDone(task.status))) return false;
-  if (f.due !== 'any') {
-    // Due filters are about work still to do; finished tasks never match.
-    if (isDone(task.status)) return false;
-    if (f.due === 'overdue') return task.plannedFinish < today;
-    const until = format(addDays(parseISO(today), f.due === 'week' ? 7 : 30), 'yyyy-MM-dd');
-    return task.plannedFinish >= today && task.plannedFinish <= until;
-  }
-  return true;
+/** The filters as query parameters for the server; empty when nothing is set. */
+export function filterQuery(f: TaskFilters): string {
+  const q = new URLSearchParams();
+  if (f.statuses.length) q.set('status', f.statuses.join(','));
+  if (f.owner !== 'any') q.set('owner', f.owner);
+  if (f.due !== 'any') q.set('due', f.due);
+  if (f.delayed) q.set('delayed', 'true');
+  if (f.phases.length) q.set('phase', f.phases.join(','));
+  return q.toString();
 }

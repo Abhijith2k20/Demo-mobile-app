@@ -1,14 +1,24 @@
-import { desc, isNull } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { db } from '@/lib/db/client';
-import { activity } from '@/lib/db/schema';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api/client';
+import { get, keys, refresh } from '@/lib/queries';
+import type { ActivityView } from '@/types/models';
 
-export function useActivity() {
-  const q = useLiveQuery(db.select().from(activity).orderBy(desc(activity.createdAt), desc(activity.id)).limit(100));
-  return { items: q.data, loading: !q.updatedAt };
+export function useActivityFeed() {
+  return useQuery({ queryKey: keys.activity, queryFn: get<{ items: ActivityView[]; unreadCount: number }>('/activity') });
 }
 
-/** "Seen" is kept on the phone only (the demo server has no read state for activity). */
+export function useUnreadActivityCount(): number {
+  return useActivityFeed().data?.unreadCount ?? 0;
+}
+
+export function useActivity() {
+  const q = useActivityFeed();
+  return { items: q.data?.items ?? [], loading: q.isPending && !q.isError, failed: q.isError && !q.data };
+}
+
+/** "Seen" is kept by the server, so every device of the user agrees. */
 export function markActivityRead(): void {
-  db.update(activity).set({ readAt: new Date().toISOString() }).where(isNull(activity.readAt)).run();
+  api('POST', '/activity/read')
+    .then(() => refresh(keys.activity))
+    .catch(() => {});
 }

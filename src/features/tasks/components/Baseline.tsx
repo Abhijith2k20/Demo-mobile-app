@@ -7,7 +7,7 @@ import { Button, type IconName } from '@/components/basics';
 import { Field } from '@/components/form';
 import { Sheet, SheetInput } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { rebaselineSchema } from '@/shared/schemas';
+import { rebaselineSchema } from '@/contract/schemas';
 import { shortProjectName } from '../../shared';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';

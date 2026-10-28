@@ -8,16 +8,16 @@ import { Pressable, View } from 'react-native';
 import { Avatar, Card, Pill } from '@/components/basics';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { T } from '@/components/T';
-import { shortDate } from '@/shared/taskRules';
+import { shortDate } from '@/lib/format';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Attachment, CheckinAnswer, ID, Message, MessageType } from '@/types/models';
-import { CheckinCard } from '../../bot/CheckinCard';
-import { VoiceChip } from '../../bot/NoteField';
-import { MorningSummary } from '../../bot/MorningSummary';
-import { firstName } from '../../shared';
+import { CheckinCard } from '../../bot/components/CheckinCard';
+import { VoiceChip } from '../../bot/components/NoteField';
+import { MorningSummary } from '../../bot/components/MorningSummary';
+import { firstName, useProblemTypes } from '../../shared';
 import { useTask } from '../../tasks/hooks';
-import { StatusDot, useStatusLabel } from '../../tasks/components/bits';
+import { StatusDot, useStatusLabel } from '../../tasks/components/TaskIndicators';
 import { useChat } from '../context';
 
 type Props = { message: Message };
@@ -207,14 +207,14 @@ function IssueCard({ message }: Props) {
   const urgent = d.urgency === 'urgent';
   const photos = (d.attachments as Attachment[] | undefined) ?? [];
   const mentions = ((d.mentions as ID[] | undefined) ?? []).map((id) => users.get(id)).filter(Boolean);
-  const what = String(d.what ?? '');
+  const what = useProblemTypes().label(String(d.what ?? ''));
   return (
     <Card accent={c.danger} style={{ maxWidth: 340, marginTop: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <CardTitle icon="alert-triangle" label={t('issue.card', 'Issue')} color={c.danger} />
         {urgent ? <Pill label={t('issue.urgent', 'Urgent')} bg={c.dangerSoft} fg={c.danger} /> : null}
       </View>
-      <T variant="heading">{t(`issue.preset.${what}`, what)}</T>
+      <T variant="heading">{what}</T>
       {d.note ? <T variant="body">{String(d.note)}</T> : null}
       {d.taskName ? (
         <T variant="meta" color="textMuted" style={{ marginTop: 2 }}>
@@ -263,7 +263,7 @@ function DailyReportCard({ message }: Props) {
       <T variant="body">{String(d.workDone ?? '')}</T>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.sm }}>
         <Feather name="users" size={14} color={c.textMuted} />
-        <T variant="metaStrong">{t('report.workersCount', '{{count}} workers on site', { count: Number(d.workers ?? 0) })}</T>
+        <T variant="metaStrong">{t('report.workersCount', '{{count}} people working', { count: Number(d.workers ?? 0) })}</T>
       </View>
       <ReportLine label={t('report.problems', 'Problems')} text={String(d.problems ?? '')} />
       <ReportLine label={t('report.tomorrow', "Tomorrow's plan")} text={String(d.tomorrow ?? '')} />
@@ -276,10 +276,14 @@ function DailyReportCard({ message }: Props) {
   );
 }
 
-export function answerSummary(a: CheckinAnswer | undefined, t: (k: string, d: string, o?: Record<string, unknown>) => string): string {
+export function answerSummary(
+  a: CheckinAnswer | undefined,
+  t: (k: string, d: string, o?: Record<string, unknown>) => string,
+  problemLabel: (key: string) => string,
+): string {
   if (!a) return '';
   if (a.kind === 'progress') return `${a.percent}%`;
-  if (a.kind === 'problem') return `${t('checkin.problem', 'Problem')}${a.reason ? ` · ${t(`issue.preset.${a.reason}`, a.reason)}` : ''}`;
+  if (a.kind === 'problem') return `${t('checkin.problem', 'Problem')}${a.reason ? ` · ${problemLabel(a.reason)}` : ''}`;
   if (a.kind === 'done') return t('checkin.done', 'Done');
   if (a.kind === 'not_started') return t('checkin.notStarted', 'Not started');
   return t('checkin.started', 'Started');
@@ -288,6 +292,7 @@ export function answerSummary(a: CheckinAnswer | undefined, t: (k: string, d: st
 function StatusCard({ message }: Props) {
   const { c } = useTheme();
   const { t } = useTranslation();
+  const problems = useProblemTypes();
   const { users } = useChat();
   const d = message.data ?? {};
   const user = users.get(d.userId as ID);
@@ -309,7 +314,7 @@ function StatusCard({ message }: Props) {
         ) : (
           <T variant="body">
             <T variant="bodyStrong">{firstName(user?.name)}</T> · {String(d.taskName ?? '')} →{' '}
-            <T variant="bodyStrong">{answerSummary(d.answer as CheckinAnswer | undefined, t as never)}</T>
+            <T variant="bodyStrong">{answerSummary(d.answer as CheckinAnswer | undefined, t as never, problems.label)}</T>
             {d.hasPhoto ? ` · ${t('checkin.withPhoto', 'photo attached')}` : ''}
           </T>
         )}

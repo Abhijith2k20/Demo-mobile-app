@@ -7,10 +7,11 @@ import { Avatar, Button } from '@/components/basics';
 import { withBoundary } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { formatPhone, requestOtp } from '@/features/auth/api';
+import { normaliseEmail, requestOtp } from '@/features/auth/api';
 import { AuthShell } from '@/features/auth/components/AuthShell';
-import { DEMO_USERS } from '@/features/auth/demoUsers';
+import { useDemoAccounts } from '../hooks';
 import { isAppError } from '@/lib/api/client';
+import { otpRequestSchema } from '@/contract/schemas';
 import { errorText } from '@/lib/i18n';
 import { radius, space } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -19,24 +20,25 @@ import { useTheme } from '@/theme/useTheme';
 function LoginScreen() {
   const { c } = useTheme();
   const { t } = useTranslation();
+  const demoUsers = useDemoAccounts();
   const router = useRouter();
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
-  const digits = phone.replace(/\D/g, '');
+  const address = normaliseEmail(email);
 
-  const submit = async (number = digits) => {
-    if (number.length !== 10) {
-      setError(t('auth.phoneInvalid', 'Enter your 10-digit mobile number.'));
+  const submit = async (value = address) => {
+    if (!otpRequestSchema.safeParse({ email: value }).success) {
+      setError(t('auth.emailInvalid', 'Enter a valid work email, like name@company.com.'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await requestOtp(number);
-      router.push({ pathname: '/otp', params: { phone: number } });
+      await requestOtp(value);
+      router.push({ pathname: '/otp', params: { email: value } });
     } catch (e) {
       setError(isAppError(e) ? errorText(e) : errorText('UNKNOWN'));
     } finally {
@@ -47,7 +49,7 @@ function LoginScreen() {
   return (
     <AuthShell
       title={t('auth.signIn', 'Sign in')}
-      subtitle={t('auth.signInHint', 'Enter your mobile number to get a 6-digit code by SMS.')}
+      subtitle={t('auth.signInHint', 'Enter your work email to get a 6-digit code.')}
       footer={
         <View style={{ alignItems: 'center', gap: space.md }}>
           <Pressable
@@ -61,12 +63,12 @@ function LoginScreen() {
             </T>
           </Pressable>
           <T variant="meta" color="textFaint" style={{ textAlign: 'center' }}>
-            {t('auth.help', "Can't sign in? Ask your company admin to add your number.")}
+            {t('auth.help', "Can't sign in? Ask your company admin to add your work email.")}
           </T>
         </View>
       }>
       <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-        {t('auth.phone', 'Mobile number')}
+        {t('auth.email', 'Work email')}
       </T>
       <View
         style={{
@@ -78,23 +80,24 @@ function LoginScreen() {
           borderRadius: radius.card,
           height: 58,
         }}>
-        <T style={{ fontFamily: fonts.semibold, fontSize: 18, lineHeight: 24, color: c.textMuted, paddingLeft: space.lg, paddingRight: space.md }}>+91</T>
-        <View style={{ width: 1, height: 26, backgroundColor: c.border }} />
         <TextInput
-          value={formatPhone(phone)}
+          value={email}
           onChangeText={(v) => {
-            setPhone(v.replace(/\D/g, '').slice(0, 10));
+            setEmail(v);
             setError(null);
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          keyboardType="phone-pad"
-          autoComplete="tel"
-          textContentType="telephoneNumber"
-          placeholder="00000 00000"
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="username"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="go"
+          placeholder="name@company.com"
           placeholderTextColor={c.textFaint}
-          accessibilityLabel={t('auth.phone', 'Mobile number')}
-          style={{ flex: 1, color: c.text, fontFamily: fonts.semibold, fontSize: 18, letterSpacing: 1, paddingHorizontal: space.md, paddingVertical: 0 }}
+          accessibilityLabel={t('auth.email', 'Work email')}
+          style={{ flex: 1, color: c.text, fontFamily: fonts.semibold, fontSize: 17, paddingHorizontal: space.lg, paddingVertical: 0 }}
           onSubmitEditing={() => void submit()}
         />
       </View>
@@ -106,7 +109,7 @@ function LoginScreen() {
           </T>
         </View>
       ) : null}
-      <Button label={t('auth.continue', 'Continue')} onPress={() => void submit()} loading={busy} disabled={digits.length !== 10} style={{ marginTop: space.lg, minHeight: 54 }} />
+      <Button label={t('auth.continue', 'Continue')} onPress={() => void submit()} loading={busy} disabled={!address} style={{ marginTop: space.lg, minHeight: 54 }} />
 
       <Sheet
         visible={demo}
@@ -114,16 +117,16 @@ function LoginScreen() {
         title={t('auth.demoTitle', 'Demo accounts')}
         subtitle={t('auth.demoHint', 'Pick a person to sign in as. The code is always 123456.')}>
         <View style={{ marginHorizontal: -space.lg }}>
-          {DEMO_USERS.map((u) => (
+          {demoUsers.map((u) => (
             <Pressable
-              key={u.phone}
+              key={u.email}
               accessibilityRole="button"
               accessibilityLabel={`${u.name}, ${u.subtitle}`}
               onPress={() => {
-                setPhone(u.phone);
+                setEmail(u.email);
                 setError(null);
                 setDemo(false);
-                void submit(u.phone);
+                void submit(u.email);
               }}
               style={({ pressed }) => ({
                 flexDirection: 'row',
@@ -133,7 +136,7 @@ function LoginScreen() {
                 minHeight: 56,
                 backgroundColor: pressed ? c.surfaceAlt : 'transparent',
               })}>
-              <Avatar id={u.phone} name={u.name} size={36} />
+              <Avatar id={u.email} name={u.name} size={36} />
               <View style={{ flex: 1 }}>
                 <T variant="bodyStrong" numberOfLines={1}>
                   {u.name}

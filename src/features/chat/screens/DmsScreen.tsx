@@ -10,8 +10,8 @@ import { Avatar, Badge, EmptyState, Skeleton } from '@/components/basics';
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
 import { T } from '@/components/T';
 import { NewMessageSheet } from '@/features/chat/components/NewMessageSheet';
-import { useDmList, useRefresh, type DmRow } from '@/features/home/hooks';
-import { useMe, useUnsentCount } from '@/features/shared';
+import { useDmList, type DmRow } from '@/features/home/hooks';
+import { useMe, useRefresh } from '@/features/shared';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Message } from '@/types/models';
@@ -29,7 +29,6 @@ function DmsScreen() {
   const insets = useSafeAreaInsets();
   const me = useMe();
   const { rows, loading } = useDmList();
-  const unsent = useUnsentCount();
   const { refreshing, refresh } = useRefresh();
   const [query, setQuery] = useState('');
   const [compose, setCompose] = useState(false);
@@ -149,7 +148,7 @@ function DmsScreen() {
           ) : null}
         </View>
       </View>
-      <OfflineBanner waiting={unsent.waiting} />
+      <OfflineBanner />
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
