@@ -1,4 +1,5 @@
 # Siteline demo — rules
+- Two folders: frontend/ (the Expo app; run npm and npx there) and backend/ (FastAPI). Paths like app/ and src/ below are inside frontend/.
 - Read SITELINE_DEMO_SPEC.md before any change. It is the source of truth.
 - Must run in Expo Go. Do not add libraries that need a dev build.
 - Files in app/ are routes only: read URL params and render a screen from src/features/<area>/screens/. No layout or logic in app/ (except _layout files).

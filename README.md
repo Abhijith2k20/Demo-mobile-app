@@ -2,7 +2,7 @@
 
 Siteline: a clickable demo of a project chat and task app for Paliath Interiors.
 
-- **App** (`app/`, `src/`): Expo SDK 57, runs in Expo Go. A thin client: it shows what the server says. Messages, photos, check-ins and task updates wait in a send queue when offline, and the last loaded screens are kept on the phone.
+- **App** (`frontend/`): Expo SDK 57, runs in Expo Go. A thin client: it shows what the server says. Messages, photos, check-ins and task updates wait in a send queue when offline, and the last loaded screens are kept on the phone.
 - **Backend** (`backend/`): FastAPI mock server with in-memory demo data. All data, permissions and rules live here.
 
 ## Run it
@@ -13,7 +13,8 @@ cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-# 2. App (another terminal, repo root)
+# 2. App (another terminal)
+cd frontend
 npm install
 npx expo start          # scan the QR code with Expo Go
 ```
@@ -29,6 +30,7 @@ API docs: http://localhost:8000/docs
 ## Checks
 
 ```bash
+cd frontend
 npm run typecheck && npm run lint && npm test
 npm run test:api        # backend tests (pytest)
 ```

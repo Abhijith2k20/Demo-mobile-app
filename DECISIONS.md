@@ -474,3 +474,9 @@ the server still decides everything; the phone only holds changes until the serv
   whether to show "Mark done" on a row (`access` permissions plus "is it my task").
 - Not changed: the seed and scripted teammates (`seed.py`, `actors.py`) are Paliath's demo data, and
   the daily report still stores its head count as `workers`.
+
+## Two top-level folders (2026-10-28)
+
+- The Expo app moved into `frontend/` (app/, src/, assets/, scripts/ and its config); `backend/` is
+  unchanged. Docs and project rules stay at the top. Run npm and npx inside `frontend/`;
+  `npm run api` and `npm run test:api` there still start and test the server (`cd ../backend`).

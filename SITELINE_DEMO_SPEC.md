@@ -609,6 +609,8 @@ Also 4 extra workers (Manjunath, Imran, Lakshmi, Prakash) spread across projects
 
 ### 12.1 Folders
 
+The repository has two top-level folders: `frontend/` (this app; paths in this spec like `app/` and `src/` are inside it) and `backend/` (§10).
+
 ```
 src/
   features/
