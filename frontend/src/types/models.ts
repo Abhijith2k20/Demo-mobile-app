@@ -147,6 +147,7 @@ export interface Card {
   delivery: 'pending' | 'delivered' | 'refused' | 'failed' | null;
   deliveryError: string | null;
   askedAt: string;
+  seenAt: string | null;
   /** The answer is in the send queue on this phone. */
   sending?: boolean;
 }

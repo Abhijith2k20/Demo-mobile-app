@@ -198,9 +198,12 @@ def answer(user: dict, card_id: str, a: dict) -> dict:
 
 
 def mark_seen(user: dict, card_id: str) -> None:
+    """The first time the person opens the card; the PM app hears about it if the company turned card.seen on."""
+    from .integrations import send_card_seen
+
     c = card_for(user, card_id)
     if not c["seenAt"]:
-        db.update("cards", {"id": c["id"]}, {"seenAt": now_iso()})
+        send_card_seen(db.update("cards", {"id": c["id"]}, {"seenAt": now_iso()}))
 
 
 def set_delivery(card_id: str, delivery: str, error: str | None = None) -> None:

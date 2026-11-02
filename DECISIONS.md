@@ -618,8 +618,9 @@ The owner removed Kannada and Hindi for now.
 - **The mock PM app runs in the same process**: its "webhook endpoint" is a function (`mockpm.receive`), reached
   through the same delivery job as a real PM app. Its timers are jobs too (`mock_plan_day`, `mock_checkins`,
   `mock_remind`, `mock_escalate`, `mock_summary`). Making it "stop answering" makes deliveries retry.
-- **Rate limit is per API process** (120 calls a minute per company, counted in memory). With more than one API
-  process it must move to Postgres.
+- **Rate limit** (120 calls a minute per company) is counted in Postgres (`api_calls`), so it holds across API
+  processes.
+- **`card.seen`** is sent when the app first shows a card open, if the company turned it on (platform panel).
 - **Channel cards push only when the PM app gives `notify.push`**; without it the Managers get an Activity item
   only (status updates would otherwise push on every answer). The mock pushes for problems and escalations.
 - **Check-in cards ask once per task per day** (card id `checkin-<task>-<date>`). Opening the bot conversation

@@ -72,10 +72,29 @@ def send_event(event: str, body: dict, event_id: str) -> None:
         enqueue("webhook", {"event": event, "body": body, "eventId": event_id}, dedupe_key=f"webhook:{event_id}")
 
 
+def _person_ref(user_id: str) -> str:
+    who = db.row("SELECT email, phone FROM users WHERE id = %(u)s", u=user_id)
+    return who["email"] or who["phone"]
+
+
+def send_card_seen(card: dict) -> None:
+    i = current()
+    if i and i["sendCardSeen"]:
+        send_event("card.seen", {"card": card["extId"], "ref": card["ref"], "person": _person_ref(card["userId"]),
+                                 "seenAt": card["seenAt"]}, f"evt_card.seen_{card['id']}")
+
+
+def count_call(company_id: str, limit: int) -> bool:
+    """Counts one Cards API call for this minute; False once the company is over `limit`."""
+    calls = db.value("""INSERT INTO api_calls (company_id, minute, calls) VALUES (%(c)s, date_trunc('minute', now()), 1)
+                        ON CONFLICT (company_id, minute) DO UPDATE SET calls = api_calls.calls + 1 RETURNING calls""",
+                     c=company_id)
+    return calls <= limit
+
+
 def _answer_body(card: dict) -> dict:
     """card.answered, with links to the person's files (valid 7 days) and upload ids."""
     a = card["answer"] or {}
-    who = db.row("SELECT email, phone FROM users WHERE id = %(u)s", u=card["userId"])
     company = db.company_id()
     choice = {"scale": a["scale"]} if a.get("scale") else {k: a[k] for k in ("button", "choice") if a.get(k)}
     note: dict = {}
@@ -86,7 +105,7 @@ def _answer_body(card: dict) -> dict:
                          "seconds": a.get("voiceSec")}
     if a.get("photoUploadIds"):
         note["photos"] = [{"url": files.signed_url(company, u, days=7), "upload": u} for u in a["photoUploadIds"]]
-    return {"card": card["extId"], "ref": card["ref"], "person": who["email"] or who["phone"], "answer": choice,
+    return {"card": card["extId"], "ref": card["ref"], "person": _person_ref(card["userId"]), "answer": choice,
             "note": note, "answeredAt": card["answeredAt"], "receivedAt": card["receivedAt"]}
 
 

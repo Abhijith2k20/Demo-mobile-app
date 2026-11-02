@@ -201,6 +201,7 @@ PM company {_e(c['pmCompanyId'])}</p><p>{_e(note)}</p>
 <option value="http" {'selected' if link.get('kind') == 'http' else ''}>PM app API</option></select></label>
 <label>PM company id <input name="pm_company_id" value="{_e(c['pmCompanyId'])}"></label>
 <label>Webhook URL (answers go here) <input name="webhook_url" value="{_e(link.get('webhookUrl'))}"></label>
+<label><input type="checkbox" name="card_seen" value="1" {'checked' if link.get('sendCardSeen') else ''}> Also send card.seen (when a person first opens a card)</label>
 <p class="muted">The PM app calls {_e(config.PUBLIC_URL)}/api/v1 with this company's API key (docs/CARDS_API.md).
 {'A key is set.' if link.get('apiKeyHash') else 'No key yet.'}</p>
 <button>Save</button></form>
@@ -281,9 +282,9 @@ def save_setup(company_id: str, setup: str = Form(...), siteline_platform: str |
 
 @router.post("/companies/{company_id}/pm-link")
 def save_pm_link(company_id: str, kind: str = Form(...), webhook_url: str = Form(""), pm_company_id: str = Form(""),
-                 siteline_platform: str | None = Cookie(None)):
+                 card_seen: str = Form(""), siteline_platform: str | None = Cookie(None)):
     companies.update_pm_link(company_id, kind=kind, webhook_url=webhook_url or None, pm_company_id=pm_company_id or None,
-                             actor=_require(siteline_platform))
+                             card_seen=card_seen == "1", actor=_require(siteline_platform))
     return _back(company_id, "PM link saved.")
 
 

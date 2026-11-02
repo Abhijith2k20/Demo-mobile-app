@@ -102,11 +102,13 @@ def update_setup(company_id: str, setup: dict, actor: str) -> None:
     accounts.audit(company_id, actor, "setup.changed", company_id)
 
 
-def update_pm_link(company_id: str, *, kind: str, webhook_url: str | None, pm_company_id: str | None, actor: str) -> None:
+def update_pm_link(company_id: str, *, kind: str, webhook_url: str | None, pm_company_id: str | None, actor: str,
+                   card_seen: bool = False) -> None:
     if kind not in ("mock", "http"):
         raise invalid({"kind": "Pick mock or http"})
-    db.run("""INSERT INTO integrations (company_id, kind, webhook_url, options) VALUES (%(c)s, %(k)s, %(u)s, '{}')
-              ON CONFLICT (company_id) DO UPDATE SET kind = excluded.kind, webhook_url = excluded.webhook_url""",
-           c=company_id, k=kind, u=webhook_url)
+    db.run("""INSERT INTO integrations (company_id, kind, webhook_url, send_card_seen, options)
+              VALUES (%(c)s, %(k)s, %(u)s, %(s)s, '{}')
+              ON CONFLICT (company_id) DO UPDATE SET kind = excluded.kind, webhook_url = excluded.webhook_url,
+                send_card_seen = excluded.send_card_seen""", c=company_id, k=kind, u=webhook_url, s=card_seen)
     db.run("UPDATE companies SET pm_company_id = %(p)s WHERE id = %(c)s", p=pm_company_id, c=company_id)
     accounts.audit(company_id, actor, "pm_link.changed", company_id, {"kind": kind})

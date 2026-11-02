@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { uuidv7 } from 'uuidv7';
+import { api } from '@/lib/api/client';
 import { enqueue } from '@/lib/outbox';
 import type { Card, CardAnswer } from '@/types/models';
 
@@ -19,4 +20,10 @@ export function answerCard(card: Card, answer: CardAnswer, files: AnswerFiles): 
     photos: files.photoUris.map((uri) => ({ attachmentId: uuidv7(), uri })),
     voice: files.voice ? { uri: files.voice.uri, kind: 'voice', name: 'voice-note.m4a', mime: 'audio/mp4' } : undefined,
   });
+}
+
+/** The first time the open card is shown. Online-only and best effort: a missed one only means the PM app isn't told. */
+export function markSeen(card: Card): void {
+  if (card.seenAt || card.sending) return;
+  api('POST', `/cards/${card.id}/seen`).catch(() => {});
 }

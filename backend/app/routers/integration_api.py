@@ -2,9 +2,6 @@
 session; the key decides the company. HTTP only: the work is in services/cards.py, projects.py, integrations.py."""
 from __future__ import annotations
 
-import time
-from collections import defaultdict, deque
-
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import JSONResponse
 
@@ -17,19 +14,12 @@ from ..services import projects as spaces
 router = APIRouter(prefix="/api/v1", tags=["cards api"])
 
 CALLS_PER_MINUTE = 120
-# shortcut: counted per API process; with several API processes, move the count to Postgres.
-_calls: dict[str, deque] = defaultdict(deque)
 
 
 def integration(authorization: str = Header(default="")) -> str:
     company_id = integrations.company_for_key(authorization.removeprefix("Bearer ").strip())
-    window = _calls[company_id]
-    now = time.monotonic()
-    while window and now - window[0] > 60:
-        window.popleft()
-    if len(window) >= CALLS_PER_MINUTE:
+    if not integrations.count_call(company_id, CALLS_PER_MINUTE):
         raise ApiError("RATE_LIMITED", "Too many calls: 120 a minute per company.", {"retryAfter": 60})
-    window.append(now)
     db.current().set_company(company_id)
     return company_id
 

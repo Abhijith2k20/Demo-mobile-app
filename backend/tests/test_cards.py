@@ -261,3 +261,34 @@ def test_people_joining_and_leaving_are_sent_to_the_pm_app(login, client):
     with in_company("Paliath Interiors"):
         hooks = db.rows("SELECT payload FROM jobs WHERE kind = 'webhook'")
     assert any(h["payload"]["event"] == "person.left" and h["payload"]["body"]["person"] == "ravi@paliath.in" for h in hooks)
+
+
+def test_card_seen_is_sent_once_and_only_when_turned_on(login, client):
+    ravi = login("ravi@paliath.in")
+    c = open_card(ravi)
+    hooks = "SELECT payload FROM jobs WHERE kind = 'webhook' AND payload->>'event' = 'card.seen'"
+    ravi.post(f"/cards/{c['id']}/seen")
+    with in_company("Paliath Interiors"):
+        assert db.rows(hooks) == []  # off by default
+        db.run("UPDATE integrations SET send_card_seen = true")
+        db.run("UPDATE cards SET seen_at = NULL")
+    ravi.post(f"/cards/{c['id']}/seen")
+    ravi.post(f"/cards/{c['id']}/seen")  # opened again: nothing more
+    with in_company("Paliath Interiors"):
+        sent = db.rows(hooks)
+    assert len(sent) == 1 and sent[0]["payload"]["body"]["person"] == "ravi@paliath.in"
+    assert sent[0]["payload"]["body"]["card"] == c["extId"]
+    run_jobs({"webhook"})  # the mock PM app accepts it
+    assert next(x for x in ravi.get("/me/cards").json()["cards"] if x["id"] == c["id"])["seenAt"]
+
+
+def test_the_rate_limit_is_counted_in_the_database_per_company(client, monkeypatch):
+    from app.routers import integration_api
+
+    monkeypatch.setattr(integration_api, "CALLS_PER_MINUTE", 3)
+    paliath, brightline = api_key("Paliath Interiors"), api_key("Brightline Events")
+    codes = [client.get("/api/v1/cards/none", headers=paliath).status_code for _ in range(4)]
+    assert codes == [404, 404, 404, 429]
+    assert client.get("/api/v1/cards/none", headers=brightline).status_code == 404  # each company has its own count
+    with db.transaction():
+        assert db.value("SELECT max(calls) FROM api_calls") == 4

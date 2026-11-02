@@ -5,7 +5,7 @@
 //  - every state shares the same frame and the same left edge, so cards line up
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { Button, type IconName } from '@/components/basics';
@@ -14,7 +14,7 @@ import { radius, space, touch } from '@/theme/spacing';
 import { useLargeText, useTheme } from '@/theme/useTheme';
 import type { CardAnswer, CardButton, CardContent, ID, Message, Tone } from '@/types/models';
 import { pickPhotos, shortProjectName, useProjectAccess } from '../../shared';
-import { answerCard } from '../api';
+import { answerCard, markSeen } from '../api';
 import { asks, useCard } from '../hooks';
 import { useCardQueue } from '../queue';
 import { NoteField, VoiceChip, type NoteValue } from './NoteField';
@@ -169,6 +169,11 @@ export function CardView({ message }: { message: Message }) {
   const [photoUris, setPhotoUris] = useState<string[]>([]);
 
   const title = card?.content.title ?? t('card.loading', 'Loading…');
+  // Seen = shown open (the active card in the queue, or any card shown outside the bot conversation).
+  const shownOpen = !!card && card.state === 'open' && !message.data?.nudge && (!queue || queue.activeId === card.id);
+  useEffect(() => {
+    if (shownOpen && card) markSeen(card);
+  }, [shownOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A nudge repeats a question that already has its own card: keep it to one quiet line.
   if (message.data?.nudge) {
