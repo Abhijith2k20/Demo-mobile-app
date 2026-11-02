@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { withBoundary } from '@/components/chrome';
 import { T } from '@/components/T';
-import { requestOtp, verifyOtp } from '@/features/auth/api';
+import { openCompany, requestCode, verifyCode } from '@/features/auth/api';
 import { AuthShell } from '@/features/auth/components/AuthShell';
 import { isAppError } from '@/lib/api/client';
 import { errorText } from '@/lib/i18n';
@@ -16,7 +16,15 @@ import { useTheme } from '@/theme/useTheme';
 const LENGTH = 6;
 const BOX_HEIGHT = 60;
 
-function OtpScreen({ email }: { email: string }) {
+interface Props {
+  identifier: string;
+  /** Where the code went. */
+  channel: 'email' | 'sms';
+  /** Dev sign-in sheet: open this company straight away when the person has several. */
+  company?: string;
+}
+
+function OtpScreen({ identifier, channel, company }: Props) {
   const { c } = useTheme();
   const { t } = useTranslation();
   const [code, setCode] = useState('');
@@ -40,7 +48,10 @@ function OtpScreen({ email }: { email: string }) {
     setBusy(true);
     setError(null);
     try {
-      await verifyOtp(email, value); // the auth gate moves us to Home
+      const choices = await verifyCode(identifier, value); // with one company the auth gate moves us to Home
+      const preset = company && choices?.companies.find((c) => c.name === company);
+      if (preset) await openCompany(preset.id);
+      else if (choices) router.replace('/companies');
     } catch (e) {
       if (!mounted.current) return;
       setError(isAppError(e) ? errorText(e) : errorText('UNKNOWN'));
@@ -62,7 +73,7 @@ function OtpScreen({ email }: { email: string }) {
 
   const resend = async () => {
     try {
-      await requestOtp(email);
+      await requestCode(identifier);
       setSeconds(30);
       setError(null);
     } catch (e) {
@@ -102,8 +113,8 @@ function OtpScreen({ email }: { email: string }) {
       title={t('auth.enterCode', 'Enter the code')}
       subtitle={
         <>
-          {t('auth.codeSentTo', 'Sent by email to')}{' '}
-          <T variant="bodyStrong">{email}</T>
+          {channel === 'sms' ? t('auth.codeSentBySms', 'Sent by SMS to') : t('auth.codeSentTo', 'Sent by email to')}{' '}
+          <T variant="bodyStrong">{identifier}</T>
           {'  '}
           <T variant="bodyStrong" color="accent" onPress={() => (router.canGoBack() ? router.back() : router.replace('/login'))} accessibilityRole="link">
             {t('auth.change', 'Change')}
@@ -111,9 +122,11 @@ function OtpScreen({ email }: { email: string }) {
         </>
       }
       footer={
-        <T variant="meta" color="textFaint" style={{ textAlign: 'center' }}>
-          {t('auth.demoCode', 'Demo build: the code is 123456.')}
-        </T>
+        __DEV__ ? (
+          <T variant="meta" color="textFaint" style={{ textAlign: 'center' }}>
+            {t('auth.demoCode', 'Test build: seeded accounts use 123456.')}
+          </T>
+        ) : undefined
       }>
       <Pressable
         onPress={() => inputRef.current?.focus()}

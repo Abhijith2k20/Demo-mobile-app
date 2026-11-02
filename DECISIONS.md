@@ -542,3 +542,35 @@ Done as in `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md`.
 - Kannada and Hindi: 5 strings whose English changed now fall back to English until translated
   (`offline.queued`, `activity.emptyHint`, `members.managerHint`, `members.memberHint`, `people.deactivateBody`).
 
+## Build steps 3–7: database, companies, PM sync, bot jobs, files and push (2026-11-02)
+
+Built as spec §15 steps 3–7; step 8 (launch) has its config (`render.yaml`, `backend/Dockerfile`, CI) but needs
+the accounts listed in the README. Where it differs from the spec:
+- **No SQLAlchemy or Alembic.** Plain SQL through `backend/app/db.py` (psycopg 3 and a pool) and numbered SQL
+  files in `backend/db/migrations`, applied at start-up. The code needs neither an ORM nor generated migrations.
+- **Routes are plain (sync) functions** run in FastAPI's thread pool, one transaction each; not async.
+- **Live events** go through an `events` table plus `NOTIFY` with its id, so big audiences never hit Postgres's
+  8 kB notify limit; rows are deleted after 10 minutes by the hourly cleanup job.
+- **Sign-in** returns the companies and invites; with exactly one company and no invites it also starts that
+  company's session. Accepting an invite opens the company at once. The first-sign-in name and language
+  prompt is not built: the name comes from the invite and the language is set on You.
+- **People routes** keep the app's paths: `PATCH /users/:id` (role) and `POST /users/:id/deactivate`, not
+  `/members/...`.
+- **Guests** join the projects of the channels they were given, as members marked `guest`; they can't be
+  managers, see only those channels, see only people who share a channel, and DM only them.
+- **`/me` → company.pmLinked** tells the app whether projects come from the PM app (no "New project" then).
+  Companies can be created without a PM link (`pmKind: "none"`); they make their own projects.
+- **Files**: links are signed when a message is shown and work to the end of the next hour (stable within the
+  hour so the image cache works); for R2 the file route redirects to a 5-minute R2 link. The company is part of
+  the signed link. Uploads are checked by their first bytes, not the name.
+- **The mock PM app** lives in `pm_mock_*` tables per company and is edited on the platform panel; its edits
+  run the same code as real webhooks (`pm/sync.apply_event`). `pm/http.py` is the client for the real API.
+- **Notifications**: three levels (all, important, off) and quiet hours on/off (21:00–07:00), saved on the
+  server; check-in pushes wait for quiet hours to end.
+- **Expo Go** still opens the app for quick checks: the push module is loaded only in real builds.
+- **Not verified on a real device**: push (needs an EAS project id and a development build), real voice
+  recording and file picking (checked by type and lint, the emulator flow covered sign-in and check-ins),
+  R2, Resend and MSG91 (each logs instead of sending without keys).
+- Local Docker: the compose project is named `siteline`, so it can't collide with other projects named
+  `backend`. The API runs on a normal (non-superuser) database role so row-level security applies.
+

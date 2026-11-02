@@ -4,18 +4,21 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Button, EmptyState, Pill } from '@/components/basics';
+import { Avatar, Button, EmptyState, Pill, Segmented } from '@/components/basics';
 import { appScreen, Header, Screen } from '@/components/chrome';
 import { Input } from '@/components/form';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { deactivatePerson } from '../api';
+import { changeRole, deactivatePerson } from '../api';
 import { InviteSheet } from '../components/InviteSheet';
 import { firstName, isBotUser, shortProjectName, useAllProjectMembers, useCan, useMe, useProjects, useRoleLabels, useUsers } from '@/features/shared';
 import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { User, UserView } from '@/types/models';
+import type { CompanyRole, User, UserView } from '@/types/models';
+
+/** A person's email or phone, whichever they have. */
+const address = (u: Pick<User, 'email' | 'phone'>) => u.email ?? u.phone ?? '';
 
 /** Everyone in the company. Owner and Admins can also invite and deactivate people here. */
 function PeopleScreen() {
@@ -41,7 +44,7 @@ function PeopleScreen() {
 
   const { active, inactive } = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const people = users.list.filter((u) => !isBotUser(u) && (u.name.toLowerCase().includes(q) || u.email.includes(q)));
+    const people = users.list.filter((u) => !isBotUser(u) && (u.name.toLowerCase().includes(q) || address(u).includes(q)));
     return { active: people.filter((u) => u.isActive), inactive: people.filter((u) => !u.isActive) };
   }, [users.list, query]);
 
@@ -54,7 +57,7 @@ function PeopleScreen() {
     <Pressable
       key={u.id}
       accessibilityRole="button"
-      accessibilityLabel={`${u.name}, ${roleLabel(u)}, ${u.email}${u.isActive ? '' : `, ${t('people.deactivated', 'Deactivated')}`}`}
+      accessibilityLabel={`${u.name}, ${roleLabel(u)}, ${address(u)}${u.isActive ? '' : `, ${t('people.deactivated', 'Deactivated')}`}`}
       onPress={() => setOpen(u)}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -73,7 +76,7 @@ function PeopleScreen() {
           {u.id === me.id ? <T variant="meta" color="textMuted">{`  ${t('people.you', 'You')}`}</T> : null}
         </T>
         <T variant="meta" color="textMuted" numberOfLines={2}>
-          {roleLabel(u)} · {u.email}
+          {roleLabel(u)} · {address(u)}
         </T>
       </View>
       <Feather name="chevron-right" size={18} color={c.textFaint} />
@@ -86,13 +89,16 @@ function PeopleScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + space.xl }} keyboardShouldPersistTaps="handled">
         <View style={{ padding: space.lg, gap: space.md }}>
           {can('user.invite') ? (
-            <Button icon="user-plus" kind="secondary" label={t('invite.title', 'Invite person')} onPress={() => setInviting(true)} />
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button icon="user-plus" kind="secondary" full={false} style={{ flex: 1 }} label={t('invite.title', 'Invite person')} onPress={() => setInviting(true)} />
+              <Button icon="mail" kind="ghost" full={false} label={t('invites.title', 'Invites')} onPress={() => router.push('/invites')} />
+            </View>
           ) : null}
           <Input
             value={query}
             onChangeText={setQuery}
-            placeholder={t('people.search', 'Search by name or email')}
-            accessibilityLabel={t('people.search', 'Search by name or email')}
+            placeholder={t('people.search', 'Search by name, email or phone')}
+            accessibilityLabel={t('people.search', 'Search by name, email or phone')}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -114,9 +120,9 @@ function PeopleScreen() {
         ) : null}
       </ScrollView>
 
-      <InviteSheet me={me} visible={inviting} onClose={() => setInviting(false)} />
+      <InviteSheet visible={inviting} onClose={() => setInviting(false)} />
 
-      <Sheet visible={!!open} onClose={() => setOpen(null)} title={person?.name ?? ''} subtitle={person?.email}>
+      <Sheet visible={!!open} onClose={() => setOpen(null)} title={person?.name ?? ''} subtitle={person ? address(person) : undefined}>
         {person ? (
           <View style={{ gap: space.lg }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
@@ -126,13 +132,13 @@ function PeopleScreen() {
             <View style={{ gap: space.sm }}>
               <T variant="label" color="textMuted">
                 {/* A member's phone only holds their own projects, so they see the overlap only. */}
-                {can('company.users') ? t('people.projects', 'Projects') : t('people.sharedProjects', 'Projects you share')}
+                {can('company.people') ? t('people.projects', 'Projects') : t('people.sharedProjects', 'Projects you share')}
               </T>
-              {person.companyRole !== 'member' ? (
+              {person.companyRole === 'owner' || person.companyRole === 'admin' ? (
                 <T variant="body">{t('people.seesAll', 'Sees every project in the company.')}</T>
               ) : personProjects.length === 0 ? (
                 <T variant="body" color="textMuted">
-                  {can('company.users') ? t('people.noProjects', 'Not on any project yet.') : t('people.noSharedProjects', 'No projects in common.')}
+                  {can('company.people') ? t('people.noProjects', 'Not on any project yet.') : t('people.noSharedProjects', 'No projects in common.')}
                 </T>
               ) : (
                 personProjects.map(({ m, p }) => (
@@ -155,6 +161,26 @@ function PeopleScreen() {
                   router.push(`/dm/${person.id}`);
                 }}
               />
+            ) : null}
+            {person.canChangeRole ? (
+              <View style={{ gap: space.sm }}>
+                <T variant="label" color="textMuted">
+                  {t('people.role', 'Company role')}
+                </T>
+                <Segmented<Exclude<CompanyRole, 'owner'>>
+                  value={person.companyRole === 'owner' ? 'admin' : person.companyRole}
+                  onChange={(role) => {
+                    void changeRole(person, role);
+                    setOpen(null);
+                    toast(t('people.roleChanged', '{{name}} is now {{role}}.', { name: firstName(person.name), role: labels.company(role) }));
+                  }}
+                  options={[
+                    ...(can('user.invite_admin') ? [{ value: 'admin' as const, label: t('you.admin', 'Admin') }] : []),
+                    { value: 'member' as const, label: t('you.member', 'Member') },
+                    { value: 'guest' as const, label: t('you.guest', 'Guest') },
+                  ]}
+                />
+              </View>
             ) : null}
             {person.canDeactivate ? (
               <Button

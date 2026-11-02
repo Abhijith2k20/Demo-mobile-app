@@ -16,7 +16,7 @@ import { isAppError } from '@/lib/api/client';
 import { errorText } from '@/lib/i18n';
 import { API_URL, isSimulatedOffline, setSimulatedOffline } from '@/lib/api/transport';
 import { refreshAll } from '@/lib/queries';
-import { signInWithEmail, wipeEverything } from '@/lib/session';
+import { signInDemo, wipeEverything } from '@/lib/session';
 import { useDemo } from '@/stores/demo';
 import { useSession } from '@/stores/session';
 import { toast, useUi } from '@/stores/ui';
@@ -62,6 +62,7 @@ function DemoPanel() {
   const demoUsers = useDemoAccounts();
   const insets = useSafeAreaInsets();
   const user = useSession((s) => s.user);
+  const company = useSession((s) => s.company);
   const socketConnected = useUi((s) => s.socketConnected);
   const online = useUi((s) => s.online);
   const apiLog = useDemo((s) => s.apiLog);
@@ -87,10 +88,10 @@ function DemoPanel() {
     }
   };
 
-  const switchTo = async (email: string) => {
-    setSwitching(email);
+  const switchTo = async (identifier: string, companyName: string) => {
+    setSwitching(`${companyName}:${identifier}`);
     try {
-      await signInWithEmail(email);
+      await signInDemo(identifier, companyName);
       router.dismissTo('/');
     } catch (e) {
       toast(isAppError(e) ? errorText(e) : 'Could not switch user.', 'danger');
@@ -99,9 +100,9 @@ function DemoPanel() {
     }
   };
 
-  const needUser = (fn: (id: string) => Promise<unknown>, done?: string) => () => {
+  const needUser = (fn: () => Promise<unknown>, done?: string) => () => {
     if (!user) toast('Sign in first.');
-    else void run(() => fn(user.id), done);
+    else void run(fn, done);
   };
 
   const reset = () =>
@@ -110,22 +111,23 @@ function DemoPanel() {
       await wipeEverything();
       clearLogs();
       router.replace('/login');
-      toast('Demo reset. All data is back to the seed.', 'success');
+      toast('Reset. All data is back to the seed.', 'success');
     });
 
   return (
     <Screen>
-      <Header title="Demo panel" subtitle="Change the world around the app" close />
+      <Header title="Dev panel" subtitle="Development and test builds only" close />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: insets.bottom + space.xxl }}>
         <Section title="1 · Who am I" hint="Switching signs in again; nothing from the previous person is kept.">
           <Card style={{ padding: 0 }}>
             {demoUsers.map((u, i) => {
-              const current = user?.email === u.email;
+              const current = (user?.email === u.identifier || user?.phone === u.identifier) && company?.name === u.company;
+              const key = `${u.company}:${u.identifier}`;
               return (
                 <View
-                  key={u.email}
+                  key={key}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: c.border, backgroundColor: current ? c.accentSoft : 'transparent' }}>
-                  <Avatar id={current && user ? user.id : u.email} name={u.name} size={32} />
+                  <Avatar id={current && user ? user.id : u.identifier} name={u.name} size={32} />
                   <View style={{ flex: 1 }}>
                     <T variant="bodyStrong" numberOfLines={1}>
                       {u.name}
@@ -139,7 +141,7 @@ function DemoPanel() {
                       <Pill label="You" bg={c.accent} fg={c.onAccent} />
                     </View>
                   ) : (
-                    <Button small full={false} kind="secondary" label="Switch" loading={switching === u.email} disabled={!!switching} onPress={() => void switchTo(u.email)} />
+                    <Button small full={false} kind="secondary" label="Switch" loading={switching === key} disabled={!!switching} onPress={() => void switchTo(u.identifier, u.company)} />
                   )}
                 </View>
               );
@@ -150,7 +152,7 @@ function DemoPanel() {
               <T variant="metaStrong">
                 {user.name} · company role: {user.companyRole}
               </T>
-              {user.companyRole !== 'member' ? (
+              {user.companyRole === 'owner' || user.companyRole === 'admin' ? (
                 <T variant="meta" color="textMuted">
                   Sees every project and channel, but never other people&apos;s DMs.
                 </T>
@@ -234,8 +236,8 @@ function DemoPanel() {
                 small
                 kind="danger"
                 label="Deactivate me"
-                onPress={needUser(async (id) => {
-                  await demo.deactivate(id);
+                onPress={needUser(async () => {
+                  await demo.deactivate();
                   // Any request now gets 401 and the refresh fails, which signs the app out.
                   void refreshAll();
                 })}
@@ -252,11 +254,17 @@ function DemoPanel() {
             kind="secondary"
             icon="bell"
             label="Trigger escalation now"
-            onPress={needUser(async (id) => {
-              const r = await demo.escalate(id);
+            onPress={needUser(async () => {
+              const r = await demo.escalate();
               toast(r.escalated ? 'Escalated to the project managers.' : 'No unanswered check-in to escalate. Send a check-in first.');
             })}
           />
+        </Section>
+
+        <Section title="PM app (mock)" hint="The bot reads tasks from the company's mock PM app. Edit tasks in the platform panel (/platform).">
+          <Button small kind="secondary" icon="refresh-cw" label="Sync with the PM app now" onPress={() => void run(demo.pmSync, 'Sync queued.')} />
+          <Button small kind="secondary" icon="wifi-off" label="Make the PM app stop answering" onPress={() => void run(() => demo.pmDown(true), 'The mock PM app is down: answers wait and retry.')} />
+          <Button small kind="secondary" icon="wifi" label="Bring the PM app back" onPress={() => void run(() => demo.pmDown(false), 'The mock PM app answers again.')} />
         </Section>
 
         <Section title="5 · Teammates" hint="Scripted teammates act every 20–40 s while someone is signed in.">

@@ -1,6 +1,6 @@
 export type ID = string; // UUIDv7
 
-export type CompanyRole = 'owner' | 'admin' | 'member';
+export type CompanyRole = 'owner' | 'admin' | 'member' | 'guest';
 export type ProjectRole = 'manager' | 'member';
 /** Job titles are the company's own words (its setup on the server, sent in /meta). */
 export type JobTitle = string;
@@ -8,7 +8,9 @@ export type JobTitle = string;
 export interface User {
   id: ID;
   name: string;
-  email: string;
+  /** Work email and/or phone (E.164); at least one. */
+  email: string | null;
+  phone?: string | null;
   companyRole: CompanyRole;
   avatarColor: string;
   isActive: boolean;
@@ -24,6 +26,8 @@ export interface Project {
   address: string;
   /** The project in the company's PM app; null for a project made in Siteline. */
   pmProjectId: ID | null;
+  /** Link to the project in the PM app, when it gives one. */
+  pmUrl: string | null;
   /** Set when the project is archived: everything in it becomes read-only. */
   archivedAt: string | null;
   updatedAt: string;
@@ -34,6 +38,8 @@ export interface ProjectMember {
   userId: ID;
   role: ProjectRole;
   jobTitle: JobTitle;
+  /** Where the membership comes from: the PM app, added in Siteline, or a guest. */
+  source?: 'pm' | 'manual' | 'guest';
 }
 
 export type ChannelKind = 'project' | 'company' | 'dm' | 'bot';
@@ -120,8 +126,8 @@ export interface Checkin {
   answer: null | CheckinAnswer;
   /** The task as the PM app has it now; null once it was removed there. */
   task: PmTask | null;
-  /** Whether the answer reached the PM app: saved, refused (reason in `pmError`), or nothing to save. */
-  pmWrite: 'saved' | 'refused' | null;
+  /** Whether the answer reached the PM app: pending (sending to it), saved, refused (reason in `pmError`), or nothing to save. */
+  pmWrite: 'pending' | 'saved' | 'refused' | null;
   pmError: string | null;
   /** Nothing left to answer: the task was finished or removed in the PM app. */
   closed: boolean;
@@ -208,10 +214,42 @@ export interface Company {
   id: ID;
   name: string;
 }
+export interface CompanyRef extends Company {
+  /** Projects and people come from the company's PM app (no "New project" in Siteline). */
+  pmLinked?: boolean;
+}
 
-/** Demo build: one sign-in per role. */
+/** A company the person can open, with their role there. */
+export interface CompanyChoice extends Company {
+  role: CompanyRole;
+}
+
+/** An invite waiting for the signed-in person. */
+export interface PendingInvite {
+  id: ID;
+  companyId: ID;
+  companyName: string;
+  role: CompanyRole;
+  invitedBy: string | null;
+}
+
+/** An invite the Owner or an Admin sent (Invites screen). */
+export interface SentInvite {
+  id: ID;
+  identifier: string;
+  name: string;
+  role: CompanyRole;
+  channelIds: ID[];
+  createdAt: string;
+  expiresAt: string;
+  invitedBy: string | null;
+}
+
+/** Development and staging builds: one sign-in per role in each seeded company. */
 export interface DemoAccount {
-  email: string;
+  identifier: string;
+  email: string | null;
+  company: string;
   name: string;
   companyRole: CompanyRole;
   /** Already in the reader's language. */
@@ -221,6 +259,8 @@ export interface DemoAccount {
 export interface UserView extends User {
   /** Whether the viewer may deactivate this person. */
   canDeactivate?: boolean;
+  /** Whether the viewer may change this person's company role. */
+  canChangeRole?: boolean;
   /** False for the Owner and Admins: they see every project already, so they're never added to one. */
   joinsProjects?: boolean;
 }
@@ -252,7 +292,9 @@ export type ServerEvent =
   | { type: 'channel.read'; channelId: ID; userId: ID }
   | { type: 'project.updated'; project: Project }
   | { type: 'project.deleted'; projectId: ID }
-  | { type: 'checkin.new'; checkin: Checkin }
+  | { type: 'checkin.new' | 'checkin.updated'; checkin: Checkin }
+  | { type: 'session.ended' }
+  | { type: 'membership.removed' }
   | { type: 'activity.new'; activity: Activity }
   | { type: 'activity.read' }
   | { type: 'user.updated'; user: User };

@@ -14,8 +14,6 @@ export const messageTypes = [
   'system',
 ] as const;
 
-export const otpRequestSchema = z.object({ email: z.email('Enter a valid email address') });
-export const otpVerifySchema = z.object({ email: z.email(), code: z.string().length(6) });
 
 export const messageCreateSchema = z.object({
   id,
@@ -89,13 +87,17 @@ export const projectCreateSchema = z.object({
   client: z.string().trim().min(1, 'Who is the client?').max(80),
   address: z.string().trim().max(160),
 });
-export const userInviteSchema = z.object({
-  id,
+/** Instant feedback only: the server normalises the email or phone and checks it again. */
+export const inviteSchema = z.object({
   name: z.string().trim().min(2, 'Enter their name').max(60),
-  email: z.string().trim().toLowerCase().pipe(z.email('Enter a valid work email')),
-  companyRole: z.enum(['member', 'admin']),
+  identifier: z
+    .string()
+    .trim()
+    .refine((v) => (v.includes('@') ? /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) : v.replace(/\D/g, '').length >= 10), 'Enter a work email or a phone number'),
+  role: z.enum(['admin', 'member', 'guest']),
+  channelIds: z.array(z.string()),
 });
-export type UserInvite = z.infer<typeof userInviteSchema>;
+export type InviteInput = z.infer<typeof inviteSchema>;
 
 // ---- In-chat forms (§6) ----
 

@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uuidv7 } from 'uuidv7';
 import { create } from 'zustand';
 import { api, isAppError, type AppError } from '@/lib/api/client';
-import { photoForm } from '@/lib/api/transport';
+import { photoForm, uploadForm } from '@/lib/api/transport';
 import { errorText } from '@/lib/i18n';
 import { keys, refresh } from '@/lib/queries';
 import { dropPhoto, keepPhoto, photoExists } from '@/lib/queuedFiles';
@@ -21,6 +21,16 @@ export interface QueuedPhoto {
   /** Set once uploaded, so a retry never uploads it again. */
   uploadId?: ID;
   url?: string;
+}
+
+/** A voice note or a document sent with a message. */
+export interface QueuedFile {
+  uri: string;
+  kind: 'voice' | 'file';
+  name: string;
+  mime: string;
+  /** Set once uploaded, so a retry never uploads it again. */
+  uploadId?: ID;
 }
 
 interface Base {
@@ -45,6 +55,7 @@ export type OutboxItem = Base &
         data: Record<string, unknown> | null;
         threadParentId: ID | null;
         photos: QueuedPhoto[];
+        file?: QueuedFile;
       }
     | { kind: 'checkin'; checkinId: ID; taskId: ID; taskName: string; answer: CheckinAnswer }
   );
@@ -59,7 +70,8 @@ const TEMPORARY = new Set(['offline', 'timeout', 'server', 'rate_limited']);
 /** A server error this many times in a row is a bug, not bad signal: stop blocking the queue. */
 export const MAX_SERVER_ERRORS = 5;
 
-export const storageKey = (userId: ID) => `siteline.outbox.${userId}`;
+/** One queue per person and company; items for another company wait until it's opened again. */
+export const storageKey = (userId: ID, companyId: ID) => `siteline.outbox.${userId}.${companyId}`;
 
 interface OutboxState {
   items: OutboxItem[];
@@ -70,8 +82,9 @@ export const useOutbox = create<OutboxState>((set) => ({ items: [], set: (items)
 function save(items: OutboxItem[]): void {
   useOutbox.getState().set(items);
   const userId = useSession.getState().user?.id;
-  if (userId) {
-    AsyncStorage.setItem(storageKey(userId), JSON.stringify(items.filter((i) => i.userId === userId))).catch((e) =>
+  const companyId = useSession.getState().company?.id;
+  if (userId && companyId) {
+    AsyncStorage.setItem(storageKey(userId, companyId), JSON.stringify(items.filter((i) => i.userId === userId))).catch((e) =>
       console.warn('[outbox] could not save', e),
     );
   }
@@ -81,10 +94,10 @@ const update = (id: ID, patch: Partial<Base> & Record<string, unknown>) =>
   save(useOutbox.getState().items.map((i) => (i.id === id ? ({ ...i, ...patch } as OutboxItem) : i)));
 
 /** Loads the signed-in person's queue (after sign-in or app start). Items "sending" when the app closed are tried again. */
-export async function loadOutbox(userId: ID): Promise<void> {
+export async function loadOutbox(userId: ID, companyId: ID): Promise<void> {
   let items: OutboxItem[] = [];
   try {
-    const raw = await AsyncStorage.getItem(storageKey(userId));
+    const raw = await AsyncStorage.getItem(storageKey(userId, companyId));
     items = raw ? (JSON.parse(raw) as OutboxItem[]) : [];
   } catch (e) {
     console.warn('[outbox] could not load', e);
@@ -96,9 +109,9 @@ export async function loadOutbox(userId: ID): Promise<void> {
 }
 
 /** Forgets the queue on this phone (log out after the warning, or demo reset). */
-export async function clearOutbox(userId?: ID): Promise<void> {
+export async function clearOutbox(userId?: ID, companyId?: ID): Promise<void> {
   useOutbox.getState().set([]);
-  if (userId) await AsyncStorage.removeItem(storageKey(userId)).catch(() => {});
+  if (userId && companyId) await AsyncStorage.removeItem(storageKey(userId, companyId)).catch(() => {});
 }
 
 /** Adds a change and starts sending. */
@@ -107,7 +120,10 @@ export function enqueue(input: NewItem): ID {
   if (!userId) throw new Error('No session');
   const items = useOutbox.getState().items;
   const { id, ...rest } = input;
-  if (rest.kind === 'message') rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
+  if (rest.kind === 'message') {
+    rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
+    if (rest.file) rest.file = { ...rest.file, uri: keepPhoto(rest.file.uri, `${id ?? uuidv7()}-file`) };
+  }
   const item = { ...rest, id: id ?? uuidv7(), userId, createdAt: new Date().toISOString(), state: 'waiting', attempts: 0, nextAt: 0, error: null } as OutboxItem;
   save([...items, item]);
   void runOutbox();
@@ -129,7 +145,10 @@ export function retryItem(id: ID): void {
 
 export function discardItem(id: ID): void {
   const item = useOutbox.getState().items.find((i) => i.id === id);
-  if (item?.kind === 'message') item.photos.forEach((p) => dropPhoto(p.uri));
+  if (item?.kind === 'message') {
+    item.photos.forEach((p) => dropPhoto(p.uri));
+    if (item.file) dropPhoto(item.file.uri);
+  }
   save(useOutbox.getState().items.filter((i) => i.id !== id));
 }
 
@@ -155,8 +174,16 @@ async function send(item: OutboxItem): Promise<void> {
         photos[n] = { ...photos[n], uploadId: res.uploadId, url: res.url };
         update(item.id, { photos }); // remembered even if the message itself fails next
       }
+      let file = item.file;
+      if (file && !file.uploadId) {
+        if (!photoExists(file.uri)) throw new MissingPhoto();
+        const res = await api<{ uploadId: ID }>('POST', '/uploads', undefined, uploadForm(file.uri, file.kind, file.name, file.mime));
+        file = { ...file, uploadId: res.uploadId };
+        update(item.id, { file });
+      }
       const attachments: Attachment[] = photos.map((p) => ({ id: p.attachmentId, kind: 'image', uri: p.url ?? null, uploadId: p.uploadId ?? null }));
-      const data = attachments.length ? { ...(item.data ?? {}), attachments } : item.data;
+      let data = attachments.length ? { ...(item.data ?? {}), attachments } : item.data;
+      if (file?.uploadId) data = { ...(data ?? {}), uploadId: file.uploadId, name: file.name };
       await api('POST', `/channels/${item.channelId}/messages`, {
         id: item.id,
         type: item.type,

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useUnreadActivityCount } from '@/features/activity/hooks';
 import { useDmList } from '@/features/home/hooks';
 import { useMeSync, useUnreadCounts } from '@/features/shared';
+import { usePushSetup } from '@/features/shared/push';
 import { useSession } from '@/stores/session';
 import { fonts } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
@@ -12,6 +13,7 @@ function TabsForUser() {
   const { c } = useTheme();
   const { t } = useTranslation();
   useMeSync();
+  usePushSetup();
   const unread = useUnreadCounts();
   const dms = useDmList();
   const activity = useUnreadActivityCount();

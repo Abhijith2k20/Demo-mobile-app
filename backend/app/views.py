@@ -41,7 +41,9 @@ def me_view(user: dict) -> dict:
         "permissions": company_permissions(user),
         # The big-button layout, for people whose job titles the company marked as simple.
         "simpleMode": simple_mode(setup(), titles),
-        "company": {"id": c["id"], "name": c["name"]},
+        "company": {"id": c["id"], "name": c["name"],
+                    # Linked companies get projects from the PM app; the app hides "New project" then.
+                    "pmLinked": bool(db.value("SELECT 1 FROM pm_links WHERE company_id = current_company()"))},
         "companies": accounts.companies_for(user["id"]),
     }
 

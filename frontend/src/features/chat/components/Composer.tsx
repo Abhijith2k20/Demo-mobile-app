@@ -1,4 +1,6 @@
 import { Feather } from '@expo/vector-icons';
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
@@ -6,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { IconName } from '@/components/basics';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { useUi } from '@/stores/ui';
+import { toast, useUi } from '@/stores/ui';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { ID, Message, User } from '@/types/models';
@@ -14,6 +16,9 @@ import { editMessage } from '../api';
 import { extractMentions, pickPhotos, sendMessage } from '@/features/shared';
 
 export type FormKind = 'issue' | 'report';
+
+const MAX_VOICE_SECONDS = 120;
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 interface Props {
   channelId: ID;
@@ -61,7 +66,10 @@ export function Composer(props: Props) {
   const setDraft = useUi((s) => s.setDraft);
   const [plus, setPlus] = useState(false);
   const [alsoSend, setAlsoSend] = useState(false);
-  const [recording, setRecording] = useState<number | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+  /** Seconds recorded, or null when not recording. */
+  const recording = recorderState.isRecording ? Math.floor(recorderState.durationMillis / 1000) : null;
   const inputRef = useRef<TextInput>(null);
   const text = draft;
   const hasText = text.trim().length > 0;
@@ -75,11 +83,27 @@ export function Composer(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing?.id]);
 
-  useEffect(() => {
-    if (recording === null) return;
-    const timer = setInterval(() => setRecording((s) => (s === null ? null : Math.min(59, s + 1))), 1000);
-    return () => clearInterval(timer);
-  }, [recording === null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const startRecording = async () => {
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        toast(t('chat.micDenied', 'Allow microphone access in Settings to record voice notes.'), 'danger');
+        return;
+      }
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (e) {
+      console.warn('[voice]', e);
+      toast(t('chat.recordFailed', "Couldn't start recording."), 'danger');
+    }
+  };
+
+  const stopRecording = async (): Promise<string | null> => {
+    await recorder.stop();
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+    return recorder.uri;
+  };
 
   const base = { channelId, threadParentId: threadParentId ?? null };
   const extra = (data: Record<string, unknown> | null): Record<string, unknown> | null =>
@@ -106,15 +130,33 @@ export function Composer(props: Props) {
     setDraft(draftKey, '');
   };
 
-  const sendVoice = () => {
+  const sendVoice = async () => {
     if (recording === null) return;
-    sendMessage({ ...base, type: 'voice', body: null, data: extra({ durationSec: Math.max(1, recording) }) });
-    setRecording(null);
+    const seconds = Math.max(1, recording);
+    const uri = await stopRecording();
+    if (!uri) return;
+    sendMessage({ ...base, type: 'voice', body: null, data: extra({ durationSec: seconds }),
+      file: { uri, kind: 'voice', name: 'voice-note.m4a', mime: 'audio/mp4' } });
   };
 
-  const sendFile = () => {
+  const cancelVoice = () => void stopRecording();
+
+  // Voice notes stop at two minutes (spec §5.3).
+  useEffect(() => {
+    if (recording !== null && recording >= MAX_VOICE_SECONDS) void sendVoice();
+  }, [recording]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sendFile = async () => {
     setPlus(false);
-    sendMessage({ ...base, type: 'file', body: text.trim() || null, data: extra({ name: 'Site_measurements.pdf', sizeKb: 412 }) });
+    const res = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
+    if (res.canceled) return;
+    const doc = res.assets[0];
+    if ((doc.size ?? 0) > MAX_FILE_BYTES) {
+      toast(t('chat.fileTooBig', 'Files must be under 25 MB.'), 'danger');
+      return;
+    }
+    sendMessage({ ...base, type: 'file', body: text.trim() || null, data: extra({ name: doc.name, size: doc.size ?? null }),
+      file: { uri: doc.uri, kind: 'file', name: doc.name, mime: doc.mimeType ?? 'application/pdf' } });
     setDraft(draftKey, '');
   };
 
@@ -177,14 +219,14 @@ export function Composer(props: Props) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingTop: space.sm, minHeight: 56 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.danger }} />
           <T variant="bodyStrong" style={{ flex: 1 }}>
-            {t('chat.recording', 'Recording…')} 0:{String(recording).padStart(2, '0')}
+            {t('chat.recording', 'Recording…')} {Math.floor(recording / 60)}:{String(recording % 60).padStart(2, '0')}
           </T>
-          <Pressable hitSlop={10} onPress={() => setRecording(null)} style={{ paddingHorizontal: space.sm, minHeight: touch.min, justifyContent: 'center' }}>
+          <Pressable hitSlop={10} onPress={cancelVoice} style={{ paddingHorizontal: space.sm, minHeight: touch.min, justifyContent: 'center' }}>
             <T variant="metaStrong" color="textMuted">
               {t('common.cancel', 'Cancel')}
             </T>
           </Pressable>
-          {round('send', t('chat.send', 'Send'), sendVoice, true)}
+          {round('send', t('chat.send', 'Send'), () => void sendVoice(), true)}
         </View>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.xs, paddingHorizontal: space.sm, paddingTop: space.sm }}>
@@ -232,7 +274,7 @@ export function Composer(props: Props) {
           />
           {hasText || editing
             ? round(editing ? 'check' : 'send', editing ? t('common.save', 'Save') : t('chat.send', 'Send'), send, hasText)
-            : round('mic', t('chat.voiceNote', 'Voice note'), () => setRecording(0), false)}
+            : round('mic', t('chat.voiceNote', 'Voice note'), () => void startRecording(), false)}
         </View>
       )}
 
@@ -245,10 +287,10 @@ export function Composer(props: Props) {
             label={t('chat.voiceNote', 'Voice note')}
             onPress={() => {
               setPlus(false);
-              setRecording(0);
+              void startRecording();
             }}
           />
-          <Tile icon="file-text" label={t('plus.file', 'File')} onPress={sendFile} />
+          <Tile icon="file-text" label={t('plus.file', 'File')} onPress={() => void sendFile()} />
           {projectId ? <Tile icon="alert-triangle" label={t('forms.reportIssue', 'Report issue')} onPress={() => openForm('issue')} /> : null}
           {projectId ? <Tile icon="clipboard" label={t('forms.dailyReport', 'Daily report')} onPress={() => openForm('report')} /> : null}
         </View>

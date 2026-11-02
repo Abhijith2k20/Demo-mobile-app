@@ -3,15 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { get, keys, refreshAll } from '@/lib/queries';
-import type { ChannelView, Company, ID, Meta, ProjectMember, ProjectRole, ProjectView, User, UserView } from '@/types/models';
+import { useSession } from '@/stores/session';
+import type { ChannelView, CompanyRef, ID, Meta, ProjectMember, ProjectRole, ProjectView, User, UserView } from '@/types/models';
 
 export function useMeta(): Meta | undefined {
   return useQuery({ queryKey: keys.meta, queryFn: get<Meta>('/meta'), staleTime: Infinity }).data;
 }
 
-/** The workspace's name; needs no sign-in, so the login screen can show it too. */
-export function useCompany(): Company | undefined {
-  return useQuery({ queryKey: keys.company, queryFn: get<Company>('/company'), staleTime: Infinity }).data;
+/** The company of the current session (it comes with the session; switching company starts a new one). */
+export function useCompany(): CompanyRef | undefined {
+  return useSession((s) => s.company);
 }
 
 /** Whether a project role is always in every channel (the server's rule, from /meta). */

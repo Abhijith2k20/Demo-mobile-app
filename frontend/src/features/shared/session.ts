@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { get, keys } from '@/lib/queries';
-import { useSession } from '@/stores/session';
+import { useSession, type Me } from '@/stores/session';
 import type { ID, JobTitle, ProjectRole, User } from '@/types/models';
 import { useProject } from './data';
 
@@ -20,7 +20,7 @@ export function useCan(): (action: string) => boolean {
 
 /** Keeps the signed-in user's profile, permissions and layout mode current. */
 export function useMeSync(): void {
-  const q = useQuery({ queryKey: keys.me, queryFn: get<{ user: User; permissions: string[]; simpleMode: boolean }>('/me') });
+  const q = useQuery({ queryKey: keys.me, queryFn: get<Me>('/me') });
   useEffect(() => {
     if (q.data && useSession.getState().user) useSession.getState().setMe(q.data);
   }, [q.data]);

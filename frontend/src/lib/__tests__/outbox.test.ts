@@ -40,7 +40,8 @@ beforeEach(async () => {
   mockMissing.clear();
   useOutbox.getState().set([]);
   await AsyncStorage.clear();
-  useSession.getState().setSession({ user: { id: 'u1' } as never, permissions: [], simpleMode: false, accessToken: 'a', refreshToken: 'r' });
+  useSession.getState().setSession({ user: { id: 'u1' } as never, permissions: [], simpleMode: false, accessToken: 'a', refreshToken: 'r',
+    company: { id: 'c1', name: 'Paliath Interiors' }, companies: [] });
 });
 afterEach(() => jest.useRealTimers());
 
@@ -83,9 +84,9 @@ it('a refusal marks the item failed and the queue moves on; Retry sends it again
 
 it('drops task updates queued by an older version of the app (tasks belong to the PM app now)', async () => {
   const oldTask = { kind: 'task', taskId: 't1', changes: { percent: 50 }, id: 'x1', userId: 'u1', createdAt: '', state: 'waiting', attempts: 0, nextAt: 0, error: null };
-  await AsyncStorage.setItem(storageKey('u1'), JSON.stringify([oldTask]));
+  await AsyncStorage.setItem(storageKey('u1', 'c1'), JSON.stringify([oldTask]));
   api.mockResolvedValue({});
-  await loadOutbox('u1');
+  await loadOutbox('u1', 'c1');
   await flush();
   expect(items()).toEqual([]);
   expect(api).not.toHaveBeenCalled();
@@ -111,13 +112,13 @@ it('survives an app restart: saved per person, and "sending" items are tried aga
   const saved: OutboxItem[] = [
     { ...text('was sending'), id: 'm1', userId: 'u1', createdAt: '', state: 'sending', attempts: 0, nextAt: 0, error: null },
   ];
-  await AsyncStorage.setItem(storageKey('u1'), JSON.stringify(saved));
+  await AsyncStorage.setItem(storageKey('u1', 'c1'), JSON.stringify(saved));
   api.mockResolvedValue({});
-  await loadOutbox('u1');
+  await loadOutbox('u1', 'c1');
   await runOutbox();
   await flush();
   expect(api).toHaveBeenCalledWith('POST', '/channels/ch1/messages', expect.objectContaining({ id: 'm1' }));
-  expect(JSON.parse((await AsyncStorage.getItem(storageKey('u1'))) ?? '[]')).toEqual([]);
+  expect(JSON.parse((await AsyncStorage.getItem(storageKey('u1', 'c1'))) ?? '[]')).toEqual([]);
 });
 
 it('a repeated server error stops blocking the queue after a few tries', async () => {

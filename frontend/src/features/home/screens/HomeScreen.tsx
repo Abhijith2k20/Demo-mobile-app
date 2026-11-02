@@ -16,6 +16,8 @@ import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Channel } from '@/types/models';
 import { NewProjectSheet } from '@/features/home/components/NewProjectSheet';
+import { CompanySwitcher } from '@/features/shared/CompanySwitcher';
+import { useSession } from '@/stores/session';
 
 function ChannelGlyph({ channel, strong }: { channel: Channel; strong: boolean }) {
   const { c } = useTheme();
@@ -53,10 +55,14 @@ function HomeScreen() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const me = useMe();
-  const admin = useCan()('project.create');
+  const canCreate = useCan()('project.create');
   const home = useHome();
   const users = useUsers();
   const company = useCompany();
+  // Linked companies get their projects from the PM app.
+  const admin = canCreate && !company?.pmLinked;
+  const several = (useSession((s) => s.companies) ?? []).length > 1;
+  const [switching, setSwitching] = useState(false);
   const { refreshing, refresh } = useRefresh();
   const collapsed = useUi((s) => s.collapsed);
   const toggle = useUi((s) => s.toggleCollapsed);
@@ -131,13 +137,18 @@ function HomeScreen() {
       {focused ? <StatusBar style="light" /> : null}
       {/* Workspace header: ink block with the company's name. */}
       <View style={{ backgroundColor: c.header, paddingTop: insets.top + space.sm, paddingHorizontal: space.lg, paddingBottom: space.md, gap: space.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        <Pressable
+          accessibilityRole={several ? 'button' : 'header'}
+          accessibilityLabel={several ? t('home.switchCompany', '{{name}}, switch company', { name: company?.name ?? '' }) : company?.name}
+          disabled={!several}
+          onPress={() => setSwitching(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, alignSelf: 'flex-start', minHeight: touch.min }}>
           <CompanyTile name={company?.name ?? ''} size={36} />
           <T variant="title" style={{ color: c.onHeader, flexShrink: 1 }} numberOfLines={1}>
             {company?.name ?? ''}
           </T>
-          <Feather name="chevron-down" size={18} color={c.onHeader} style={{ opacity: 0.7 }} />
-        </View>
+          {several ? <Feather name="chevron-down" size={18} color={c.onHeader} style={{ opacity: 0.7 }} /> : null}
+        </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.headerField, borderRadius: radius.input, paddingHorizontal: space.md, minHeight: 40, gap: space.sm }}>
           <Feather name="search" size={16} color={c.onHeader} style={{ opacity: 0.6 }} />
           <TextInput
@@ -246,6 +257,7 @@ function HomeScreen() {
         </Pressable>
       ) : null}
       <NewProjectSheet visible={newProject} onClose={() => setNewProject(false)} />
+      <CompanySwitcher visible={switching} onClose={() => setSwitching(false)} />
     </Screen>
   );
 }

@@ -5,18 +5,25 @@ import type { DemoAccount } from '@/types/models';
 import { useRoleLabels } from '../shared';
 
 export interface DemoUser {
-  email: string;
+  identifier: string;
+  company: string;
   name: string;
   /** Job title, or Owner / Admin. */
   subtitle: string;
 }
 
-/** Demo build: one sign-in per role, from the server (shown on the login screen and in the Demo panel). */
+/** Development and staging builds: one sign-in per role in each seeded company (sign-in sheet and dev panel). */
 export function useDemoAccounts(): DemoUser[] {
-  const q = useQuery({ queryKey: keys.demoAccounts, queryFn: get<{ accounts: DemoAccount[] }>('/auth/demo-accounts') });
+  const q = useQuery({ queryKey: keys.demoAccounts, queryFn: get<{ accounts: DemoAccount[] }>('/auth/demo-accounts'), retry: false });
   const labels = useRoleLabels();
   return useMemo(
-    () => (q.data?.accounts ?? []).map((a) => ({ email: a.email, name: a.name, subtitle: a.jobTitle ?? labels.company(a.companyRole) })),
+    () =>
+      (q.data?.accounts ?? []).map((a) => ({
+        identifier: a.identifier,
+        company: a.company,
+        name: a.name,
+        subtitle: `${a.jobTitle ?? labels.company(a.companyRole)} · ${a.company}`,
+      })),
     [q.data, labels],
   );
 }

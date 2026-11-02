@@ -228,6 +228,11 @@ export function CheckinCard({ message }: { message: Message }) {
             “{a.note}”
           </T>
         ) : null}
+        {checkin.pmWrite === 'pending' && !checkin.sending ? (
+          <T variant="meta" color="textFaint" style={{ marginTop: 4 }}>
+            {t('checkin.saving', 'Saving to the PM app…')}
+          </T>
+        ) : null}
         {checkin.pmWrite === 'refused' ? (
           <T variant="meta" color="danger" style={{ marginTop: 4 }}>
             {t('checkin.notSaved', 'Not saved: {{reason}}', { reason: checkin.pmError ?? '' })}

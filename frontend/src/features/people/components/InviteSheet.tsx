@@ -1,93 +1,135 @@
-import { useState } from 'react';
+// Invite someone by work email or phone (spec §5.11). Guests get only the channels picked here.
+import { Feather } from '@expo/vector-icons';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Pressable, View } from 'react-native';
 import { Button, Segmented } from '@/components/basics';
 import { Field } from '@/components/form';
 import { Sheet, SheetInput } from '@/components/Sheet';
 import { T } from '@/components/T';
+import { inviteSchema, type InviteInput } from '@/contract/schemas';
 import { invitePerson } from '../api';
 import { fieldErrors } from '@/lib/mutations';
-import { useCan } from '@/features/shared';
-import { userInviteSchema } from '@/contract/schemas';
+import { shortProjectName, useCan, useChannels, useProjects } from '@/features/shared';
 import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
-import type { User } from '@/types/models';
+import { useTheme } from '@/theme/useTheme';
 
-type Role = 'member' | 'admin';
+type Role = InviteInput['role'];
 
-export function InviteSheet({ me, visible, onClose }: { me: User; visible: boolean; onClose: () => void }) {
+export function InviteSheet({ visible, onClose, initial }: { visible: boolean; onClose: () => void; initial?: string }) {
   const { t } = useTranslation();
+  const { c } = useTheme();
   const can = useCan();
+  const channels = useChannels();
+  const projects = useProjects();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(initial ?? '');
   const [role, setRole] = useState<Role>('member');
+  const [picked, setPicked] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const projectChannels = useMemo(
+    () => channels.list.filter((ch) => ch.kind === 'project' && ch.projectId && !projects.byId.get(ch.projectId)?.archivedAt),
+    [channels.list, projects.byId],
+  );
 
   const close = () => {
     setName('');
-    setEmail('');
+    setIdentifier('');
     setRole('member');
+    setPicked([]);
     setErrors({});
     onClose();
   };
 
-  const [saving, setSaving] = useState(false);
   const submit = async () => {
-    const parsed = userInviteSchema.omit({ id: true }).safeParse({ name, email, companyRole: role });
+    const parsed = inviteSchema.safeParse({ name, identifier, role, channelIds: role === 'guest' ? picked : [] });
     if (!parsed.success) {
       const next: Record<string, string> = {};
       for (const issue of parsed.error.issues) next[String(issue.path[0])] = issue.message;
       setErrors(next);
       return;
     }
+    if (role === 'guest' && picked.length === 0) {
+      setErrors({ channelIds: t('invite.pickChannel', 'Pick at least one channel for a guest.') });
+      return;
+    }
     setSaving(true);
     const res = await invitePerson(parsed.data);
     setSaving(false);
     if ('error' in res) {
-      // The server checks the email and the role; show its answer under the right field.
-      setErrors(res.error.code === 'EMAIL_TAKEN' ? { email: t('errors.EMAIL_TAKEN', 'Someone already uses this email.') } : fieldErrors(res.error));
+      setErrors(fieldErrors(res.error));
       return;
     }
-    toast(t('invite.done', '{{name}} can now sign in with {{email}}.', { name: res.data.name, email: res.data.email }));
+    toast(t('invite.sent', 'Invite sent to {{who}}.', { who: res.data.identifier }));
     close();
   };
 
+  const roles: { value: Role; label: string }[] = [
+    { value: 'member', label: t('you.member', 'Member') },
+    { value: 'guest', label: t('you.guest', 'Guest') },
+    ...(can('user.invite_admin') ? [{ value: 'admin' as Role, label: t('you.admin', 'Admin') }] : []),
+  ];
+
   return (
-    <Sheet visible={visible} onClose={close} title={t('invite.title', 'Invite person')} subtitle={t('invite.hint', 'They sign in with this work email and a 6-digit code.')} full>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={t('invite.title', 'Invite person')}
+      subtitle={t('invite.hint', 'They get an email or SMS, and join by signing in with that address.')}
+      full>
       <Field label={t('invite.name', 'Name')} error={errors.name}>
         <SheetInput value={name} onChangeText={(v) => { setName(v); setErrors((e) => ({ ...e, name: '' })); }} placeholder="Deepa Nair" autoCapitalize="words" />
       </Field>
-      <Field label={t('invite.email', 'Work email')} error={errors.email}>
+      <Field label={t('invite.identifier', 'Work email or phone number')} error={errors.identifier}>
         <SheetInput
-          value={email}
+          value={identifier}
           onChangeText={(v) => {
-            setEmail(v);
-            setErrors((e) => ({ ...e, email: '' }));
+            setIdentifier(v);
+            setErrors((e) => ({ ...e, identifier: '' }));
           }}
-          placeholder="name@company.com"
+          placeholder={t('auth.identifierPlaceholder', 'name@company.com or 98765 43210')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="off"
         />
       </Field>
-      {can('user.invite_admin') ? (
-        <Field label={t('invite.role', 'Company role')}>
-          <Segmented<Role>
-            value={role}
-            onChange={setRole}
-            options={[
-              { value: 'member', label: t('you.member', 'Member') },
-              { value: 'admin', label: t('you.admin', 'Admin') },
-            ]}
-          />
-          <T variant="meta" color="textMuted" style={{ marginTop: space.xs }}>
-            {role === 'admin'
-              ? t('invite.adminHint', 'Admins see every project and can invite people.')
-              : t('invite.memberHint', 'Members see only the projects they are added to.')}
-          </T>
+      <Field label={t('invite.role', 'Company role')}>
+        <Segmented<Role> value={role} onChange={setRole} options={roles} />
+        <T variant="meta" color="textMuted" style={{ marginTop: space.xs }}>
+          {role === 'admin'
+            ? t('invite.adminHint', 'Admins see every project and can invite people.')
+            : role === 'guest'
+              ? t('invite.guestHint', 'Guests (clients, architects, subcontractors) see only the channels you pick.')
+              : t('invite.memberHint', 'Members see the projects they are on, and the company channels.')}
+        </T>
+      </Field>
+      {role === 'guest' ? (
+        <Field label={t('invite.channels', 'Channels')} error={errors.channelIds}>
+          <View style={{ gap: 2 }}>
+            {projectChannels.map((ch) => {
+              const on = picked.includes(ch.id);
+              return (
+                <Pressable
+                  key={ch.id}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  onPress={() => setPicked((p) => (on ? p.filter((x) => x !== ch.id) : [...p, ch.id]))}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 44 }}>
+                  <Feather name={on ? 'check-square' : 'square'} size={20} color={on ? c.accent : c.textMuted} />
+                  <T variant="body" style={{ flex: 1 }} numberOfLines={1}>
+                    {shortProjectName(projects.byId.get(ch.projectId!)?.name ?? '')} · #{ch.name}
+                  </T>
+                </Pressable>
+              );
+            })}
+          </View>
         </Field>
       ) : null}
-      <Button label={t('invite.send', 'Invite')} loading={saving} onPress={() => void submit()} />
+      <Button label={t('invite.send', 'Send invite')} loading={saving} onPress={() => void submit()} />
     </Sheet>
   );
 }

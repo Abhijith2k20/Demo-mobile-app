@@ -96,8 +96,9 @@ function refreshOnce(): Promise<boolean> {
       const refreshToken = useSession.getState().refreshToken;
       if (!refreshToken) return false;
       try {
-        const res = await send<{ accessToken: string }>('POST', '/auth/refresh', { refreshToken });
-        useSession.getState().setAccessToken(res.accessToken);
+        // Both tokens are replaced; the old refresh token never works again.
+        const res = await send<{ accessToken: string; refreshToken: string }>('POST', '/auth/refresh', { refreshToken });
+        useSession.getState().setTokens(res.accessToken, res.refreshToken);
         return true;
       } catch (e) {
         // Only a definite "no" ends the session; a network blip must not log the user out.

@@ -1,0 +1,60 @@
+# Render blueprint (spec §2, §10.2): API, worker and Postgres in Singapore. Make one per environment
+# (staging, production). Secrets marked sync: false are entered in the Render dashboard, never here.
+services:
+  - type: web
+    name: siteline-api
+    runtime: docker
+    region: singapore
+    rootDir: backend
+    healthCheckPath: /health
+    envVars: &env
+      - key: SITELINE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase: { name: siteline-db, property: connectionString }
+      - key: SITELINE_SECRET
+        sync: false
+      - key: SITELINE_PLATFORM_KEY
+        sync: false
+      - key: SITELINE_PUBLIC_URL
+        sync: false
+      - key: SITELINE_WORKER
+        value: "off"
+      - key: SITELINE_STORAGE
+        value: r2
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: MSG91_AUTH_KEY
+        sync: false
+      - key: MSG91_TEMPLATE_CODE
+        sync: false
+      - key: MSG91_TEMPLATE_INVITE
+        sync: false
+      - key: SITELINE_PUSH
+        value: expo
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+  - type: worker
+    name: siteline-worker
+    runtime: docker
+    region: singapore
+    rootDir: backend
+    dockerCommand: python -m app.worker
+    envVars: *env
+
+databases:
+  - name: siteline-db
+    region: singapore
+    postgresMajorVersion: "16"

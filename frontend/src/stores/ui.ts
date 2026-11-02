@@ -20,13 +20,11 @@ interface UiState {
   socketConnected: boolean;
   toast: Toast | null;
   demoPillHidden: boolean;
-  notifications: { messages: boolean; checkins: boolean };
   setTheme: (t: ThemePref) => void;
   setLanguage: (l: Language) => void;
   toggleCollapsed: (key: string, fallback?: boolean) => void;
   setDraft: (key: string, text: string) => void;
   set: (patch: Partial<Pick<UiState, 'online' | 'socketConnected' | 'demoPillHidden'>>) => void;
-  setNotification: (key: 'messages' | 'checkins', value: boolean) => void;
   showToast: (text: string, tone?: Toast['tone']) => void;
   hideToast: (id: number) => void;
 }
@@ -44,14 +42,12 @@ export const useUi = create<UiState>()(
       socketConnected: false,
       toast: null,
       demoPillHidden: false,
-      notifications: { messages: true, checkins: true },
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       toggleCollapsed: (key, fallback = false) =>
         set((s) => ({ collapsed: { ...s.collapsed, [key]: !(s.collapsed[key] ?? fallback) } })),
       setDraft: (key, text) => set((s) => ({ drafts: { ...s.drafts, [key]: text } })),
       set: (patch) => set(patch),
-      setNotification: (key, value) => set((s) => ({ notifications: { ...s.notifications, [key]: value } })),
       showToast: (text, tone = 'info') => set({ toast: { id: ++toastSeq, text, tone } }),
       hideToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : s)),
     }),
@@ -62,7 +58,6 @@ export const useUi = create<UiState>()(
       partialize: (s) => ({
         theme: s.theme,
         language: s.language,
-        notifications: s.notifications,
         demoPillHidden: s.demoPillHidden,
       }),
     },

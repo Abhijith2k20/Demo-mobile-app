@@ -2,7 +2,7 @@
 // send queue; the server decides the rest.
 import * as Haptics from 'expo-haptics';
 import { uuidv7 } from 'uuidv7';
-import { enqueue } from '@/lib/outbox';
+import { enqueue, type QueuedFile } from '@/lib/outbox';
 import type { ID, MessageType, User } from '@/types/models';
 
 /** Finds "@First" tokens that match people in the channel. */
@@ -20,6 +20,8 @@ export interface NewMessage {
   threadParentId?: ID | null;
   /** Local file URIs of photos to upload first. */
   photoUris?: string[];
+  /** A voice note or document to upload first. */
+  file?: Omit<QueuedFile, 'uploadId'>;
 }
 
 /**
@@ -36,5 +38,6 @@ export function sendMessage(input: NewMessage): ID {
     data: input.data ?? null,
     threadParentId: input.threadParentId ?? null,
     photos: (input.photoUris ?? []).map((uri) => ({ attachmentId: uuidv7(), uri })),
+    ...(input.file ? { file: input.file } : {}),
   });
 }

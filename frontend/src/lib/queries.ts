@@ -8,7 +8,8 @@ import type { ServerEvent } from '@/types/models';
 export const keys = {
   me: ['me'] as const,
   meta: ['meta'] as const,
-  company: ['company'] as const,
+  invites: ['invites'] as const,
+  integration: ['integration'] as const,
   demoAccounts: ['demo-accounts'] as const,
   users: ['users'] as const,
   projects: ['projects'] as const,
@@ -70,11 +71,15 @@ export function keysFor(e: ServerEvent): QueryKey[] {
     case 'channel.read':
       return [keys.channels, keys.channel(e.channelId)];
     case 'checkin.new':
+    case 'checkin.updated':
       return [keys.checkins, ['tasks']];
     case 'activity.new':
     case 'activity.read':
       return [keys.activity];
     case 'user.updated':
       return [keys.users, keys.me];
+    case 'session.ended':
+    case 'membership.removed':
+      return [keys.me];
   }
 }

@@ -6,9 +6,8 @@
 > from Siteline. Companies are created by the Siteline team. Sign-in is a one-time code by email or SMS.
 > The app ships as real builds (EAS), not through Expo Go.
 >
-> **Status: not built yet.** The code still matches demo version 1.4 (one company, in-memory data, tasks inside
-> Siteline). Build it in the order of §15. The reasons for each change are in `DECISIONS.md`
-> ("MVP direction"). Where this file and the code disagree, this file wins.
+> **Status: steps 1–7 of §15 are built; step 8 (launch) needs the accounts listed in the README.** Where the
+> build differs from this file, `DECISIONS.md` says how and why ("Build steps 3–7").
 
 ---
 

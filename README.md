@@ -1,43 +1,47 @@
-# Demo-mobile-app
+# Siteline
 
-Siteline: a work chat for field teams with a bot that asks task owners for status, for many companies.
+A work chat for field teams, with a bot that asks task owners for status, for many companies.
+Spec: `SITELINE_SPEC.md` (2.0, the MVP). Changes from it: `DECISIONS.md`. Project rules: `CLAUDE.md`.
 
-> **The MVP spec (`SITELINE_SPEC.md`, version 2.0) is partly built.** Done: step 2 (project management
-> removed; tasks come from a mock PM app). Still demo: one company, in-memory data, Expo Go. See §15.
+- **App** (`frontend/`): Expo SDK 57, built with EAS (development, preview, production). A thin client:
+  it shows what the server says. Messages, photos, voice notes, files and check-in answers wait in a send
+  queue when offline; the last loaded screens are kept on the phone, per person and company.
+- **Backend** (`backend/`): FastAPI on Postgres with row-level security per company, a worker for the
+  bot's timed jobs, and a mock PM app that stands in for each company's PM app until its API exists.
 
-- **App** (`frontend/`): Expo SDK 57, runs in Expo Go. A thin client: it shows what the server says. Messages, photos, check-ins and task updates wait in a send queue when offline, and the last loaded screens are kept on the phone.
-- **Backend** (`backend/`): FastAPI mock server with in-memory demo data. All data, permissions and rules live here.
-
-## Run it
+## Run it locally
 
 ```bash
-# 1. Backend (Python 3.11+)
+# 1. Database (Docker), then the API with a worker inside it (Python 3.13)
 cd backend
+docker compose up -d
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+#   An empty database is seeded: Paliath Interiors and Brightline Events. Every code is 123456.
+#   Platform panel: http://localhost:8000/platform (admin@siteline.app). API docs: /docs
 
-# 2. App (another terminal)
+# 2. The app (another terminal)
 cd frontend
 npm install
-npx expo start          # scan the QR code with Expo Go
+npx expo start            # a development build (npm run build:dev) for push; `--go` for a quick look in Expo Go
 ```
 
-The app finds the server on the same computer that runs Expo (port 8000).
-- **Phone on the same Wi-Fi:** works as is (allow port 8000 through the Mac firewall if asked).
-- **Android emulator:** run `adb reverse tcp:8000 tcp:8000` once.
-- **Somewhere else:** set `EXPO_PUBLIC_API_URL=http://<host>:8000` before `npx expo start`.
-
-Sign in with any demo account (e.g. `ravi@paliath.in`); the code is always `123456`.
-API docs: http://localhost:8000/docs
+The app finds the server on the computer running Expo (port 8000), or at `EXPO_PUBLIC_API_URL`.
+On the Android emulator run `adb reverse tcp:8000 tcp:8000` once.
 
 ## Checks
 
 ```bash
 cd frontend
 npm run typecheck && npm run lint && npm test
-npm run test:api        # backend tests (pytest)
+npm run test:api          # backend tests (pytest, against the Docker Postgres)
 ```
 
-- Spec: `SITELINE_SPEC.md`
-- Changes from the spec: `DECISIONS.md`
-- Project rules: `CLAUDE.md`
+CI runs the same on every push (`.github/workflows/checks.yml`).
+
+## Deploy
+
+`render.yaml` describes the API, the worker and Postgres (Singapore). Before going live you need:
+Render, Cloudflare R2, Resend (email), MSG91 with DLT-registered templates (SMS), Sentry, an Expo/EAS
+project (its id in `app.json` → `extra.eas.projectId`, for push), and store developer accounts.
+Set the secrets listed in `render.yaml` in Render, and the API address in `frontend/eas.json`.

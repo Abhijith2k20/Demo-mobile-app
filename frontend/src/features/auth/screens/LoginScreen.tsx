@@ -7,11 +7,10 @@ import { Avatar, Button } from '@/components/basics';
 import { withBoundary } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { normaliseEmail, requestOtp } from '@/features/auth/api';
+import { looksLikeIdentifier, requestCode } from '@/features/auth/api';
 import { AuthShell } from '@/features/auth/components/AuthShell';
 import { useDemoAccounts } from '../hooks';
 import { isAppError } from '@/lib/api/client';
-import { otpRequestSchema } from '@/contract/schemas';
 import { errorText } from '@/lib/i18n';
 import { radius, space } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
@@ -22,23 +21,23 @@ function LoginScreen() {
   const { t } = useTranslation();
   const demoUsers = useDemoAccounts();
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
-  const address = normaliseEmail(email);
+  const address = identifier.trim();
 
-  const submit = async (value = address) => {
-    if (!otpRequestSchema.safeParse({ email: value }).success) {
-      setError(t('auth.emailInvalid', 'Enter a valid work email, like name@company.com.'));
+  const submit = async (value = address, company?: string) => {
+    if (!looksLikeIdentifier(value)) {
+      setError(t('auth.identifierInvalid', 'Enter your work email or a phone number with 10 digits.'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await requestOtp(value);
-      router.push({ pathname: '/otp', params: { email: value } });
+      const sent = await requestCode(value);
+      router.push({ pathname: '/otp', params: { identifier: value, channel: sent.channel, ...(company ? { company } : {}) } });
     } catch (e) {
       setError(isAppError(e) ? errorText(e) : errorText('UNKNOWN'));
     } finally {
@@ -49,7 +48,7 @@ function LoginScreen() {
   return (
     <AuthShell
       title={t('auth.signIn', 'Sign in')}
-      subtitle={t('auth.signInHint', 'Enter your work email to get a 6-digit code.')}
+      subtitle={t('auth.signInHint', 'Enter your work email or phone number to get a 6-digit code.')}
       footer={
         <View style={{ alignItems: 'center', gap: space.md }}>
           <Pressable
@@ -63,12 +62,12 @@ function LoginScreen() {
             </T>
           </Pressable>
           <T variant="meta" color="textFaint" style={{ textAlign: 'center' }}>
-            {t('auth.help', "Can't sign in? Ask your company admin to add your work email.")}
+            {t('auth.help', "Can't sign in? Ask your company admin to invite you.")}
           </T>
         </View>
       }>
       <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-        {t('auth.email', 'Work email')}
+        {t('auth.identifier', 'Work email or phone number')}
       </T>
       <View
         style={{
@@ -81,22 +80,22 @@ function LoginScreen() {
           height: 58,
         }}>
         <TextInput
-          value={email}
+          value={identifier}
           onChangeText={(v) => {
-            setEmail(v);
+            setIdentifier(v);
             setError(null);
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           keyboardType="email-address"
-          autoComplete="email"
+          autoComplete="username"
           textContentType="username"
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="go"
-          placeholder="name@company.com"
+          placeholder={t('auth.identifierPlaceholder', 'name@company.com or 98765 43210')}
           placeholderTextColor={c.textFaint}
-          accessibilityLabel={t('auth.email', 'Work email')}
+          accessibilityLabel={t('auth.identifier', 'Work email or phone number')}
           style={{ flex: 1, color: c.text, fontFamily: fonts.semibold, fontSize: 17, paddingHorizontal: space.lg, paddingVertical: 0 }}
           onSubmitEditing={() => void submit()}
         />
@@ -119,14 +118,14 @@ function LoginScreen() {
         <View style={{ marginHorizontal: -space.lg }}>
           {demoUsers.map((u) => (
             <Pressable
-              key={u.email}
+              key={`${u.company}:${u.identifier}`}
               accessibilityRole="button"
               accessibilityLabel={`${u.name}, ${u.subtitle}`}
               onPress={() => {
-                setEmail(u.email);
+                setIdentifier(u.identifier);
                 setError(null);
                 setDemo(false);
-                void submit(u.email);
+                void submit(u.identifier, u.company);
               }}
               style={({ pressed }) => ({
                 flexDirection: 'row',
@@ -136,7 +135,7 @@ function LoginScreen() {
                 minHeight: 56,
                 backgroundColor: pressed ? c.surfaceAlt : 'transparent',
               })}>
-              <Avatar id={u.email} name={u.name} size={36} />
+              <Avatar id={u.identifier} name={u.name} size={36} />
               <View style={{ flex: 1 }}>
                 <T variant="bodyStrong" numberOfLines={1}>
                   {u.name}

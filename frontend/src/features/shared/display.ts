@@ -16,7 +16,13 @@ export function useRoleLabels() {
   return useMemo(
     () => ({
       company: (role: CompanyRole) =>
-        role === 'owner' ? t('you.owner', 'Owner') : role === 'admin' ? t('you.admin', 'Admin') : t('you.member', 'Member'),
+        role === 'owner'
+          ? t('you.owner', 'Owner')
+          : role === 'admin'
+            ? t('you.admin', 'Admin')
+            : role === 'guest'
+              ? t('you.guest', 'Guest')
+              : t('you.member', 'Member'),
       project: (role: ProjectRole) => (role === 'manager' ? t('you.manager', 'Manager') : t('you.member', 'Member')),
       jobTitle: (name: JobTitle) => jobTitles?.find((jt) => jt.name === name)?.label ?? name,
     }),

@@ -1,4 +1,5 @@
-// Demo panel controls on the server (`/internal/*`, only on the mock backend).
+// Dev panel controls on the server (`/internal/*`, refused in production). Bot and account actions apply to
+// the signed-in person in their current company.
 import { api } from '@/lib/api/client';
 
 export type NetworkMode = 'online' | 'slow' | 'flaky';
@@ -13,10 +14,12 @@ export const demo = {
   setNetwork: (body: { mode?: NetworkMode; inject?: Injection | 'none' }) => api<DemoState['network']>('POST', '/internal/network', body),
   setActorsPaused: (paused: boolean) => api('POST', '/internal/actors', { paused }),
   rohanPosts: () => api('POST', '/internal/actors/rohan-posts'),
-  expireToken: (userId: string) => api('POST', '/internal/expire-token', { userId }),
-  deactivate: (userId: string) => api('POST', '/internal/deactivate', { userId }),
-  morningSummary: (userId: string) => api('POST', '/internal/bot/morning-summary', { userId }),
-  eveningCheckin: (userId: string) => api('POST', '/internal/bot/evening-checkin', { userId }),
-  escalate: (userId: string) => api<{ escalated: boolean }>('POST', '/internal/bot/escalate', { userId }),
+  expireToken: () => api('POST', '/internal/expire-token'),
+  deactivate: () => api('POST', '/internal/deactivate'),
+  morningSummary: () => api('POST', '/internal/bot/morning-summary'),
+  eveningCheckin: () => api('POST', '/internal/bot/evening-checkin'),
+  escalate: () => api<{ escalated: boolean }>('POST', '/internal/bot/escalate'),
+  pmSync: () => api('POST', '/internal/pm/sync'),
+  pmDown: (down: boolean) => api('POST', '/internal/pm/down', { down }),
   reset: () => api('POST', '/internal/reset'),
 };

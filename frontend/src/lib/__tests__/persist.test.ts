@@ -1,4 +1,4 @@
-// Saved screens: each person only ever gets their own data back; old or deleted data never returns.
+// Saved screens: each person, in each company, only ever gets their own data back; old or deleted data never returns.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { forgetSession, restoreCache, startSavingCache, stopSavingCache } from '@/lib/persist';
 import { queryClient } from '@/lib/queryClient';
@@ -12,8 +12,8 @@ const flush = async () => {
 };
 
 /** Signs in as `userId`, loads some data, and lets the cache be saved. */
-async function seeAs(userId: string, projects: string[]) {
-  startSavingCache(userId);
+async function seeAs(userId: string, projects: string[], companyId = 'paliath') {
+  startSavingCache(userId, companyId);
   queryClient.setQueryData(['projects'], projects);
   jest.advanceTimersByTime(3000);
   await flush();
@@ -31,23 +31,33 @@ afterEach(() => jest.useRealTimers());
 it('gives each person back only their own saved screens', async () => {
   await seeAs('arjun', ['Project A', 'Project B', 'Project C']);
   await seeAs('ravi', ['Project A']);
-  await restoreCache('ravi');
+  await restoreCache('ravi', 'paliath');
   expect(queryClient.getQueryData(['projects'])).toEqual(['Project A']);
   queryClient.clear();
-  await restoreCache('someone-new');
+  await restoreCache('someone-new', 'paliath');
   expect(queryClient.getQueryData(['projects'])).toBeUndefined();
 });
 
 it('forgets saved screens on sign-out', async () => {
   await seeAs('ravi', ['Project A']);
-  await forgetSession('ravi');
-  await restoreCache('ravi');
+  await forgetSession('ravi', 'paliath');
+  await restoreCache('ravi', 'paliath');
   expect(queryClient.getQueryData(['projects'])).toBeUndefined();
 });
 
 it('does not show saved screens older than a week', async () => {
   await seeAs('ravi', ['Project A']);
   jest.setSystemTime(Date.now() + 8 * 24 * 60 * 60 * 1000);
-  await restoreCache('ravi');
+  await restoreCache('ravi', 'paliath');
   expect(queryClient.getQueryData(['projects'])).toBeUndefined();
+});
+
+it('keeps each company apart for a person in two companies', async () => {
+  await seeAs('suresh', ['Villa 99'], 'paliath');
+  await seeAs('suresh', ['Sharma Wedding'], 'brightline');
+  await restoreCache('suresh', 'brightline');
+  expect(queryClient.getQueryData(['projects'])).toEqual(['Sharma Wedding']);
+  queryClient.clear();
+  await restoreCache('suresh', 'paliath');
+  expect(queryClient.getQueryData(['projects'])).toEqual(['Villa 99']);
 });

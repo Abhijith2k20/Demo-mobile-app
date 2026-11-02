@@ -140,8 +140,14 @@ export function openEventStream(
 export function photoForm(uri: string): FormData {
   const name = uri.split('/').pop() || 'photo.jpg';
   const type = /\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : 'image/jpeg';
+  return uploadForm(uri, 'image', name, type);
+}
+
+/** A file for POST /uploads; `kind` sets the server's size limit and allowed types (it checks the content). */
+export function uploadForm(uri: string, kind: 'image' | 'voice' | 'file', name: string, type: string): FormData {
   const form = new FormData();
   // React Native's FormData takes a { uri, name, type } file descriptor.
   form.append('file', { uri, name, type } as unknown as Blob);
+  form.append('kind', kind);
   return form;
 }

@@ -5,19 +5,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dehydrate, hydrate, type DehydratedState } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { queryClient } from '@/lib/queryClient';
-import type { User } from '@/types/models';
+import type { Me } from '@/stores/session';
 
 const SESSION_KEY = 'siteline.session';
-const cacheKey = (userId: string) => `siteline.cache.${userId}`;
+/** Saved screens are per person and company: switching company never shows another company's data. */
+const cacheKey = (userId: string, companyId: string) => `siteline.cache.${userId}.${companyId}`;
 /** Saved data older than this is not shown: better an empty screen than a misleading one. */
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface SavedSession {
+export interface SavedSession extends Me {
   accessToken: string;
   refreshToken: string;
-  user: User;
-  permissions: string[];
-  simpleMode: boolean;
 }
 
 export async function saveSession(s: SavedSession): Promise<void> {
@@ -33,15 +31,15 @@ export async function loadSession(): Promise<SavedSession | null> {
   }
 }
 
-export async function forgetSession(userId?: string): Promise<void> {
+export async function forgetSession(userId?: string, companyId?: string): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});
-  if (userId) await AsyncStorage.removeItem(cacheKey(userId)).catch(() => {});
+  if (userId && companyId) await AsyncStorage.removeItem(cacheKey(userId, companyId)).catch(() => {});
 }
 
 /** Puts the saved screens back into the cache; the screens then refresh them from the server. */
-export async function restoreCache(userId: string): Promise<void> {
+export async function restoreCache(userId: string, companyId: string): Promise<void> {
   try {
-    const raw = await AsyncStorage.getItem(cacheKey(userId));
+    const raw = await AsyncStorage.getItem(cacheKey(userId, companyId));
     if (!raw) return;
     const saved = JSON.parse(raw) as { at: number; state: DehydratedState };
     if (Date.now() - saved.at > MAX_AGE_MS) return;
@@ -53,14 +51,14 @@ export async function restoreCache(userId: string): Promise<void> {
 
 let stopSaving: (() => void) | null = null;
 
-/** Saves successful replies a few seconds after the cache changes, for this user only. */
-export function startSavingCache(userId: string): void {
+/** Saves successful replies a few seconds after the cache changes, for this person and company only. */
+export function startSavingCache(userId: string, companyId: string): void {
   stopSavingCache();
   let timer: ReturnType<typeof setTimeout> | null = null;
   const flush = () => {
     timer = null;
     const state = dehydrate(queryClient, { shouldDehydrateQuery: (q) => q.state.status === 'success' && q.queryKey[0] !== 'demo-state' });
-    AsyncStorage.setItem(cacheKey(userId), JSON.stringify({ at: Date.now(), state })).catch((e) => console.warn('[persist] cache not saved', e));
+    AsyncStorage.setItem(cacheKey(userId, companyId), JSON.stringify({ at: Date.now(), state })).catch((e) => console.warn('[persist] cache not saved', e));
   };
   const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
     if (event.type === 'updated' && !timer) timer = setTimeout(flush, 3000);
