@@ -14,9 +14,6 @@ from ..rules import (
     is_company_admin,
     job_title_error,
     joins_projects,
-    localized,
-    stage_keys,
-    today_iso,
 )
 from ..schemas import MemberAdd, MemberPatch, ProjectCreate, ProjectPatch
 from ..access import (
@@ -28,7 +25,8 @@ from ..access import (
     visible_project,
 )
 from ..store import S, admins, first_name, project_channel, project_channels, project_role, setup
-from ..views import message_view, project_view
+from ..pm import connector as pm
+from ..views import message_view, pm_task_view, project_view
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["projects"])
@@ -54,10 +52,6 @@ def set_member_channels(project_id: str, user_id: str, channel_ids: list[str]) -
             audience = [*channel_audience(ch), user_id]
             s.channel_members.remove(row)
             publish({"type": "channel.member_removed", "channelId": ch["id"], "userId": user_id}, audience)
-
-
-def _stage_label(key: str) -> str:
-    return next(localized(st["label"], "en") for st in setup()["stages"] if st["key"] == key)
 
 
 def _project_updated(project: dict) -> None:
@@ -86,8 +80,7 @@ async def create_project(body: ProjectCreate, user: dict = Depends(current_user)
     ts = now_iso()
     project = {
         "id": body.id, "companyId": s.company_id, "name": body.name, "client": body.client, "address": body.address,
-        "stage": stage_keys(setup())[0], "startDate": today_iso(), "plannedFinish": today_iso(), "baselineFinish": None,
-        "baselineLocked": False, "archivedAt": None, "updatedAt": ts,
+        "pmProjectId": None, "archivedAt": None, "updatedAt": ts,
     }
     s.projects[project["id"]] = project
     for std in setup()["projectChannels"]:
@@ -106,9 +99,6 @@ async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depend
     project = visible_project(user, project_id)
     role = project_role(user["id"], project["id"])
     fields = body.model_dump(exclude_unset=True)
-    stage = fields.pop("stage", None)
-    if stage and stage not in stage_keys(setup()):
-        raise invalid({"stage": "Pick one of the company's stages"})
     archived = fields.pop("archived", None)
     if archived is not None and archived != bool(project["archivedAt"]):
         if not can(user, "project.edit", role):
@@ -118,21 +108,13 @@ async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depend
         if home := project_channel(project["id"], "general"):
             post_message(home, s.bot_id, type="system",
                          body=f"{first_name(user['id'])} {'archived' if archived else 'unarchived'} this project")
-    if project["archivedAt"] and (stage or fields):
+    if project["archivedAt"] and fields:
         assert_project_active(project["id"])
     if fields:
         if not can(user, "project.edit", role):
             raise forbidden("Only managers can edit project details.")
         project.update(fields)
         _project_updated(project)
-    if stage and stage != project["stage"]:
-        if not can(user, "project.stage", role):
-            raise forbidden("Only managers can move the project stage.")
-        project["stage"] = stage
-        _project_updated(project)
-        if general := project_channel(project["id"], "general"):
-            post_message(general, s.bot_id, type="system",
-                         body=f"{first_name(user['id'])} moved the project to {_stage_label(stage)}")
     return project_view(project, user)
 
 
@@ -148,13 +130,10 @@ async def delete_project(project_id: str, user: dict = Depends(current_user)):
         raise forbidden("Only the owner or an admin can delete a project.")
     audience = project_audience(project["id"])
     channel_ids = {c["id"] for c in project_channels(project["id"])}
-    task_ids = {t["id"] for t in s.tasks.values() if t["projectId"] == project["id"]}
     s.messages = {k: m for k, m in s.messages.items() if m["channelId"] not in channel_ids}
     s.channels = {k: c for k, c in s.channels.items() if k not in channel_ids}
     s.channel_members = [m for m in s.channel_members if m["channelId"] not in channel_ids]
-    s.tasks = {k: t for k, t in s.tasks.items() if k not in task_ids}
-    s.task_history = [h for h in s.task_history if h["taskId"] not in task_ids]
-    s.checkins = {k: c for k, c in s.checkins.items() if c["taskId"] not in task_ids}
+    s.checkins = {k: c for k, c in s.checkins.items() if c["projectId"] != project["id"]}
     s.project_members = [m for m in s.project_members if m["projectId"] != project["id"]]
     del s.projects[project["id"]]
     publish({"type": "project.deleted", "projectId": project["id"]}, audience)
@@ -230,6 +209,15 @@ async def remove_member(project_id: str, user_id: str, user: dict = Depends(curr
     _project_updated(project)
     publish({"type": "project.updated", "project": project}, [user_id])
     return {"removed": True}
+
+
+@router.get("/projects/{project_id}/tasks")
+async def project_tasks(project_id: str, user: dict = Depends(current_user)):
+    """The project's open tasks as the PM app has them, read-only (for "Related task" in Report issue)."""
+    project = visible_project(user, project_id)
+    tasks = pm.list_tasks(project["pmProjectId"]) if project.get("pmProjectId") else []
+    open_ = sorted((t for t in tasks if t["status"] != "done"), key=lambda t: (t["plannedStart"], t["name"]))
+    return {"tasks": [pm_task_view(t) for t in open_]}
 
 
 @router.get("/projects/{project_id}/updates")

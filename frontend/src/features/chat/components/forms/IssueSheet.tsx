@@ -13,8 +13,7 @@ import { issueFormSchema, type IssueForm } from '@/contract/schemas';
 import { todayIso } from '@/lib/format';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import { NO_FILTERS } from '../../../tasks/filters';
-import { useProjectTasks } from '../../../tasks/hooks';
+import { useProjectTasks } from '../../hooks';
 import { type SheetProps, PhotoPicker } from './parts';
 import { sendMessage, useProblemTypes } from '../../../shared';
 
@@ -22,8 +21,8 @@ export function IssueSheet({ visible, onClose: onCloseProp, projectId, channelId
   const { t } = useTranslation();
   const { c } = useTheme();
   const problems = useProblemTypes();
-  // Tasks being worked on, filtered by the server.
-  const { tasks } = useProjectTasks(projectId, { ...NO_FILTERS, statuses: ['in_progress', 'blocked'] });
+  // The project's open tasks, from the PM app.
+  const tasks = useProjectTasks(projectId);
   const open = tasks.slice(0, 12);
   const [photos, setPhotos] = useState<string[]>([]);
   const onClose = () => {

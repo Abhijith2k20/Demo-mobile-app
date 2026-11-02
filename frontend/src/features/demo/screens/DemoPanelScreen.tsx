@@ -267,7 +267,6 @@ function DemoPanel() {
             label={server.data?.actorsPaused ? 'Resume scripted activity' : 'Pause scripted activity'}
             onPress={() => void run(() => demo.setActorsPaused(!server.data?.actorsPaused))}
           />
-          <Button small kind="secondary" icon="calendar" label="Amit shifts 5 tasks now" onPress={() => void run(demo.amitShifts, 'Amit moved 5 tasks by a day. One batched Activity item follows in ~10 s.')} />
           <Button small kind="secondary" icon="lock" label="Someone posts in a private channel now" onPress={() => void run(demo.rohanPosts, 'Posted in Villa 99 #qs (visible to QS, Managers, Owner and Admin only).')} />
         </Section>
 

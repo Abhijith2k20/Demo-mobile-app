@@ -1,4 +1,4 @@
-// The send queue: order, retries, refusals, merging, and surviving an app restart.
+// The send queue: order, retries, refusals, and surviving an app restart.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppError } from '@/lib/api/client';
 import { enqueue, loadOutbox, MAX_SERVER_ERRORS, retryItem, runOutbox, storageKey, useOutbox, type NewItem, type OutboxItem } from '@/lib/outbox';
@@ -81,13 +81,14 @@ it('a refusal marks the item failed and the queue moves on; Retry sends it again
   expect(items()).toHaveLength(0);
 });
 
-it('merges waiting updates to the same task into one request', async () => {
-  api.mockRejectedValueOnce(offline()); // hold the queue
-  enqueue(text('hold'));
+it('drops task updates queued by an older version of the app (tasks belong to the PM app now)', async () => {
+  const oldTask = { kind: 'task', taskId: 't1', changes: { percent: 50 }, id: 'x1', userId: 'u1', createdAt: '', state: 'waiting', attempts: 0, nextAt: 0, error: null };
+  await AsyncStorage.setItem(storageKey('u1'), JSON.stringify([oldTask]));
+  api.mockResolvedValue({});
+  await loadOutbox('u1');
   await flush();
-  enqueue({ kind: 'task', taskId: 't1', projectId: 'p1', taskName: 'Order supplies', changes: { percent: 25 } });
-  enqueue({ kind: 'task', taskId: 't1', projectId: 'p1', taskName: 'Order supplies', changes: { percent: 50, status: 'in_progress' } });
-  expect(items().filter((i) => i.kind === 'task')).toEqual([expect.objectContaining({ changes: { percent: 50, status: 'in_progress' } })]);
+  expect(items()).toEqual([]);
+  expect(api).not.toHaveBeenCalled();
 });
 
 it('uploads each photo once, even when the message itself has to be retried', async () => {

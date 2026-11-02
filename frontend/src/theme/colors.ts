@@ -22,8 +22,6 @@ export const light = {
   dangerSoft: '#FBEAE8',
   info: '#2F6F99',
   infoSoft: '#E6F0F6',
-  violet: '#5E55A6',
-  violetSoft: '#ECEAF6',
   onAccent: '#FFFFFF',
   /** Text on fixed colours that don't change with the theme (avatars, photo overlays). */
   onColor: '#FFFFFF',
@@ -55,8 +53,6 @@ export const dark: Colors = {
   dangerSoft: '#38201E',
   info: '#6FA9CC',
   infoSoft: '#1A2A35',
-  violet: '#A39BDD',
-  violetSoft: '#28253D',
   // Dark ink: white on the lighter dark-mode blue is only 2.87:1.
   onAccent: '#0E1A26',
   onColor: '#FFFFFF',
@@ -90,17 +86,3 @@ export const photoTones: Record<PhotoTone, { bg: string; ink: string }> = {
   linen: { bg: '#E4E0D8', ink: '#57534A' },
   sage: { bg: '#A9B8A0', ink: '#39472F' },
 };
-
-/** Stages are coloured by their position, so any company's stages get distinct colours. */
-export function stageColors(c: Colors, index: number): { bg: string; fg: string } {
-  const tones: [string, string][] = [
-    [c.infoSoft, c.info],
-    [c.accentSoft, c.accent],
-    [c.warningSoft, c.warning],
-    [c.violetSoft, c.violet],
-    [c.successSoft, c.success],
-    [c.surfaceAlt, c.textMuted],
-  ];
-  const [bg, fg] = tones[Math.max(0, index) % tones.length];
-  return { bg, fg };
-}

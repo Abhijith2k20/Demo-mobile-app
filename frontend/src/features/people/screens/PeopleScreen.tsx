@@ -178,7 +178,7 @@ function PeopleScreen() {
         <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
           {t(
             'people.deactivateBody',
-            "{{name}} won't be able to sign in and will be removed from lists and pickers. Their messages, tasks and history stay. Their work email can be used again.",
+            "{{name}} won't be able to sign in and will be removed from lists and pickers. Their messages and history stay. Their work email can be used again.",
             { name: firstName(confirming?.name) },
           )}
         </T>

@@ -58,11 +58,6 @@ def project_id(api: Api, name: str) -> str:
     return next(p["id"] for p in api.get("/projects").json()["projects"] if p["name"].startswith(name))
 
 
-def task_named(api: Api, project: str, name: str) -> dict:
-    tasks = api.get(f"/projects/{project_id(api, project)}/tasks").json()["tasks"]
-    return next(t for t in tasks if t["name"] == name)
-
-
 def channel_named(api: Api, project: str | None, name: str) -> dict:
     pid = project_id(api, project) if project else None
     return next(c for c in api.get("/channels").json()["channels"] if c["name"] == name and c["projectId"] == pid)

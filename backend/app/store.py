@@ -11,7 +11,7 @@ from .rules import is_company_admin
 @dataclass
 class Store:
     company_id: str = ""
-    company: dict = field(default_factory=dict)  # id, name, setup (the company's own stages, job titles...)
+    company: dict = field(default_factory=dict)  # id, name, setup (the company's own job titles, channels...)
     bot_id: str = ""
     users: dict[str, dict] = field(default_factory=dict)
     projects: dict[str, dict] = field(default_factory=dict)
@@ -19,9 +19,9 @@ class Store:
     channels: dict[str, dict] = field(default_factory=dict)
     channel_members: list[dict] = field(default_factory=list)  # + joinedAt
     messages: dict[str, dict] = field(default_factory=dict)
-    tasks: dict[str, dict] = field(default_factory=dict)
-    task_history: list[dict] = field(default_factory=list)
     checkins: dict[str, dict] = field(default_factory=dict)  # + messageId, remindedAt, escalatedAt
+    # The mock PM app's own data (pm/mock.py): projects, tasks, and answers already written (by key).
+    pm: dict = field(default_factory=lambda: {"projects": {}, "tasks": {}, "writes": {}})
     activities: list[dict] = field(default_factory=list)  # + readAt (server-side read state)
     uploads: dict[str, dict] = field(default_factory=dict)  # id -> {id, userId, path, contentType}
     tokens: dict[str, dict] = field(default_factory=dict)  # token -> {userId, kind, expired}
@@ -51,7 +51,7 @@ def reset_store() -> Store:
 # ---- Lookups ----
 
 def setup() -> dict:
-    """The company's own words and defaults: stages, phases, job titles, standard channels."""
+    """The company's own words and defaults: job titles, standard channels, problem types."""
     return S().company["setup"]
 
 

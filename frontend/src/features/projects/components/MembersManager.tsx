@@ -59,8 +59,8 @@ function MemberEditor({ draft, channels, onChange }: { draft: Draft; channels: C
         />
         <T variant="meta" color="textMuted">
           {draft.role === 'manager'
-            ? t('members.managerHint', 'Managers can edit dates, confirm tasks, lock the baseline and manage members.')
-            : t('members.memberHint', 'Members can chat, add tasks and update their own tasks.')}
+            ? t('members.managerHint', "Managers manage the project's channels and members, and hear when check-ins go unanswered.")
+            : t('members.memberHint', "Members chat in their channels and answer the bot's check-ins on their tasks.")}
         </T>
       </View>
       <View style={{ gap: 6 }}>

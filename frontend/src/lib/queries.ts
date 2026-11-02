@@ -10,7 +10,6 @@ export const keys = {
   meta: ['meta'] as const,
   company: ['company'] as const,
   demoAccounts: ['demo-accounts'] as const,
-  taskDefaults: (projectId: string, phase: string) => ['task-defaults', projectId, phase] as const,
   users: ['users'] as const,
   projects: ['projects'] as const,
   channels: ['channels'] as const,
@@ -20,11 +19,8 @@ export const keys = {
   thread: (parentId: string) => ['thread', parentId] as const,
   pins: (channelId: string) => ['pins', channelId] as const,
   dm: (userId: string) => ['dm', userId] as const,
-  /** Prefix for every filtered list of a project's tasks; the filters are the third part. */
+  /** A project's open tasks, read-only from the PM app. */
   tasks: (projectId: string) => ['tasks', projectId] as const,
-  task: (id: string) => ['task', id] as const,
-  tasksByIds: (ids: string) => ['tasks-by-ids', ids] as const,
-  myTasks: ['my-tasks'] as const,
   checkins: ['checkins'] as const,
   activity: ['activity'] as const,
   updates: (projectId: string) => ['updates', projectId] as const,
@@ -63,12 +59,9 @@ export function keysFor(e: ServerEvent): QueryKey[] {
         ['files'],
       ];
     }
-    case 'task.created':
-    case 'task.updated':
-      return [keys.tasks(e.task.projectId), keys.task(e.task.id), ['tasks-by-ids'], keys.myTasks];
     case 'project.updated':
     case 'project.deleted':
-      return [keys.projects, keys.me, keys.channels, ['browse'], ['tasks'], keys.myTasks];
+      return [keys.projects, keys.me, keys.channels, ['browse'], ['tasks']];
     case 'channel.updated':
     case 'channel.deleted':
     case 'channel.member_added':
@@ -77,7 +70,7 @@ export function keysFor(e: ServerEvent): QueryKey[] {
     case 'channel.read':
       return [keys.channels, keys.channel(e.channelId)];
     case 'checkin.new':
-      return [keys.checkins];
+      return [keys.checkins, ['tasks']];
     case 'activity.new':
     case 'activity.read':
       return [keys.activity];

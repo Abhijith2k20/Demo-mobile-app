@@ -29,7 +29,6 @@ export function useMeSync(): void {
 export interface ProjectAccess {
   role: ProjectRole | null;
   jobTitle: JobTitle | null;
-  isManager: boolean;
   isAdmin: boolean;
   /** The project is archived (read-only). */
   archived: boolean;
@@ -47,7 +46,6 @@ export function useProjectAccess(projectId: ID | null | undefined): ProjectAcces
     role: project?.access.role ?? null,
     jobTitle: project?.access.jobTitle ?? null,
     isAdmin: can('project.delete'),
-    isManager: can('task.edit_any'),
     archived: !!project?.archivedAt,
     canArchive: can('project.archive'),
     can,

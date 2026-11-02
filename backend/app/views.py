@@ -1,5 +1,5 @@
-"""How records look to a given viewer. Computed fields (permissions, unread counts, delays,
-lateness) are worked out here so the app never has to."""
+"""How records look to a given viewer. Computed fields (permissions, unread counts, overdue) are
+worked out here so the app never has to."""
 from __future__ import annotations
 
 from .core import now_ms, parse_iso_ms
@@ -12,14 +12,12 @@ from .rules import (
     company_permissions,
     is_company_admin,
     joins_projects,
-    next_stage,
-    simple_mode,
-    task_is_delayed,
-    project_delay_days,
     project_permissions,
-    task_is_late,
-    task_variance_days,
+    OPEN_TASK_STATUSES,
+    simple_mode,
+    task_is_overdue,
 )
+from .pm import connector as pm
 from .store import S, channel_member_ids, project_member, project_member_ids, project_role, setup
 
 
@@ -41,13 +39,6 @@ def me_view(user: dict) -> dict:
     }
 
 
-def _progress(project_id: str) -> dict:
-    """Finished tasks out of all of them (waiting for confirmation isn't finished yet)."""
-    tasks = [t for t in S().tasks.values() if t["projectId"] == project_id and not t["deletedAt"]]
-    done = sum(1 for t in tasks if t["status"] == "done")
-    return {"done": done, "total": len(tasks), "percent": round(done * 100 / len(tasks)) if tasks else 0}
-
-
 def project_view(p: dict, viewer: dict) -> dict:
     mine = project_member(viewer["id"], p["id"])
     role = mine["role"] if mine else None
@@ -58,9 +49,7 @@ def project_view(p: dict, viewer: dict) -> dict:
     ]
     return {
         **p,
-        "delayDays": project_delay_days(p),
-        "nextStage": next_stage(setup(), p["stage"]),
-        "progress": _progress(p["id"]),
+        "linked": bool(p.get("pmProjectId")),  # projects and people come from the PM app
         "members": members,
         "access": {
             "role": role,
@@ -167,9 +156,21 @@ def reply_info(parents: list[dict]) -> dict[str, tuple[int, str]]:
     return info
 
 
-def task_view(t: dict) -> dict:
-    return {**t, "varianceDays": task_variance_days(t), "isLate": task_is_late(t), "isDelayed": task_is_delayed(t)}
+def pm_task_view(t: dict) -> dict:
+    """A PM task as the app shows it (read-only): name, finish date, progress, overdue."""
+    return {**{k: t[k] for k in ("id", "name", "plannedStart", "plannedFinish", "status", "percent")},
+            "isOverdue": task_is_overdue(t)}
 
 
 def checkin_view(c: dict) -> dict:
-    return {k: c[k] for k in ("id", "taskId", "userId", "askedAt", "answer")}
+    """A check-in with what the card shows: the task as the PM app has it now (None once it's gone),
+    its project, whether the answer reached the PM app, and `closed` when there's nothing left to answer
+    (the task was finished or removed in the PM app)."""
+    task = pm.get_task(c["taskId"])
+    project = S().projects.get(c["projectId"] or "")
+    return {
+        **{k: c[k] for k in ("id", "taskId", "taskName", "projectId", "userId", "askedAt", "answer", "pmWrite", "pmError")},
+        "projectName": project["name"] if project else None,
+        "task": pm_task_view(task) if task else None,
+        "closed": c["answer"] is None and (task is None or task["status"] not in OPEN_TASK_STATUSES),
+    }

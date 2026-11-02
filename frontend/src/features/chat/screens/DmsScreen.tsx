@@ -51,8 +51,6 @@ function DmsScreen() {
           return String(m.data?.name ?? t('plus.file', 'File'));
         case 'checkin':
           return t('dms.previewCheckin', 'Check-in: tap to update a task');
-        case 'task_card':
-          return t('task.card', 'Task');
         case 'issue_card':
           return t('issue.card', 'Issue');
         case 'daily_report':

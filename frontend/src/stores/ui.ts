@@ -20,13 +20,13 @@ interface UiState {
   socketConnected: boolean;
   toast: Toast | null;
   demoPillHidden: boolean;
-  notifications: { messages: boolean; tasks: boolean; checkins: boolean };
+  notifications: { messages: boolean; checkins: boolean };
   setTheme: (t: ThemePref) => void;
   setLanguage: (l: Language) => void;
   toggleCollapsed: (key: string, fallback?: boolean) => void;
   setDraft: (key: string, text: string) => void;
   set: (patch: Partial<Pick<UiState, 'online' | 'socketConnected' | 'demoPillHidden'>>) => void;
-  setNotification: (key: 'messages' | 'tasks' | 'checkins', value: boolean) => void;
+  setNotification: (key: 'messages' | 'checkins', value: boolean) => void;
   showToast: (text: string, tone?: Toast['tone']) => void;
   hideToast: (id: number) => void;
 }
@@ -44,7 +44,7 @@ export const useUi = create<UiState>()(
       socketConnected: false,
       toast: null,
       demoPillHidden: false,
-      notifications: { messages: true, tasks: true, checkins: true },
+      notifications: { messages: true, checkins: true },
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       toggleCollapsed: (key, fallback = false) =>

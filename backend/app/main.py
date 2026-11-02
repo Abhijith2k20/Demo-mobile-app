@@ -15,8 +15,7 @@ from . import actors, bot, netsim
 from .core import ApiError, ERROR_STATUS, uuid7
 from .deps import user_for_token
 from .events import cancel_all, hub
-from .notify import reset_notify
-from .routers import auth, channels, internal, me, messages, people, projects, tasks, uploads
+from .routers import auth, channels, internal, me, messages, people, projects, uploads
 from .store import reset_store
 
 log = logging.getLogger("siteline")
@@ -24,7 +23,6 @@ DEMO = os.environ.get("SITELINE_DEMO", "1") != "0"
 
 
 def reset_everything() -> None:
-    reset_notify()
     bot.reset_bot()
     actors.reset()
     cancel_all()
@@ -110,7 +108,7 @@ async def simulate_network(request: Request, call_next):
     return response
 
 
-for r in (auth, me, people, projects, channels, messages, tasks, uploads):
+for r in (auth, me, people, projects, channels, messages, uploads):
     app.include_router(r.router)
 if DEMO:
     app.include_router(internal.router)

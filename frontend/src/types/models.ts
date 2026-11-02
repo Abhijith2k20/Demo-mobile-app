@@ -2,10 +2,8 @@ export type ID = string; // UUIDv7
 
 export type CompanyRole = 'owner' | 'admin' | 'member';
 export type ProjectRole = 'manager' | 'member';
-/** Job titles and stages are the company's own words (its setup on the server, sent in /meta). */
+/** Job titles are the company's own words (its setup on the server, sent in /meta). */
 export type JobTitle = string;
-/** A stage key from the company's setup. */
-export type Stage = string;
 
 export interface User {
   id: ID;
@@ -24,11 +22,8 @@ export interface Project {
   name: string;
   client: string;
   address: string;
-  stage: Stage;
-  startDate: string;
-  plannedFinish: string;
-  baselineFinish: string | null;
-  baselineLocked: boolean;
+  /** The project in the company's PM app; null for a project made in Siteline. */
+  pmProjectId: ID | null;
   /** Set when the project is archived: everything in it becomes read-only. */
   archivedAt: string | null;
   updatedAt: string;
@@ -64,7 +59,6 @@ export type MessageType =
   | 'image'
   | 'voice'
   | 'file'
-  | 'task_card'
   | 'checkin'
   | 'issue_card'
   | 'daily_report'
@@ -89,37 +83,18 @@ export interface Message {
   deletedAt: string | null;
 }
 
-export type TaskStatus = 'not_started' | 'in_progress' | 'blocked' | 'done' | 'done_pending_confirmation';
+/** A task as the PM app has it. Siteline only reads tasks; the bot sends answers back. */
+export type TaskStatus = 'not_started' | 'in_progress' | 'blocked' | 'done';
 
-export interface Task {
+export interface PmTask {
   id: ID;
-  projectId: ID;
-  phase: string;
   name: string;
-  description: string | null;
-  ownerId: ID | null;
   plannedStart: string;
   plannedFinish: string;
-  baselineStart: string | null;
-  baselineFinish: string | null;
-  actualStart: string | null;
-  actualFinish: string | null;
   status: TaskStatus;
   percent: number;
-  channelId: ID | null;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-export interface TaskHistory {
-  id: ID;
-  taskId: ID;
-  userId: ID;
-  field: string;
-  from: string | null;
-  to: string | null;
-  via: 'app' | 'checkin' | 'system';
-  createdAt: string;
+  /** Not done and its finish date has passed (worked out by the server). */
+  isOverdue: boolean;
 }
 
 export interface CheckinAnswer {
@@ -135,10 +110,21 @@ export interface CheckinAnswer {
 
 export interface Checkin {
   id: ID;
+  /** The task in the PM app. */
   taskId: ID;
+  taskName: string;
+  projectId: ID | null;
+  projectName: string | null;
   userId: ID;
   askedAt: string;
   answer: null | CheckinAnswer;
+  /** The task as the PM app has it now; null once it was removed there. */
+  task: PmTask | null;
+  /** Whether the answer reached the PM app: saved, refused (reason in `pmError`), or nothing to save. */
+  pmWrite: 'saved' | 'refused' | null;
+  pmError: string | null;
+  /** Nothing left to answer: the task was finished or removed in the PM app. */
+  closed: boolean;
   /** The answer is in the send queue on this phone. */
   sending?: boolean;
 }
@@ -160,8 +146,6 @@ export interface Attachment {
 export type ActivityKind =
   | 'mention'
   | 'thread_reply'
-  | 'task_assigned'
-  | 'task_changes'
   | 'checkin_result'
   | 'escalation';
 
@@ -175,7 +159,7 @@ export interface Activity {
   messageId: ID | null;
   taskIds: ID[];
   text: string;
-  /** Lines shown when a batched item is expanded. */
+  /** Extra lines under the text. */
   lines: string[];
   createdAt: string;
 }
@@ -186,16 +170,12 @@ export interface Activity {
 export interface ProjectAccessInfo {
   role: ProjectRole | null;
   jobTitle: JobTitle | null;
-  /** Actions the viewer may take in this project right now (e.g. 'task.edit_any', 'project.archive'). */
+  /** Actions the viewer may take in this project right now (e.g. 'channel.manage', 'project.archive'). */
   permissions: string[];
 }
 export interface ProjectView extends Project {
-  /** Days behind (positive) or ahead (negative) of the locked baseline; 0 without one. */
-  delayDays: number;
-  /** The stage after this one in the company's setup; null at the last stage. */
-  nextStage: Stage | null;
-  /** Finished tasks out of all of them. */
-  progress: { done: number; total: number; percent: number };
+  /** Linked to a project in the PM app. */
+  linked: boolean;
   members: ProjectMember[];
   access: ProjectAccessInfo;
 }
@@ -224,39 +204,6 @@ export interface ChannelView extends Channel {
   memberCount?: number;
 }
 
-export interface TaskView extends Task {
-  /** Positive = finishing later than baseline; null without a baseline. */
-  varianceDays: number | null;
-  /** Not done and its finish date has passed. */
-  isLate: boolean;
-  /** Not done and planned to finish later than its baseline. */
-  isDelayed: boolean;
-}
-
-/** The schedule as the server filtered it. Everything but `tasks` covers the whole project. */
-export interface TaskList {
-  /** Matching tasks, in phase order. */
-  tasks: TaskView[];
-  total: number;
-  /** Phases the project uses, in order, with whole-phase progress. */
-  phases: { name: string; done: number; total: number }[];
-  /** Phases a new task can go in. */
-  phaseChoices: string[];
-  /** Where work is happening now (quick add targets it). */
-  currentPhase: string | null;
-  /** Date span the timeline bars are drawn against. */
-  window: { from: string; to: string };
-}
-
-/** What a new task form starts with. */
-export interface TaskDefaults {
-  phase: string;
-  plannedStart: string;
-  plannedFinish: string;
-  /** Phases to offer: the project's own, then the company's. */
-  phaseChoices: string[];
-}
-
 export interface Company {
   id: ID;
   name: string;
@@ -283,9 +230,6 @@ export interface ActivityView extends Activity {
 }
 
 export interface Meta {
-  /** In order, with labels in the reader's language. */
-  stages: { key: Stage; label: string }[];
-  phases: string[];
   jobTitles: { name: JobTitle; label: string; managersOnly: boolean }[];
   /** Job title a new project member starts with. */
   defaultJobTitle: JobTitle;
@@ -302,7 +246,6 @@ export interface Meta {
 
 export type ServerEvent =
   | { type: 'message.new' | 'message.updated' | 'message.deleted'; message: Message }
-  | { type: 'task.updated' | 'task.created'; task: Task; history: TaskHistory[] }
   | { type: 'channel.updated'; channel: Channel }
   | { type: 'channel.deleted'; channelId: ID }
   | { type: 'channel.member_added' | 'channel.member_removed'; channelId: ID; userId: ID }

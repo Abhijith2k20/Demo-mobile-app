@@ -1,7 +1,7 @@
 // Who and what: icon names, avatars, counts and labels.
 import { Feather } from '@expo/vector-icons';
 import { View } from 'react-native';
-import { avatarTone, stageColors } from '@/theme/colors';
+import { avatarTone } from '@/theme/colors';
 import { radius, space } from '@/theme/spacing';
 import { fonts } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
@@ -77,18 +77,6 @@ export function Pill({ label, bg, fg, icon }: { label: string; bg: string; fg: s
       <T variant="label" style={{ color: fg, letterSpacing: 0, textTransform: 'none' }} numberOfLines={1}>
         {label}
       </T>
-    </View>
-  );
-}
-
-/** A stage name in its colour; `index` is the stage's position in the company's setup. */
-export function StagePill({ index, label }: { index: number; label: string }) {
-  const { c } = useTheme();
-  const s = stageColors(c, index);
-  // Wrapped so it centres in rows (the pill itself hugs the start of columns).
-  return (
-    <View>
-      <Pill label={label} bg={s.bg} fg={s.fg} />
     </View>
   );
 }

@@ -5,12 +5,12 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Badge, EmptyState, Row, SectionHeader, Skeleton, StagePill } from '@/components/basics';
+import { Avatar, Badge, EmptyState, Row, SectionHeader, Skeleton } from '@/components/basics';
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
 import { CompanyTile } from '@/components/CompanyTile';
 import { T } from '@/components/T';
 import { useHome } from '@/features/home/hooks';
-import { isBotUser, shortProjectName, useCan, useCompany, useMe, useRefresh, useStages, useUsers } from '@/features/shared';
+import { isBotUser, shortProjectName, useCan, useCompany, useMe, useRefresh, useUsers } from '@/features/shared';
 import { useUi } from '@/stores/ui';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -57,8 +57,6 @@ function HomeScreen() {
   const home = useHome();
   const users = useUsers();
   const company = useCompany();
-  const stages = useStages();
-  const stageLabel = stages.label;
   const { refreshing, refresh } = useRefresh();
   const collapsed = useUi((s) => s.collapsed);
   const toggle = useUi((s) => s.toggleCollapsed);
@@ -85,7 +83,6 @@ function HomeScreen() {
   const projectRow = ({ project, channels, unread }: (typeof home.projects)[number]) => {
                 const key = `project:${project.id}`;
                 const open = !(collapsed[key] ?? false);
-                const delay = project.delayDays;
                 return (
                   <View key={project.id}>
                     <Pressable
@@ -104,15 +101,6 @@ function HomeScreen() {
                       <T variant={unread > 0 ? 'bodyStrong' : 'body'} numberOfLines={1} style={{ flexShrink: 1 }}>
                         {shortProjectName(project.name)}
                       </T>
-                      <StagePill index={stages.index(project.stage)} label={stageLabel(project.stage)} />
-                      {delay > 0 ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('home.daysBehind', '{{count}} days behind', { count: delay })}>
-                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.danger }} />
-                          <T variant="metaStrong" color="danger">
-                            {delay}d
-                          </T>
-                        </View>
-                      ) : null}
                       <View style={{ flex: 1 }} />
                       {open ? null : <Badge count={unread} />}
                     </Pressable>
@@ -128,7 +116,7 @@ function HomeScreen() {
                               <Feather name="layout" size={15} color={c.textMuted} />
                             </View>
                           }
-                          title={t('home.projectOverview', 'Project overview')}
+                          title={t('home.projectOverview', 'Project info')}
                           muted
                           onPress={() => router.push(`/project/${project.id}`)}
                         />
@@ -185,7 +173,7 @@ function HomeScreen() {
                 key={project.id}
                 left={<Feather name="folder" size={18} color={c.textMuted} />}
                 title={project.name}
-                subtitle={stageLabel(project.stage)}
+                subtitle={project.client}
                 height={52}
                 onPress={() => router.push(`/project/${project.id}`)}
               />

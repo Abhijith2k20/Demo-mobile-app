@@ -3,7 +3,7 @@
 > **Note:** `SITELINE_DEMO_SPEC.md` was rewritten as version 1.2 to describe the app as built. The
 > entries below are kept as the record of what changed from the first version of the spec and why.
 
-`SITELINE_DEMO_SPEC.md` is the source of truth. This file records every place where the build
+`SITELINE_SPEC.md` (named `SITELINE_DEMO_SPEC.md` until 2026-11-02) is the source of truth. This file records every place where the build
 differs from it, or where the spec left a choice open. Built against **Expo SDK 57**
 (React Native 0.86, React 19.2, Reanimated 4.5).
 
@@ -480,3 +480,65 @@ the server still decides everything; the phone only holds changes until the serv
 - The Expo app moved into `frontend/` (app/, src/, assets/, scripts/ and its config); `backend/` is
   unchanged. Docs and project rules stay at the top. Run npm and npx inside `frontend/`;
   `npm run api` and `npm run test:api` there still start and test the server (`cd ../backend`).
+
+## MVP direction (2026-11-02)
+
+The owner decided Siteline goes live in a few weeks as an MVP, not a demo. The spec was rewritten as
+`SITELINE_SPEC.md` version 2.0 (renamed from `SITELINE_DEMO_SPEC.md`). **Nothing is built yet**; the code is
+still demo 1.4. Decisions:
+
+- **Chat plus bot; project management moves out.** Projects and tasks live in the company's PM app. Siteline's
+  bot reads task dates and owners and asks the owner for status with the existing check-in card, then writes
+  the answer back. Removed from Siteline: My tasks tab, schedule, task detail, stages, phases, baseline, the
+  new-task form and task cards. Projects stay as **project spaces** (channels and people), created from PM
+  projects. The PM app has no API yet, so Siteline defines the API it needs (spec §9.3) and builds against a
+  **mock PM**; the real one replaces one module.
+- **Tenancy:** shared Postgres tables with `company_id` on every row, row-level security as a safety net, the
+  company taken from the session. Chosen over a schema or database per company: cheaper, one migration for
+  everyone, fits hundreds of companies.
+- **Companies are created by the Siteline team** (platform panel, or `POST /platform/companies`, which the PM
+  app can call later). No public sign-up. A super-admin can't read companies' messages; every platform action
+  is audited.
+- **One person, several companies** (changes the 2026-10-23 decision "one company per login" in
+  `docs/CHANGE_02_MULTI_TENANT.md`): memberships per company, a picker after sign-in and a switcher. Field
+  subcontractors often work for several firms.
+- **Sign-in by one-time code, email or phone (SMS)**, no passwords: site workers forget passwords and share
+  phones. The proposal's "email link to set a password" became "sign in with the invited email or phone to
+  accept". The invite link carries no secret.
+- **Roles:** Owner, Admin, Member, plus **Guest** (only the channels they are given).
+- **Not Expo Go any more.** Push notifications, real voice notes and files need native modules, so the app
+  ships through EAS (development, preview, production builds). The Expo Go rule in `CLAUDE.md` was replaced.
+- **Stack for launch:** Postgres + SQLAlchemy + Alembic, a Postgres `jobs` table with one worker (bot timers
+  survive restarts and never double-send), LISTEN/NOTIFY to carry events from the worker to the API, Cloudflare
+  R2 for files, Resend (email) and MSG91 (SMS), Expo push, Sentry, Render in Singapore, staging and production.
+  No Redis until load needs it.
+- `docs/CHANGE_01_PARENT_SUBTASKS_AREAS.md` (tasks move to the PM app) and `docs/CHANGE_02_MULTI_TENANT.md`
+  are marked superseded.
+- **Bot data flow:** the PM app pushes facts (webhooks), Siteline pulls a nightly full sync as a safety net,
+  and the bot re-checks each task with one `GET /tasks/:id` just before sending its check-in card (falls back to
+  the saved copy if the PM app doesn't answer in 3 s). The bot alone decides when to ask; the PM app never
+  sends "ask now" commands, so check-in rules live in one place.
+
+## Build step 2: project management removed (2026-11-02)
+
+Done as in `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md`.
+- **Mock PM app** (`backend/app/pm/mock.py`, data in `S().pm`): the seeded tasks moved there with the same
+  names, dates and owners (owner = email). `pm/connector.py` is the only way in. Each Siteline project has a
+  `pmProjectId`; projects made in Siteline have none (`linked: false`).
+- **Bot:** asks about active or overdue tasks only (`rules.task_needs_update`), so tasks that haven't started
+  yet are no longer asked about, which the demo did. It reads the PM app live, which covers the spec's re-check
+  before asking until the saved copy of PM tasks arrives with Postgres. Answers go to the PM app
+  (`rules.pm_change_for`); a refusal is kept on the check-in (`pmWrite`, `pmError`) and shown on the card,
+  with no status card. Check-ins carry `taskName`, `projectName`, the live `task` and `closed` (finished or
+  removed in the PM app), so the app no longer loads tasks itself. The morning summary stores its rows.
+- **Deviation, until jobs (build step 6):** the PM write happens during the answer request, so there is no
+  "Saving to the PM app…" state yet and no retry when the PM app is down.
+- **Deviation, until PM sync (build step 5):** project members are still managed in Siteline for linked
+  projects too.
+- Removed: My tasks tab, task detail, schedule, stages, baseline, new-task form, task cards, task
+  notifications and their batching, "Amit shifts 5 tasks", task items in the send queue (old queued ones are
+  dropped on load), the "Task changes" notification switch. `isManager` (which read a task permission) is gone.
+- The project's Overview tab is now **Info** (client, address, channels, recent check-in results).
+- Kannada and Hindi: 5 strings whose English changed now fall back to English until translated
+  (`offline.queued`, `activity.emptyHint`, `members.managerHint`, `members.memberHint`, `people.deactivateBody`).
+

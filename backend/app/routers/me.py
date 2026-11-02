@@ -43,8 +43,6 @@ async def meta(user: dict = Depends(current_user), lang: str = Depends(language)
     st = setup()
     titles = [jt["name"] for jt in st["jobTitles"]]
     return {
-        "stages": [{"key": x["key"], "label": localized(x["label"], lang)} for x in st["stages"]],
-        "phases": st["phases"],
         "jobTitles": [{"name": jt["name"], "label": localized(jt.get("label", jt["name"]), lang),
                        "managersOnly": jt.get("managersOnly", False)} for jt in st["jobTitles"]],
         "defaultJobTitle": st["defaultJobTitle"],
@@ -73,8 +71,7 @@ async def answer_checkin(checkin_id: str, body: CheckinAnswer, user: dict = Depe
     if not c or c["userId"] != user["id"]:
         raise not_found("Check-in")
     if not c["answer"]:
-        task = s.tasks.get(c["taskId"])
-        assert_project_active(task["projectId"] if task else None)
+        assert_project_active(c["projectId"])
         bot.apply_checkin_answer(c, body.model_dump(exclude_none=True))  # repeating it changes nothing
     return checkin_view(c)
 

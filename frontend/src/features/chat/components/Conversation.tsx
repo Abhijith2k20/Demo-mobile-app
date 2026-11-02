@@ -13,12 +13,11 @@ import type { ID, Message, MessageView } from '@/types/models';
 import { BotProgress } from '../../bot/components/BotProgress';
 import { CheckinQueueProvider } from '../../bot/queue';
 import { leaveChannel } from '../../projects/api';
-import { StageBanner } from '../../projects/components/StageBanner';
 import { firstName, useMe, useProject, useProjectAccess, useUsers } from '../../shared';
 import { ChatContext, type ChatContextValue } from '../context';
 import { useChannelInfo, useChannelMessages, usePinned, type ListItem } from '../hooks';
 import { Composer, ReadOnlyBar, type FormKind } from './Composer';
-import { DailyReportSheet, IssueSheet, NewTaskSheet } from './forms';
+import { DailyReportSheet, IssueSheet } from './forms';
 import { MessageMenu } from './MessageMenu';
 import { DayDivider, MessageRow, NewDivider } from './MessageRow';
 
@@ -41,7 +40,6 @@ export function Conversation({ channelId }: { channelId: ID }) {
   const [menu, setMenu] = useState<MessageView | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [form, setForm] = useState<FormKind | null>(null);
-  const [taskName, setTaskName] = useState<string | undefined>(undefined);
   const [details, setDetails] = useState(false);
   const listRef = useRef<FlashListRef<ListItem>>(null);
 
@@ -63,7 +61,6 @@ export function Conversation({ channelId }: { channelId: ID }) {
   // The bot conversation shows one open check-in at a time.
   const Queue = info.isBot ? CheckinQueueProvider : Fragment;
   const projectId = info.channel?.projectId ?? null;
-  const canCreateTask = !!projectId && access.can('task.create');
   const placeholder = info.channel?.kind === 'dm' ? t('chat.messagePerson', 'Message {{name}}', { name: firstName(info.peer?.name) }) : t('chat.messageChannel', 'Message {{name}}', { name: info.title });
 
   return (
@@ -82,7 +79,6 @@ export function Conversation({ channelId }: { channelId: ID }) {
           }
         />
         <OfflineBanner />
-        {project && info.channel?.kind === 'project' ? <StageBanner project={project} /> : null}
         {info.isBot ? <BotProgress /> : null}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <View style={{ flex: 1 }}>
@@ -133,15 +129,11 @@ export function Conversation({ channelId }: { channelId: ID }) {
             <Composer
               channelId={channelId}
               projectId={projectId}
-              canCreateTask={canCreateTask}
               members={info.members}
               placeholder={placeholder}
               editing={editing}
               onDoneEditing={() => setEditing(null)}
-              onOpenForm={(kind) => {
-                setTaskName(undefined);
-                setForm(kind);
-              }}
+              onOpenForm={setForm}
             />
           ) : info.channel ? (
             <ReadOnlyBar
@@ -160,17 +152,11 @@ export function Conversation({ channelId }: { channelId: ID }) {
           message={menu}
           me={me}
           access={access}
-          canCreateTask={canCreateTask}
           onClose={() => setMenu(null)}
           onEdit={setEditing}
-          onCreateTask={(m) => {
-            setTaskName((m.body ?? '').slice(0, 80));
-            setForm('task');
-          }}
         />
         {projectId ? (
           <>
-            <NewTaskSheet visible={form === 'task'} onClose={() => setForm(null)} projectId={projectId} channelId={channelId} initialName={taskName} />
             <IssueSheet visible={form === 'issue'} onClose={() => setForm(null)} projectId={projectId} channelId={channelId} />
             <DailyReportSheet visible={form === 'report'} onClose={() => setForm(null)} projectId={projectId} channelId={channelId} />
           </>

@@ -1,6 +1,9 @@
 # Demo-mobile-app
 
-Siteline: a clickable demo of a project chat and task app for Paliath Interiors.
+Siteline: a work chat for field teams with a bot that asks task owners for status, for many companies.
+
+> **The MVP spec (`SITELINE_SPEC.md`, version 2.0) is partly built.** Done: step 2 (project management
+> removed; tasks come from a mock PM app). Still demo: one company, in-memory data, Expo Go. See §15.
 
 - **App** (`frontend/`): Expo SDK 57, runs in Expo Go. A thin client: it shows what the server says. Messages, photos, check-ins and task updates wait in a send queue when offline, and the last loaded screens are kept on the phone.
 - **Backend** (`backend/`): FastAPI mock server with in-memory demo data. All data, permissions and rules live here.
@@ -35,6 +38,6 @@ npm run typecheck && npm run lint && npm test
 npm run test:api        # backend tests (pytest)
 ```
 
-- Spec: `SITELINE_DEMO_SPEC.md`
+- Spec: `SITELINE_SPEC.md`
 - Changes from the spec: `DECISIONS.md`
 - Project rules: `CLAUDE.md`

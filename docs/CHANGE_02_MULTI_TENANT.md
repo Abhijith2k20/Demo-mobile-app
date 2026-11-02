@@ -1,5 +1,7 @@
 # Change 02 — Multi-tenant: many companies on one Siteline
 
+> **Superseded (2026-11-02) by `SITELINE_SPEC.md` 2.0, §9.** The MVP keeps "the Siteline team creates companies" but changes "one company per login": one person can belong to several companies and switch between them. Kept for history only.
+
 > **Status: NOT STARTED — parked for later.** Nothing in this document has been implemented yet.
 > The three product decisions in §2 were made by the owner on 2026-10-23. The open questions
 > in §10 still need answers before building.

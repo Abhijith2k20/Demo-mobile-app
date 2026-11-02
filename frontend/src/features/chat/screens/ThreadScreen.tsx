@@ -73,7 +73,6 @@ function ThreadScreen({ messageId }: { messageId: string }) {
               channelId={parent.channelId}
               threadParentId={parent.id}
               projectId={null}
-              canCreateTask={false}
               members={info.members}
               placeholder={t('thread.reply', 'Reply…')}
               alsoSendLabel={info.channel?.kind === 'dm' ? undefined : t('thread.alsoSend', 'Also send to {{channel}}', { channel: info.title.replace('# ', '#') })}
@@ -89,11 +88,9 @@ function ThreadScreen({ messageId }: { messageId: string }) {
           message={menu}
           me={me}
           access={access}
-          canCreateTask={false}
           inThread
           onClose={() => setMenu(null)}
           onEdit={setEditing}
-          onCreateTask={noop}
         />
       </Screen>
     </ChatContext.Provider>

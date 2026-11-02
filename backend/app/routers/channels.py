@@ -190,9 +190,6 @@ async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
         raise invalid({"name": "#general cannot be deleted"})
     audience = channel_audience(ch)
     s.messages = {k: m for k, m in s.messages.items() if m["channelId"] != ch["id"]}
-    for t in s.tasks.values():
-        if t["channelId"] == ch["id"]:
-            t["channelId"] = None
     s.channel_members = [m for m in s.channel_members if m["channelId"] != ch["id"]]
     del s.channels[ch["id"]]
     publish({"type": "channel.deleted", "channelId": ch["id"]}, audience)

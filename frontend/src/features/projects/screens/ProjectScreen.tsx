@@ -6,13 +6,12 @@ import { Banner, EmptyState, IconButton, Segmented } from '@/components/basics';
 import { appScreen, Header, OfflineBanner, Screen } from '@/components/chrome';
 import { MembersManager } from '@/features/projects/components/MembersManager';
 import { useProject, useProjectAccess } from '@/features/shared';
-import { ScheduleList } from '@/features/tasks/components/ScheduleList';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { ProjectFiles } from '@/features/projects/components/ProjectFiles';
-import { ProjectOverview } from '@/features/projects/components/ProjectOverview';
+import { ProjectInfo } from '@/features/projects/components/ProjectInfo';
 
-type Tab = 'overview' | 'tasks' | 'members' | 'files';
+type Tab = 'info' | 'members' | 'files';
 
 function ProjectScreen({ projectId: id }: { projectId: string }) {
   const { c } = useTheme();
@@ -20,7 +19,7 @@ function ProjectScreen({ projectId: id }: { projectId: string }) {
   const project = useProject(id);
   const access = useProjectAccess(id);
   const canManage = access.canArchive || access.isAdmin || access.can('channel.manage') || access.can('project.members');
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('info');
 
   return (
     <Screen>
@@ -40,8 +39,7 @@ function ProjectScreen({ projectId: id }: { projectId: string }) {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'overview', label: 'Overview' },
-            { value: 'tasks', label: 'Tasks' },
+            { value: 'info', label: 'Info' },
             { value: 'members', label: 'Members' },
             { value: 'files', label: 'Files' },
           ]}
@@ -49,10 +47,8 @@ function ProjectScreen({ projectId: id }: { projectId: string }) {
       </View>
       {!project ? (
         <EmptyState icon="folder" title="This project isn't available" hint="You may no longer have access to it." />
-      ) : tab === 'overview' ? (
-        <ProjectOverview project={project} />
-      ) : tab === 'tasks' ? (
-        <ScheduleList project={project} />
+      ) : tab === 'info' ? (
+        <ProjectInfo project={project} />
       ) : tab === 'members' ? (
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + space.xl }}>
           <MembersManager projectId={project.id} />

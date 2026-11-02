@@ -12,7 +12,6 @@ export const demo = {
   state: () => api<DemoState>('GET', '/internal/state'),
   setNetwork: (body: { mode?: NetworkMode; inject?: Injection | 'none' }) => api<DemoState['network']>('POST', '/internal/network', body),
   setActorsPaused: (paused: boolean) => api('POST', '/internal/actors', { paused }),
-  amitShifts: () => api('POST', '/internal/actors/amit-shifts'),
   rohanPosts: () => api('POST', '/internal/actors/rohan-posts'),
   expireToken: (userId: string) => api('POST', '/internal/expire-token', { userId }),
   deactivate: (userId: string) => api('POST', '/internal/deactivate', { userId }),

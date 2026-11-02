@@ -2,22 +2,12 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OTHER_PROBLEM } from '@/contract/schemas';
-import type { CompanyRole, JobTitle, ProjectRole, Stage, User } from '@/types/models';
+import type { CompanyRole, JobTitle, ProjectRole, User } from '@/types/models';
 import { useMeta } from './data';
 
 export const firstName = (name: string | undefined): string => name?.split(' ')[0] ?? '';
 
 export const shortProjectName = (name: string): string => name.split(' – ')[0];
-
-/** The company's stages (from its setup on the server), in order, with labels in the user's language. */
-export function useStages() {
-  const stages = useMeta()?.stages;
-  return useMemo(() => {
-    const list = stages ?? [];
-    const index = (key: Stage) => list.findIndex((st) => st.key === key);
-    return { list, index, label: (key: Stage) => list[index(key)]?.label ?? key };
-  }, [stages]);
-}
 
 /** Names for company roles, project roles and the company's own job titles, in the user's language. */
 export function useRoleLabels() {

@@ -1,14 +1,15 @@
-"""Siteline Bot (§8): check-ins, reminders, escalation and the morning summary."""
+"""Siteline Bot (§8): check-ins, reminders, escalation and the morning summary. Tasks come from the PM
+app (pm/connector.py); answers go back to it."""
 from __future__ import annotations
 
 from .core import now_iso, now_ms, parse_iso_ms, uuid7
 from .events import cancel, later, publish
 from .notify import add_activity
-from .rules import is_company_admin, is_done
-from .store import S, bot_channel_for, first_name, project_channel, project_managers, setup, short_project
+from .pm import connector as pm
+from .rules import pm_change_for, task_needs_update
+from .store import S, admins, bot_channel_for, first_name, project_channel, project_managers, setup, short_project
 from .views import checkin_view
 from .services.messaging import post_message
-from .services.tasks import apply_task_changes
 
 REMINDER_SECONDS = 60  # demo timing
 ESCALATION_SECONDS = 60
@@ -26,9 +27,14 @@ def _clear(checkin_id: str) -> None:
 
 
 def open_tasks_for(user_id: str) -> list[dict]:
-    s = S()
-    tasks = [t for t in s.tasks.values() if t["ownerId"] == user_id and not t["deletedAt"] and not is_done(t["status"])
-             and not s.projects.get(t["projectId"], {}).get("archivedAt")]
+    """The person's active or overdue PM tasks in projects that aren't archived, soonest finish first.
+    Read live from the PM app, which is the spec's re-check before asking (§8.1) until the saved copy
+    of PM tasks arrives with the database."""
+    u = S().users.get(user_id)
+    if not u:
+        return []
+    tasks = [t for t in pm.list_tasks(owner_ref=u["email"]) if task_needs_update(t)
+             and (p := pm.project_of(t)) and not p["archivedAt"]]
     return sorted(tasks, key=lambda t: t["plannedFinish"])
 
 
@@ -58,26 +64,28 @@ def remind(c: dict) -> None:
     _schedule(c)
 
 
-def _report_channel(task: dict) -> dict | None:
-    s = S()
-    return (s.channels.get(task["channelId"]) if task["channelId"] else None) or project_channel(task["projectId"], setup()["workChannel"])
+def _report_channel(c: dict) -> dict | None:
+    return project_channel(c["projectId"], setup()["workChannel"]) if c["projectId"] else None
+
+
+def _managers(c: dict) -> list[str]:
+    """Who hears about a check-in: the project's Managers, or the company's Admins when it has none."""
+    return (project_managers(c["projectId"]) if c["projectId"] else []) or admins()
 
 
 def escalate(c: dict) -> None:
-    s = S()
-    task = s.tasks.get(c["taskId"])
-    if not task or c["escalatedAt"]:
+    if c["escalatedAt"]:
         return
     _clear(c["id"])
     c["escalatedAt"] = now_iso()
-    ch = _report_channel(task)
-    text = f"{first_name(c['userId'])} hasn't updated {task['name']}."
+    ch = _report_channel(c)
+    text = f"{first_name(c['userId'])} hasn't updated {c['taskName']}."
     if ch:
         _post(ch, type="status_card", body=None,
-              data={"kind": "escalation", "userId": c["userId"], "taskId": task["id"], "taskName": task["name"], "text": text})
-    for uid in project_managers(task["projectId"]):
-        add_activity(userId=uid, kind="escalation", actorId=c["userId"], projectId=task["projectId"],
-                     channelId=ch["id"] if ch else None, messageId=None, taskIds=[task["id"]], text=text, lines=[])
+              data={"kind": "escalation", "userId": c["userId"], "taskId": c["taskId"], "taskName": c["taskName"], "text": text})
+    for uid in _managers(c):
+        add_activity(userId=uid, kind="escalation", actorId=c["userId"], projectId=c["projectId"],
+                     channelId=ch["id"] if ch else None, messageId=None, taskIds=[c["taskId"]], text=text, lines=[])
 
 
 def on_login(user_id: str) -> None:
@@ -89,8 +97,8 @@ def on_login(user_id: str) -> None:
 
 def send_morning_summary(user_id: str) -> None:
     if ch := bot_channel_for(user_id):
-        _post(ch, type="text", body=None,
-              data={"kind": "morning_summary", "taskIds": [t["id"] for t in open_tasks_for(user_id)[:5]]})
+        rows = [{k: t[k] for k in ("id", "name", "plannedFinish", "percent")} for t in open_tasks_for(user_id)[:5]]
+        _post(ch, type="text", body=None, data={"kind": "morning_summary", "tasks": rows})
 
 
 def _create_checkin(user_id: str, task: dict, with_reminder: bool) -> None:
@@ -101,8 +109,10 @@ def _create_checkin(user_id: str, task: dict, with_reminder: bool) -> None:
     cid = uuid7()
     message = _post(ch, type="checkin", body=None, data={"checkinId": cid, "taskId": task["id"]})
     ts = now_iso()
-    c = {"id": cid, "taskId": task["id"], "userId": user_id, "askedAt": ts, "answer": None, "messageId": message["id"],
-         "updatedAt": ts, "remindedAt": None, "escalatedAt": None}
+    project = pm.project_of(task)
+    c = {"id": cid, "taskId": task["id"], "taskName": task["name"], "projectId": project["id"] if project else None,
+         "userId": user_id, "askedAt": ts, "answer": None, "messageId": message["id"], "updatedAt": ts,
+         "remindedAt": None, "escalatedAt": None, "pmWrite": None, "pmError": None}
     s.checkins[cid] = c
     publish({"type": "checkin.new", "checkin": checkin_view(c)}, [user_id])
     if with_reminder:
@@ -151,41 +161,40 @@ def trigger_escalation(user_id: str) -> bool:
 
 
 def apply_checkin_answer(c: dict, answer: dict) -> None:
-    """Task update ("via check-in" history), status card in the project, activity for managers."""
-    s = S()
+    """Sends the answer to the PM app, then (once it's saved) a status card in the project and
+    activity for the managers. A refusal is kept on the check-in and shown on the card."""
     _clear(c["id"])
     c["answer"] = {**answer, "at": now_iso()}
     c["updatedAt"] = now_iso()
-    task = s.tasks.get(c["taskId"])
-    if not task:
-        return
-    who = s.users.get(c["userId"])
-    is_manager = c["userId"] in project_managers(task["projectId"]) or bool(who and is_company_admin(who))
-    kind = answer["kind"]
-    change = {
-        "progress": {"percent": answer.get("percent") if answer.get("percent") is not None else task["percent"], "status": "in_progress"},
-        "started": {"status": "in_progress"},
-        "problem": {"status": "blocked"},
-        "done": {"status": "done"},
-    }.get(kind)
+    change = pm_change_for(answer)
     if change:
-        apply_task_changes(c["userId"], task, change, "checkin", is_manager)
-    ch = _report_channel(task)
+        try:
+            pm.write_status(c["taskId"], {**change, "note": answer.get("note")}, key=c["id"])
+            c["pmWrite"] = "saved"
+        except pm.Refused as e:
+            c["pmWrite"], c["pmError"] = "refused", str(e)
+    if c["pmWrite"] != "refused":
+        _report(c, answer)
+    publish({"type": "checkin.new", "checkin": checkin_view(c)}, [c["userId"]])
+
+
+def _report(c: dict, answer: dict) -> None:
+    ch = _report_channel(c)
     if ch:
         _post(ch, type="status_card", body=None,
-              data={"kind": "checkin", "userId": c["userId"], "taskId": task["id"], "taskName": task["name"],
+              data={"kind": "checkin", "userId": c["userId"], "taskId": c["taskId"], "taskName": c["taskName"],
                     "answer": c["answer"], "hasPhoto": bool(answer.get("hasPhoto"))})
     what = {
         "progress": f"to {answer.get('percent')}%",
         "problem": f"— problem: {answer.get('reason') or 'needs attention'}",
         "done": "as done",
         "not_started": "as not started yet",
-    }.get(kind, "as started")
-    for uid in project_managers(task["projectId"]):
-        add_activity(userId=uid, kind="checkin_result", actorId=c["userId"], projectId=task["projectId"],
-                     channelId=ch["id"] if ch else None, messageId=None, taskIds=[task["id"]],
-                     text=f"{first_name(c['userId'])} updated {task['name']} {what}", lines=[short_project(task["projectId"])])
-    publish({"type": "checkin.new", "checkin": checkin_view(c)}, [c["userId"]])
+    }.get(answer["kind"], "as started")
+    for uid in _managers(c):
+        add_activity(userId=uid, kind="checkin_result", actorId=c["userId"], projectId=c["projectId"],
+                     channelId=ch["id"] if ch else None, messageId=None, taskIds=[c["taskId"]],
+                     text=f"{first_name(c['userId'])} updated {c['taskName']} {what}",
+                     lines=[short_project(c["projectId"])] if c["projectId"] else [])
 
 
 def reset_bot() -> None:

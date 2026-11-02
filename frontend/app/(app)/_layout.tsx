@@ -30,7 +30,7 @@ function TabsForUser() {
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, borderTopWidth: 1, elevation: 0 },
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-        // Like the system tab bars: labels grow a little, not to 200%, so five tabs still fit.
+        // Like the system tab bars: labels grow a little, not to 200%, so the tabs still fit.
         tabBarAllowFontScaling: false,
         tabBarBadgeStyle: badgeStyle,
         sceneStyle: { backgroundColor: c.bg },
@@ -49,13 +49,6 @@ function TabsForUser() {
           title: t('tabs.dms', 'DMs'),
           tabBarIcon: ({ color }) => <Feather name="message-circle" size={22} color={color} />,
           tabBarBadge: count(dms.totalUnread),
-        }}
-      />
-      <Tabs.Screen
-        name="tasks"
-        options={{
-          title: t('tabs.myTasks', 'My tasks'),
-          tabBarIcon: ({ color }) => <Feather name="check-square" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

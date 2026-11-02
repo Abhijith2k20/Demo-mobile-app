@@ -13,14 +13,13 @@ import type { ID, Message, User } from '@/types/models';
 import { editMessage } from '../api';
 import { extractMentions, pickPhotos, sendMessage } from '@/features/shared';
 
-export type FormKind = 'task' | 'issue' | 'report';
+export type FormKind = 'issue' | 'report';
 
 interface Props {
   channelId: ID;
   threadParentId?: ID;
-  /** Project forms (task / issue / report) are offered only in project channels. */
+  /** Project forms (issue / report) are offered only in project channels. */
   projectId: ID | null;
-  canCreateTask: boolean;
   members: User[];
   placeholder: string;
   /** Thread only: label for "Also send to #channel". */
@@ -250,7 +249,6 @@ export function Composer(props: Props) {
             }}
           />
           <Tile icon="file-text" label={t('plus.file', 'File')} onPress={sendFile} />
-          {projectId && props.canCreateTask ? <Tile icon="check-square" label={t('forms.newTask', 'New task')} onPress={() => openForm('task')} /> : null}
           {projectId ? <Tile icon="alert-triangle" label={t('forms.reportIssue', 'Report issue')} onPress={() => openForm('issue')} /> : null}
           {projectId ? <Tile icon="clipboard" label={t('forms.dailyReport', 'Daily report')} onPress={() => openForm('report')} /> : null}
         </View>

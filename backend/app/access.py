@@ -47,13 +47,6 @@ def visible_channel(user: dict, channel_id: str) -> dict:
     return ch
 
 
-def visible_task(user: dict, task_id: str) -> dict:
-    t = S().tasks.get(task_id)
-    if not t or t["deletedAt"] or not can_see_project(user, t["projectId"]):
-        raise not_found("Task")
-    return t
-
-
 def assert_project_active(project_id: str | None) -> None:
     if project_id and (p := S().projects.get(project_id)) and p["archivedAt"]:
         raise ApiError("PROJECT_ARCHIVED", "This project is archived. Unarchive it to make changes.")

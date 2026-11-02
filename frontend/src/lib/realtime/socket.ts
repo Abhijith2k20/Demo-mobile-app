@@ -18,9 +18,6 @@ function summary(e: ServerEvent): string {
     case 'message.updated':
     case 'message.deleted':
       return `${e.message.type} · ${(e.message.body ?? '').slice(0, 32)}`;
-    case 'task.updated':
-    case 'task.created':
-      return `${e.task.name} · ${e.task.percent}%`;
     case 'project.updated':
       return e.project.name;
     case 'channel.updated':

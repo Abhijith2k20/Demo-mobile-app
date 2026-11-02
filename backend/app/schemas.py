@@ -4,17 +4,14 @@ from __future__ import annotations
 import re
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Id = str
-ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHANNEL_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
-MessageType = Literal["text", "image", "voice", "file", "task_card", "checkin", "issue_card", "daily_report", "status_card", "system"]
-TaskStatus = Literal["not_started", "in_progress", "blocked", "done", "done_pending_confirmation"]
-# Stages and job titles are the company's own (see the setup); routes check them against it.
-Stage = str
+MessageType = Literal["text", "image", "voice", "file", "checkin", "issue_card", "daily_report", "status_card", "system"]
+# Job titles are the company's own (see the setup); routes check them against it.
 JobTitle = str
 ProjectRole = Literal["manager", "member"]
 
@@ -26,12 +23,6 @@ class Body(BaseModel):
 def _id(v: str) -> str:
     if not isinstance(v, str) or len(v) < 8:
         raise ValueError("Invalid id")
-    return v
-
-
-def _date(v: str) -> str:
-    if not ISO_DATE.match(v or ""):
-        raise ValueError("Pick a date")
     return v
 
 
@@ -117,50 +108,7 @@ class DmOpen(Body):
     userId: Id
 
 
-# ---- Tasks ----
-
-class TaskCreate(Body):
-    id: Id
-    name: str
-    phase: str = Field(min_length=1)
-    ownerId: Optional[Id] = None
-    # Left out: the server picks them (after the phase's last task, three days long).
-    plannedStart: Optional[str] = None
-    plannedFinish: Optional[str] = None
-    description: Optional[str] = Field(default=None, max_length=2000)
-    channelId: Optional[Id] = None
-    v_n = field_validator("name")(_name(1, 120, "Give the task a name"))
-    v_d = field_validator("plannedStart", "plannedFinish")(_date)
-
-    @model_validator(mode="after")
-    def finish_after_start(self):
-        if (self.plannedStart is None) != (self.plannedFinish is None):
-            raise ValueError("plannedFinish|Give both dates or neither")
-        if self.plannedStart and self.plannedFinish < self.plannedStart:
-            raise ValueError("plannedFinish|Finish must be on or after start")
-        return self
-
-
-class TaskPatch(Body):
-    name: Optional[str] = None
-    description: Optional[str] = Field(default=None, max_length=2000)
-    phase: Optional[str] = Field(default=None, min_length=1)
-    ownerId: Optional[Id] = None
-    plannedStart: Optional[str] = None
-    plannedFinish: Optional[str] = None
-    status: Optional[TaskStatus] = None
-    percent: Optional[int] = Field(default=None, ge=0, le=100)
-
-    @field_validator("name")
-    @classmethod
-    def name_ok(cls, v):
-        return None if v is None else _name(1, 120, "Give the task a name")(v)
-
-    @field_validator("plannedStart", "plannedFinish")
-    @classmethod
-    def dates_ok(cls, v):
-        return None if v is None else _date(v)
-
+# ---- Check-ins ----
 
 class CheckinAnswer(Body):
     kind: Literal["started", "progress", "problem", "done", "not_started"]
@@ -169,11 +117,6 @@ class CheckinAnswer(Body):
     note: Optional[str] = Field(default=None, max_length=500)
     voiceSec: Optional[int] = Field(default=None, ge=1, le=600)
     hasPhoto: Optional[bool] = None
-
-
-class Rebaseline(Body):
-    reason: str
-    v_r = field_validator("reason")(_name(3, 300, "Give a short reason"))
 
 
 # ---- Projects, members, channels ----
@@ -189,7 +132,6 @@ class ProjectCreate(Body):
 
 
 class ProjectPatch(Body):
-    stage: Optional[Stage] = None
     name: Optional[str] = None
     client: Optional[str] = None
     address: Optional[str] = None

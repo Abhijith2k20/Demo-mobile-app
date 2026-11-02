@@ -86,10 +86,6 @@ export default function RootLayout() {
             }}>
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
-            <Stack.Screen
-              name="task/[id]"
-              options={{ presentation: 'transparentModal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: 'transparent' } }}
-            />
             <Stack.Screen name="demo" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           </Stack>
           <DemoPill />

@@ -11,21 +11,12 @@ from .store import Store
 _seq = 0
 
 # Paliath is an interior-design studio, so its workspace speaks that language. Another company
-# gets its own stages, phases, job titles and channels; the code doesn't change.
+# gets its own job titles, channels and problem types; the code doesn't change.
 PALIATH_SETUP = {
-    "stages": [
-        {"key": "design", "label": {"en": "Design", "kn": "ಡಿಸೈನ್", "hi": "डिज़ाइन"}},
-        {"key": "approval", "label": {"en": "Approval", "kn": "ಅನುಮೋದನೆ", "hi": "मंज़ूरी"}},
-        {"key": "procurement", "label": {"en": "Procurement", "kn": "ಖರೀದಿ", "hi": "ख़रीद"}},
-        {"key": "execution", "label": {"en": "Execution", "kn": "ಕೆಲಸ", "hi": "काम"}},
-        {"key": "finishing", "label": {"en": "Finishing", "kn": "ಫಿನಿಶಿಂಗ್", "hi": "फ़िनिशिंग"}},
-        {"key": "handover", "label": {"en": "Handover", "kn": "ಹಸ್ತಾಂತರ", "hi": "हैंडओवर"}},
-    ],
-    "phases": ["Civil", "Electrical", "Plumbing", "False ceiling", "Carpentry", "Painting", "Finishing", "Handover"],
     "projectChannels": [
         {"name": "general"}, {"name": "design"}, {"name": "site-work"}, {"name": "qs", "private": True},
     ],
-    # Task cards and the bot's escalations go here when a task has no channel of its own.
+    # The bot's status cards and escalations go here.
     "workChannel": "site-work",
     "jobTitles": [
         {"name": "Project Manager", "label": {"en": "Project Manager", "kn": "ಪ್ರಾಜೆಕ್ಟ್ ಮ್ಯಾನೇಜರ್", "hi": "प्रोजेक्ट मैनेजर"},
@@ -118,11 +109,14 @@ def build() -> Store:
         return cid
 
     # ---- Projects ----
-    def add_project(name: str, client: str, address: str, stage: str, start: int, members: list[tuple[str, str, str]]) -> dict:
+    def add_project(name: str, client: str, address: str, members: list[tuple[str, str, str]]) -> dict:
+        # The project lives in the (mock) PM app; Siteline keeps a project space linked to it.
+        pm_id = uuid_at(epoch)
+        s.pm["projects"][pm_id] = {"id": pm_id, "name": name, "client": client, "address": address, "status": "active",
+                                   "url": None, "updatedAt": iso(epoch)}
         pid = uuid_at(epoch)
-        project = {"id": pid, "companyId": company_id, "name": name, "client": client, "address": address, "stage": stage,
-                   "startDate": day(start), "plannedFinish": day(start), "baselineFinish": None, "baselineLocked": False,
-                   "archivedAt": None, "updatedAt": iso(epoch)}
+        project = {"id": pid, "companyId": company_id, "name": name, "client": client, "address": address,
+                   "pmProjectId": pm_id, "archivedAt": None, "updatedAt": iso(epoch)}
         s.projects[pid] = project
         for k, role, jt in members:
             s.project_members.append({"projectId": pid, "userId": U[k], "role": role, "jobTitle": jt, "joinedAt": iso(epoch)})
@@ -132,17 +126,17 @@ def build() -> Store:
             joined = [k for k, role, jt in members if cname in default_channel_names(PALIATH_SETUP, role, jt)]
             ch[cname] = add_channel(cname, "project", pid, list(dict.fromkeys([*joined, *admin_keys])),
                                     isPrivate=std.get("private", False))
-        return {"id": pid, "project": project, "ch": ch}
+        return {"id": pid, "pmId": pm_id, "project": project, "ch": ch}
 
-    sharma = add_project("Villa 99", "Villa 99 owners", "Bengaluru", "execution", -45, [
+    sharma = add_project("Villa 99", "Villa 99 owners", "Bengaluru", [
         ("amit", "manager", "Project Manager"), ("kavya", "member", "Designer"), ("rohan", "member", "QS"),
         ("suresh", "manager", "Supervisor"), ("ravi", "member", "Worker"), ("manju", "member", "Worker"),
         ("imran", "member", "Worker"),
     ])
-    mehta = add_project("RV University", "RV University", "Bengaluru", "design", -12, [
+    mehta = add_project("RV University", "RV University", "Bengaluru", [
         ("kavya", "manager", "Project Manager"), ("rohan", "member", "QS"),
     ])
-    cafe = add_project("OITH", "OITH", "Bengaluru", "finishing", -50, [
+    cafe = add_project("OITH", "OITH", "Bengaluru", [
         ("amit", "manager", "Project Manager"), ("suresh", "member", "Supervisor"), ("imran", "member", "Worker"),
         ("lakshmi", "member", "Worker"), ("prakash", "member", "Worker"),
     ])
@@ -157,31 +151,16 @@ def build() -> Store:
     # ---- Tasks ----
     T: dict[str, str] = {}
 
-    def add_tasks(p: dict, specs: list[tuple], baseline_locked: bool) -> None:
-        max_planned = p["project"]["startDate"]
-        max_baseline = ""
-        for spec in specs:
-            phase, name, start, finish, status, percent, owner = spec[:7]
-            slip = spec[7] if len(spec) > 7 else 0
+    def add_tasks(p: dict, specs: list[tuple]) -> None:
+        """PM tasks: (phase, name, start, finish, status, percent, owner). The phase only groups this list."""
+        for _phase, name, start, finish, status, percent, owner, *_ in specs:
             tid = uuid_at(epoch)
             T[name] = tid
-            task = {
-                "id": tid, "projectId": p["id"], "phase": phase, "name": name, "description": None,
-                "ownerId": U[owner] if owner else None, "plannedStart": day(start), "plannedFinish": day(finish),
-                "baselineStart": day(start - slip) if baseline_locked else None,
-                "baselineFinish": day(finish - slip) if baseline_locked else None,
-                "actualStart": None if status == "not_started" else day(start),
-                "actualFinish": day(finish) if status == "done" else None,
-                "status": status, "percent": percent,
-                "channelId": p["ch"]["design"] if phase == "Design" else p["ch"]["site-work"],
-                "updatedAt": iso(epoch), "deletedAt": None,
+            s.pm["tasks"][tid] = {
+                "id": tid, "projectId": p["pmId"], "name": name, "plannedStart": day(start), "plannedFinish": day(finish),
+                "ownerRef": s.users[U[owner]]["email"] if owner else None, "status": status, "percent": percent,
+                "updatedAt": iso(epoch),
             }
-            s.tasks[tid] = task
-            max_planned = max(max_planned, task["plannedFinish"])
-            if task["baselineFinish"]:
-                max_baseline = max(max_baseline, task["baselineFinish"])
-        p["project"].update(plannedFinish=max_planned, baselineLocked=baseline_locked,
-                            baselineFinish=max_baseline if baseline_locked else None)
 
     add_tasks(sharma, [
         ("Civil", "Demolition & debris clearing", -44, -41, "done", 100, "suresh"),
@@ -216,7 +195,7 @@ def build() -> Store:
         ("Finishing", "Deep cleaning", 23, 24, "not_started", 0, "suresh", 4),
         ("Handover", "Snag list walkthrough", 24, 25, "not_started", 0, "amit", 4),
         ("Handover", "Client handover", 26, 26, "not_started", 0, "arjun", 4),
-    ], True)
+    ])
     add_tasks(mehta, [
         ("Design", "Site measurement", -12, -11, "done", 100, "kavya"),
         ("Design", "Client brief & moodboard", -11, -8, "done", 100, "kavya"),
@@ -230,7 +209,7 @@ def build() -> Store:
         ("Design", "BOQ & estimate", 8, 12, "not_started", 0, "rohan"),
         ("Design", "Client approval – design", 12, 14, "not_started", 0, "arjun"),
         ("Design", "Sign-off & advance", 14, 15, "not_started", 0, "meera"),
-    ], False)
+    ])
     add_tasks(cafe, [
         ("Civil", "Site clearing & marking", -50, -47, "done", 100, "suresh"),
         ("Civil", "Counter masonry base", -47, -42, "done", 100, "prakash"),
@@ -250,7 +229,7 @@ def build() -> Store:
         ("Finishing", "Pendant lights", -1, 2, "in_progress", 50, "suresh", -1),
         ("Finishing", "Signage & branding", 1, 4, "not_started", 0, "imran", -1),
         ("Handover", "Snag list & handover", 4, 6, "not_started", 0, "amit", -1),
-    ], True)
+    ])
 
     # ---- Messages ----
     def img(tone: str, caption: str) -> dict:
@@ -311,7 +290,6 @@ def build() -> Store:
         "attachments": [img("linen", "Boarding – living room"), img("stone", "Kitchen wall cleared")],
     })
     say(sw, at(5, 9, 20), "ravi", None, type="voice", data={"durationSec": 14})
-    say(sw, at(5, 11, 0), "amit", None, type="task_card", data={"taskId": T["Kitchen carcass"]})
     say(sw, at(5, 14, 15), "suresh", "Living room boarding progress",
         **photos(img("linen", "Boarding – centre"), img("stone", "Boarding – cove edge"), img("sage", "Window side")))
     say(sw, at(4, 9, 10), "amit", "Client visit on Saturday 11 am. Please keep the living room clean and the sample laminate ready.")
@@ -388,12 +366,11 @@ def build() -> Store:
     # Villa 99 — #general
     sg = sharma["ch"]["general"]
     say(sg, at(9, 8, 50), "amit", "Welcome to Villa 99. Site address and client contact are on the project page.")
-    say(sg, at(9, 8, 55), "bot", "Project moved to Execution", type="system")
     say(sg, at(8, 9, 0), "meera", "Reminder: site entry only with ID cards. Society rule.")
     say(sg, at(6, 12, 0), "amit", "Client visit this Saturday 11 am.")
     say(sg, at(6, 12, 10), "kavya", "I'll be there with samples.")
     say(sg, at(4, 17, 30), "suresh", "Lift will be shut for maintenance tomorrow 10–12. Plan material movement.")
-    say(sg, at(2, 10, 0), "amit", "Baseline is locked. Any date change now shows as variance.")
+    say(sg, at(2, 10, 0), "amit", "Dates are final in the PM app now. Any change there shows up in the bot's check-ins.")
     say(sg, at(1, 13, 20), "rohan", "Petty cash topped up, ₹15,000 with Suresh.")
     say(sg, ago(110), "amit", "We are 4 days behind baseline, mainly the gypsum delay. Let's recover it in carpentry.")
     say(sg, ago(50), "suresh", "Will add two carpenters from Monday.")
@@ -461,32 +438,18 @@ def build() -> Store:
     # Bot DMs
     for k in human_keys:
         say(bot_dm[k], at(8, 9, 1), "bot", "Hi! I will check in on your tasks here. Tap a button to answer — no typing needed.")
+    summary = [s.pm["tasks"][T[n]] for n in ("False ceiling – living room", "False ceiling – master bedroom")]
     say(bot_dm["ravi"], ago(420), "bot", None, data={
-        "kind": "morning_summary", "taskIds": [T["False ceiling – living room"], T["False ceiling – master bedroom"]],
+        "kind": "morning_summary", "tasks": [{k: t[k] for k in ("id", "name", "plannedFinish", "percent")} for t in summary],
     })
     ci_time = ago(6)
     checkin_id = uuid_at(ci_time)
     checkin_msg = say(bot_dm["ravi"], ci_time, "bot", None, type="checkin",
                       data={"checkinId": checkin_id, "taskId": T["False ceiling – living room"]})
-    s.checkins[checkin_id] = {"id": checkin_id, "taskId": T["False ceiling – living room"], "userId": U["ravi"],
+    s.checkins[checkin_id] = {"id": checkin_id, "taskId": T["False ceiling – living room"],
+                              "taskName": "False ceiling – living room", "projectId": sharma["id"], "userId": U["ravi"],
                               "askedAt": iso(ci_time), "answer": None, "messageId": checkin_msg, "updatedAt": iso(ci_time),
-                              "remindedAt": None, "escalatedAt": None}
-
-    # ---- Task history ----
-    def hist(task_name: str, user: str, field: str, old: str | None, new: str | None, ms: int, via: str = "app") -> None:
-        s.task_history.append({"id": uuid_at(ms), "taskId": T[task_name], "userId": U[user], "field": field,
-                               "from": old, "to": new, "via": via, "createdAt": iso(ms)})
-
-    hist("False ceiling – living room", "ravi", "status", "not_started", "in_progress", at(7, 9, 30))
-    hist("False ceiling – living room", "ravi", "percent", "0", "25", at(6, 18, 4), "checkin")
-    hist("False ceiling – living room", "amit", "plannedFinish", day(-2), day(2), at(4, 10, 0))
-    hist("False ceiling – living room", "ravi", "percent", "25", "50", at(3, 18, 2), "checkin")
-    hist("False ceiling – master bedroom", "suresh", "status", "in_progress", "blocked", at(6, 9, 30))
-    hist("False ceiling – master bedroom", "amit", "plannedFinish", day(-1), day(3), at(4, 10, 0))
-    hist("Kitchen carcass", "imran", "status", "not_started", "in_progress", at(3, 10, 5))
-    hist("Kitchen carcass", "suresh", "percent", "0", "25", at(1, 18, 5))
-    hist("Pendant lights", "suresh", "percent", "0", "50", ago(80))
-    hist("3D renders – lobby & cafeteria", "kavya", "status", "not_started", "in_progress", at(1, 10, 0))
+                              "remindedAt": None, "escalatedAt": None, "pmWrite": None, "pmError": None}
 
     # ---- Activity ----
     def activity(user: str, kind: str, actor: str, created: str, *, channel_id=None, message_id=None, task_ids=(),
@@ -505,8 +468,6 @@ def build() -> Store:
              text="Ravi updated False ceiling – living room to 50%")
     activity("suresh", "thread_reply", "ravi", iso(at(6, 9, 48)), channel_id=sw, message_id=thread,
              text="Ravi replied to your message in #site-work", lines=["Ok sir, we will continue living room till then."])
-    activity("ravi", "task_assigned", "amit", iso(at(7, 9, 0)), task_ids=[T["False ceiling – living room"]],
-             text="Amit assigned you False ceiling – living room")
 
     # ---- Read markers: leave a few unread messages per channel for everyone ----
     by_channel: dict[str, list[dict]] = {}

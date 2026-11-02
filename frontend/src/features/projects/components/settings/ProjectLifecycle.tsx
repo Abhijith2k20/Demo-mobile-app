@@ -105,7 +105,7 @@ export function ProjectLifecycle({ project, access }: { project: Project; access
 
       <Sheet visible={removing} onClose={() => setRemoving(false)} title={`Delete ${shortName}?`}>
         <T variant="body" color="textMuted" style={{ marginBottom: space.md }}>
-          All its channels, messages, photos and tasks are removed for everyone. This can&apos;t be undone.
+          All its channels, messages and photos are removed for everyone. Its tasks stay in the PM app. This can&apos;t be undone.
         </T>
         <Field label={`Type ${shortName} to confirm`}>
           <SheetInput value={typed} onChangeText={setTyped} autoCapitalize="none" autoCorrect={false} placeholder={shortName} />

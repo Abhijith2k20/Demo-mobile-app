@@ -6,7 +6,6 @@ from fastapi import APIRouter
 from .. import actors, bot, netsim
 from ..core import not_found
 from ..events import hub
-from ..notify import flush_all
 from ..schemas import ActorsConfig, AsUser, NetworkConfig
 from ..store import S
 from ..services.people import deactivate_user, expire_access_tokens
@@ -46,12 +45,6 @@ async def set_actors(body: ActorsConfig):
     return {"actorsPaused": actors.paused()}
 
 
-@router.post("/actors/amit-shifts")
-async def amit_shifts():
-    actors.amit_shifts_tasks(0)
-    return {"ok": True}
-
-
 @router.post("/actors/rohan-posts")
 async def rohan_posts():
     actors.rohan_posts_qs(0)
@@ -85,12 +78,6 @@ async def evening(body: AsUser):
 @router.post("/bot/escalate")
 async def escalate(body: AsUser):
     return {"escalated": bot.trigger_escalation(_user(body.userId)["id"])}
-
-
-@router.post("/notifications/flush")
-async def flush():
-    flush_all()
-    return {"ok": True}
 
 
 @router.get("/events")

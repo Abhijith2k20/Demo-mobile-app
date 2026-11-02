@@ -5,17 +5,12 @@ from app.rules import (
     can_deactivate,
     can_invite_as,
     can_post,
-    current_phase,
     default_channel_names,
     job_title_error,
-    matches_task_filters,
-    next_stage,
-    normalize_task_change,
-    ordered_phases,
+    pm_change_for,
     simple_mode,
-    task_defaults,
-    project_delay_days,
-    task_variance_days,
+    task_is_overdue,
+    task_needs_update,
 )
 from app.schemas import normalize_channel_name
 
@@ -24,53 +19,34 @@ OWNER, ADMIN, MEMBER = {"companyRole": "owner"}, {"companyRole": "admin"}, {"com
 
 
 def task(**over):
-    base = {"status": "not_started", "percent": 0, "actualStart": None, "actualFinish": None, "name": "Wardrobe",
-            "plannedStart": "2026-10-05", "plannedFinish": "2026-10-12", "baselineFinish": None}
+    base = {"status": "in_progress", "percent": 50, "plannedStart": "2026-10-05", "plannedFinish": "2026-10-12"}
     return base | over
 
 
-# ---- Task changes ----
+# ---- What the bot asks about, and what an answer tells the PM app ----
 
-def test_first_progress_starts_the_task():
-    assert normalize_task_change(task(), {"percent": 25}, False, TODAY) == {"percent": 25, "status": "in_progress", "actualStart": TODAY}
-
-
-def test_member_100_waits_for_a_manager_and_manager_100_is_done():
-    started = task(status="in_progress", percent=75, actualStart="2026-10-05")
-    assert normalize_task_change(started, {"percent": 100}, False, TODAY) == {
-        "percent": 100, "status": "done_pending_confirmation", "actualFinish": TODAY}
-    assert normalize_task_change(started, {"percent": 100}, True, TODAY) == {"percent": 100, "status": "done", "actualFinish": TODAY}
+def test_bot_asks_about_active_and_overdue_tasks_only():
+    assert task_needs_update(task(), TODAY)  # active
+    assert task_needs_update(task(status="not_started"), TODAY)  # should have started
+    assert task_needs_update(task(plannedFinish="2026-10-01"), TODAY)  # overdue
+    assert task_needs_update(task(status="blocked"), TODAY)
+    assert not task_needs_update(task(plannedStart="2026-10-10"), TODAY)  # starts later
+    assert not task_needs_update(task(status="done"), TODAY)
 
 
-def test_marking_done_sets_100_percent():
-    started = task(status="in_progress", percent=50, actualStart="2026-10-05")
-    assert normalize_task_change(started, {"status": "done"}, True, TODAY) == {"status": "done", "percent": 100, "actualFinish": TODAY}
+def test_overdue_means_open_and_past_its_finish():
+    assert task_is_overdue(task(plannedFinish="2026-10-08"), TODAY)
+    assert not task_is_overdue(task(plannedFinish=TODAY), TODAY)
+    assert not task_is_overdue(task(plannedFinish="2026-10-08", status="done"), TODAY)
 
 
-def test_reopening_clears_finish_and_drops_below_100():
-    done = task(status="done", percent=100, actualStart="2026-10-05", actualFinish="2026-10-08")
-    assert normalize_task_change(done, {"status": "in_progress"}, True, TODAY) == {"status": "in_progress", "percent": 90, "actualFinish": None}
-
-
-def test_back_to_not_started_resets_progress_and_start():
-    started = task(status="in_progress", percent=50, actualStart="2026-10-05")
-    assert normalize_task_change(started, {"status": "not_started"}, True, TODAY) == {"status": "not_started", "percent": 0, "actualStart": None}
-
-
-def test_no_op_values_are_dropped_and_dates_left_alone():
-    started = task(status="in_progress", percent=50, actualStart="2026-10-05")
-    assert normalize_task_change(started, {"percent": 50, "name": "Wardrobe"}, True, TODAY) == {}
-    assert normalize_task_change(task(), {"plannedFinish": "2026-10-14"}, True, TODAY) == {"plannedFinish": "2026-10-14"}
-
-
-# ---- Baseline variance ----
-
-def test_variance_and_delay():
-    assert task_variance_days(task()) is None
-    assert task_variance_days(task(plannedFinish="2026-10-16", baselineFinish="2026-10-12")) == 4
-    assert task_variance_days(task(plannedFinish="2026-10-11", baselineFinish="2026-10-12")) == -1
-    assert project_delay_days({"plannedFinish": "2026-11-04", "baselineFinish": "2026-10-31", "baselineLocked": False}) == 0
-    assert project_delay_days({"plannedFinish": "2026-11-04", "baselineFinish": "2026-10-31", "baselineLocked": True}) == 4
+def test_answers_become_pm_status_changes():
+    assert pm_change_for({"kind": "progress", "percent": 75}) == {"status": "in_progress", "percent": 75}
+    assert pm_change_for({"kind": "progress", "percent": 100}) == {"status": "done"}
+    assert pm_change_for({"kind": "done"}) == {"status": "done"}
+    assert pm_change_for({"kind": "started"}) == {"status": "in_progress"}
+    assert pm_change_for({"kind": "problem", "reason": "Labour short"}) == {"status": "blocked", "problem": "Labour short"}
+    assert pm_change_for({"kind": "not_started"}) is None
 
 
 # ---- Permissions ----
@@ -81,10 +57,9 @@ def test_owner_and_admin_can_do_every_project_action():
 
 
 def test_project_roles():
-    assert can(MEMBER, "task.edit_any", "manager") and can(MEMBER, "channel.manage", "manager")
-    assert can(MEMBER, "task.create", "member") and can(MEMBER, "task.update_own", "member")
-    assert not can(MEMBER, "task.edit_any", "member") and not can(MEMBER, "task.baseline", "member")
-    assert not can(MEMBER, "task.create", None)
+    assert can(MEMBER, "channel.manage", "manager") and can(MEMBER, "message.pin", "manager")
+    assert not can(MEMBER, "channel.manage", "member") and not can(MEMBER, "message.pin", "member")
+    assert not can(MEMBER, "project.edit", None)
     assert not can(MEMBER, "project.delete", "manager")  # unknown to project roles
 
 
@@ -97,8 +72,6 @@ def test_posting_policy():
 
 # A company from another industry: nothing in the rules should assume interior design.
 EVENTS = {
-    "stages": [{"key": "plan", "label": "Plan"}, {"key": "book", "label": "Book"}, {"key": "run", "label": "Run"}],
-    "phases": ["Venue", "Catering", "Sound"],
     "projectChannels": [{"name": "general"}, {"name": "vendors"}, {"name": "on-the-day"}, {"name": "budget", "private": True}],
     "workChannel": "on-the-day",
     "jobTitles": [
@@ -117,50 +90,13 @@ def test_default_channels_come_from_the_company_setup():
     assert default_channel_names(EVENTS, "member", "Unknown") == ["general"]
 
 
-def test_job_titles_stages_and_simple_mode_come_from_the_setup():
+def test_job_titles_and_simple_mode_come_from_the_setup():
     assert job_title_error(EVENTS, "member", "Crew") is None
     assert job_title_error(EVENTS, "member", "Lead") == "This job title is for managers"
     assert job_title_error(EVENTS, "manager", "Lead") is None
     assert job_title_error(EVENTS, "member", "Designer") == "Pick one of the company's job titles"
-    assert next_stage(EVENTS, "plan") == "book" and next_stage(EVENTS, "run") is None
     assert simple_mode(EVENTS, ["Crew", "Crew"]) and not simple_mode(EVENTS, ["Crew", "Coordinator"])
     assert not simple_mode(EVENTS, [])
-
-
-def _task(**over):
-    t = {"id": "t1", "phase": "Venue", "ownerId": "me", "status": "in_progress", "plannedStart": "2026-10-05",
-         "plannedFinish": "2026-10-12", "baselineFinish": None}
-    return {**t, **over}
-
-
-def test_phases_and_new_task_defaults():
-    tasks = [_task(phase="Sound", status="not_started", plannedFinish="2026-10-20"), _task(phase="Lighting")]
-    assert ordered_phases(EVENTS, tasks) == ["Lighting", "Sound"]  # custom first, then setup order
-    assert current_phase(EVENTS, tasks) == "Lighting"  # where work is happening
-    assert current_phase(EVENTS, []) == "Venue"
-    assert task_defaults(tasks, "Sound", TODAY) == {"phase": "Sound", "plannedStart": "2026-10-21", "plannedFinish": "2026-10-23"}
-    assert task_defaults(tasks, "Venue", TODAY) == {"phase": "Venue", "plannedStart": TODAY, "plannedFinish": "2026-10-11"}
-
-
-def test_schedule_filters():
-    match = lambda t, **f: matches_task_filters(t, f, "me", TODAY)  # noqa: E731
-    assert match(_task()) and match(_task(status="done", ownerId=None))
-    pending = ["not_started", "in_progress", "blocked", "done_pending_confirmation"]
-    assert not match(_task(status="done"), statuses=pending) and match(_task(status="blocked"), statuses=pending)
-    assert not match(_task(ownerId="other"), owner="me") and match(_task(ownerId=None), owner="unassigned")
-    assert match(_task(ownerId="ravi"), owner="ravi") and not match(_task(ownerId=None), owner="ravi")
-    # Overdue: finish date passed and not done.
-    assert match(_task(plannedFinish="2026-10-08"), due="overdue") and not match(_task(plannedFinish=TODAY), due="overdue")
-    assert not match(_task(plannedFinish="2026-10-08", status="done"), due="overdue")
-    # This week: today and the next seven days.
-    assert match(_task(plannedFinish=TODAY), due="week") and match(_task(plannedFinish="2026-10-16"), due="week")
-    assert not match(_task(plannedFinish="2026-10-17"), due="week") and not match(_task(plannedFinish="2026-10-08"), due="week")
-    # Delayed: later than baseline and still open.
-    assert match(_task(baselineFinish="2026-10-10"), delayed=True)
-    assert not match(_task(baselineFinish="2026-10-12"), delayed=True)
-    assert not match(_task(baselineFinish="2026-10-10", status="done"), delayed=True)
-    assert not match(_task(), phases=["Sound"]) and match(_task(), phases=["Sound", "Venue"])
-    assert not match(_task(ownerId="other"), phases=["Venue"], owner="me")
 
 
 def test_channel_name_normalising():

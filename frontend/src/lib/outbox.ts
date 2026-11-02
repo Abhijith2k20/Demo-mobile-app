@@ -1,5 +1,5 @@
-// Send queue for the things people do in the field with bad signal: messages (with photos), check-in
-// answers and task updates. Each change is saved on the phone first and sent in the background,
+// Send queue for the things people do in the field with bad signal: messages (with photos) and check-in
+// answers. Each change is saved on the phone first and sent in the background,
 // oldest first, until the server accepts or refuses it. The server still decides everything:
 // the app only shows "sending" until it answers. Everything else in the app is online-only.
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,9 +12,7 @@ import { keys, refresh } from '@/lib/queries';
 import { dropPhoto, keepPhoto, photoExists } from '@/lib/queuedFiles';
 import { useSession } from '@/stores/session';
 import { toast } from '@/stores/ui';
-import type { Attachment, CheckinAnswer, ID, MessageType, Task } from '@/types/models';
-
-export type TaskChanges = Partial<Pick<Task, 'name' | 'description' | 'phase' | 'ownerId' | 'plannedStart' | 'plannedFinish' | 'status' | 'percent'>>;
+import type { Attachment, CheckinAnswer, ID, MessageType } from '@/types/models';
 
 export interface QueuedPhoto {
   attachmentId: ID;
@@ -49,7 +47,6 @@ export type OutboxItem = Base &
         photos: QueuedPhoto[];
       }
     | { kind: 'checkin'; checkinId: ID; taskId: ID; taskName: string; answer: CheckinAnswer }
-    | { kind: 'task'; taskId: ID; projectId: ID; taskName: string; changes: TaskChanges }
   );
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -92,6 +89,8 @@ export async function loadOutbox(userId: ID): Promise<void> {
   } catch (e) {
     console.warn('[outbox] could not load', e);
   }
+  // Task updates were queued by older versions of the app; tasks now belong to the PM app.
+  items = items.filter((i) => i.kind === 'message' || i.kind === 'checkin');
   useOutbox.getState().set(items.map((i) => (i.state === 'sending' ? { ...i, state: 'waiting' } : i)));
   void runOutbox();
 }
@@ -102,19 +101,11 @@ export async function clearOutbox(userId?: ID): Promise<void> {
   if (userId) await AsyncStorage.removeItem(storageKey(userId)).catch(() => {});
 }
 
-/** Adds a change and starts sending. Two waiting updates to one task merge into one. */
+/** Adds a change and starts sending. */
 export function enqueue(input: NewItem): ID {
   const userId = useSession.getState().user?.id;
   if (!userId) throw new Error('No session');
   const items = useOutbox.getState().items;
-  if (input.kind === 'task') {
-    const same = items.find((i) => i.kind === 'task' && i.taskId === input.taskId && i.state === 'waiting');
-    if (same && same.kind === 'task') {
-      update(same.id, { changes: { ...same.changes, ...input.changes } });
-      void runOutbox();
-      return same.id;
-    }
-  }
   const { id, ...rest } = input;
   if (rest.kind === 'message') rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
   const item = { ...rest, id: id ?? uuidv7(), userId, createdAt: new Date().toISOString(), state: 'waiting', attempts: 0, nextAt: 0, error: null } as OutboxItem;
@@ -177,10 +168,7 @@ async function send(item: OutboxItem): Promise<void> {
     }
     case 'checkin':
       await api('POST', `/checkins/${item.checkinId}/answer`, item.answer);
-      return void refresh(keys.checkins, keys.task(item.taskId), keys.myTasks, ['tasks']);
-    case 'task':
-      await api('PATCH', `/tasks/${item.taskId}`, item.changes);
-      return void refresh(keys.task(item.taskId), keys.tasks(item.projectId), keys.myTasks, ['tasks-by-ids'], keys.projects);
+      return void refresh(keys.checkins, ['tasks']);
   }
 }
 

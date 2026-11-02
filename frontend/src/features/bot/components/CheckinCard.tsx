@@ -13,9 +13,9 @@ import { T } from '@/components/T';
 import { radius, space, touch } from '@/theme/spacing';
 import { useLargeText, useTheme } from '@/theme/useTheme';
 import type { CheckinAnswer, ID, Message } from '@/types/models';
-import { pickPhotos, shortProjectName, useProblemTypes, useProject, useProjectAccess } from '../../shared';
-import { answerCheckin } from '../../tasks/api';
-import { useCheckin, useTask } from '../../tasks/hooks';
+import { pickPhotos, shortProjectName, useProblemTypes, useProjectAccess } from '../../shared';
+import { answerCheckin } from '../api';
+import { useCheckin } from '../hooks';
 import { NoteField, VoiceChip, type NoteValue } from './NoteField';
 import { useCheckinQueue } from '../queue';
 
@@ -139,9 +139,8 @@ export function CheckinCard({ message }: { message: Message }) {
   const optionRow = { flexDirection: large ? ('column' as const) : ('row' as const), gap: space.sm };
   const checkinId = message.data?.checkinId as ID | undefined;
   const checkin = useCheckin(checkinId);
-  const { task } = useTask(message.data?.taskId as ID | undefined);
-  const project = useProject(task?.projectId);
-  const access = useProjectAccess(task?.projectId);
+  const task = checkin?.task ?? null; // as the PM app has it now
+  const access = useProjectAccess(checkin?.projectId);
   const queue = useCheckinQueue();
   const [step, setStep] = useState<Step>('ask');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -149,16 +148,16 @@ export function CheckinCard({ message }: { message: Message }) {
   const [hasPhoto, setHasPhoto] = useState(false);
   const reminder = !!message.data?.reminder;
 
-  const taskName = task?.name ?? t('checkin.yourTask', 'your task');
-  const overdue = !!task?.isLate; // worked out by the server
+  const taskName = checkin?.taskName ?? t('checkin.yourTask', 'your task');
+  const overdue = !!task?.isOverdue; // worked out by the server
   const due = task ? format(parseISO(task.plannedFinish), 'EEE d MMM') : '';
-  const where = [project ? shortProjectName(project.name) : null, task ? (overdue ? t('checkin.overdue', 'Overdue · {{date}}', { date: due }) : t('checkin.due', 'due {{date}}', { date: due })) : null]
+  const where = [checkin?.projectName ? shortProjectName(checkin.projectName) : null, task ? (overdue ? t('checkin.overdue', 'Overdue · {{date}}', { date: due }) : t('checkin.due', 'due {{date}}', { date: due })) : null]
     .filter(Boolean)
     .join(' · ');
 
   // A reminder repeats a question that already has its own card: keep it to one quiet line.
   if (reminder) {
-    if (!checkin || checkin.answer) return null;
+    if (!checkin || checkin.answer || checkin.closed) return null;
     return (
       <Pressable onPress={() => checkinId && queue?.open(checkinId)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2, paddingHorizontal: space.md }}>
         <Feather name="bell" size={13} color={c.textMuted} />
@@ -229,6 +228,11 @@ export function CheckinCard({ message }: { message: Message }) {
             “{a.note}”
           </T>
         ) : null}
+        {checkin.pmWrite === 'refused' ? (
+          <T variant="meta" color="danger" style={{ marginTop: 4 }}>
+            {t('checkin.notSaved', 'Not saved: {{reason}}', { reason: checkin.pmError ?? '' })}
+          </T>
+        ) : null}
         {a.voiceSec ? (
           <View style={{ marginTop: 6 }}>
             <VoiceChip seconds={a.voiceSec} />
@@ -238,14 +242,14 @@ export function CheckinCard({ message }: { message: Message }) {
     );
   }
 
-  // ---- Archived project: nothing to answer ----
-  if (access.archived) {
+  // ---- Archived project, or the task was finished or removed in the PM app: nothing to answer ----
+  if (access.archived || checkin.closed) {
     return (
       <Shell>
         {heading(
           false,
           <T variant="meta" color="textFaint">
-            {t('checkin.archived', 'Archived')}
+            {access.archived ? t('checkin.archived', 'Archived') : t('checkin.closed', 'Changed in the PM app')}
           </T>,
         )}
       </Shell>
@@ -272,7 +276,7 @@ export function CheckinCard({ message }: { message: Message }) {
 
   // ---- The open card ----
   const submit = (answer: CheckinAnswer) =>
-    answerCheckin(checkin, taskName, { ...answer, hasPhoto: hasPhoto || undefined, note: note.text.trim() || undefined, voiceSec: note.voiceSec ?? undefined });
+    answerCheckin(checkin, { ...answer, hasPhoto: hasPhoto || undefined, note: note.text.trim() || undefined, voiceSec: note.voiceSec ?? undefined });
   const position = queue && queue.pending.length > 1 ? `${queue.pending.indexOf(checkin.id) + 1} of ${queue.pending.length}` : null;
   const current = task?.percent ?? 0;
 

@@ -1,14 +1,12 @@
 // Message renderer registry (§7.4): one component per message type.
 import { Feather } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
-import { router } from 'expo-router';
 import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
-import { Avatar, Card, Pill } from '@/components/basics';
+import { View } from 'react-native';
+import { Card, Pill } from '@/components/basics';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { T } from '@/components/T';
-import { shortDate } from '@/lib/format';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Attachment, CheckinAnswer, ID, Message, MessageType } from '@/types/models';
@@ -16,8 +14,6 @@ import { CheckinCard } from '../../bot/components/CheckinCard';
 import { VoiceChip } from '../../bot/components/NoteField';
 import { MorningSummary } from '../../bot/components/MorningSummary';
 import { firstName, useProblemTypes } from '../../shared';
-import { useTask } from '../../tasks/hooks';
-import { StatusDot, useStatusLabel } from '../../tasks/components/TaskIndicators';
 import { useChat } from '../context';
 
 type Props = { message: Message };
@@ -156,49 +152,6 @@ function CardTitle({ icon, label, color }: { icon: keyof typeof Feather.glyphMap
   );
 }
 
-function TaskCard({ message }: Props) {
-  const { c } = useTheme();
-  const { t } = useTranslation();
-  const { users } = useChat();
-  const statusLabel = useStatusLabel();
-  const { task, loading } = useTask(message.data?.taskId as ID | undefined);
-  if (!task) {
-    return (
-      <Card accent={c.info} style={{ maxWidth: 340, marginTop: 2 }}>
-        <T variant="meta" color="textMuted">
-          {loading ? '…' : t('task.unavailable', 'This task is no longer available.')}
-        </T>
-      </Card>
-    );
-  }
-  const owner = task.ownerId ? users.get(task.ownerId) : undefined;
-  return (
-    <Pressable onPress={() => router.push(`/task/${task.id}`)} accessibilityRole="button" style={{ maxWidth: 340, marginTop: 2 }}>
-      <Card accent={c.info}>
-        <CardTitle icon="check-square" label={t('task.card', 'Task')} color={c.info} />
-        <T variant="heading">{task.name}</T>
-        <T variant="meta" color="textMuted">
-          {task.phase} · {shortDate(task.plannedStart)}–{shortDate(task.plannedFinish)}
-        </T>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm }}>
-          <StatusDot status={task.status} />
-          <T variant="metaStrong">{statusLabel(task.status)}</T>
-          <T variant="meta" color="textMuted">
-            · {task.percent}%
-          </T>
-          <View style={{ flex: 1 }} />
-          {owner ? <Avatar id={owner.id} name={owner.name} size={20} /> : null}
-          {owner ? (
-            <T variant="meta" color="textMuted">
-              {firstName(owner.name)}
-            </T>
-          ) : null}
-        </View>
-      </Card>
-    </Pressable>
-  );
-}
-
 function IssueCard({ message }: Props) {
   const { c } = useTheme();
   const { t } = useTranslation();
@@ -300,7 +253,7 @@ function StatusCard({ message }: Props) {
   const answer = d.answer as CheckinAnswer | undefined;
   const tone = escalation ? c.warning : c.accent;
   return (
-    <Pressable onPress={() => d.taskId && router.push(`/task/${String(d.taskId)}`)} style={{ maxWidth: 340, marginTop: 2 }}>
+    <View style={{ maxWidth: 340, marginTop: 2 }}>
       <Card accent={tone}>
         <CardTitle
           icon={escalation ? 'bell' : 'activity'}
@@ -329,7 +282,7 @@ function StatusCard({ message }: Props) {
           </View>
         ) : null}
       </Card>
-    </Pressable>
+    </View>
   );
 }
 
@@ -355,7 +308,6 @@ export const renderers: Record<MessageType, ComponentType<{ message: Message }>>
   image: ImageMessage,
   voice: VoiceMessage,
   file: FileMessage,
-  task_card: TaskCard,
   checkin: CheckinCard,
   issue_card: IssueCard,
   daily_report: DailyReportCard,

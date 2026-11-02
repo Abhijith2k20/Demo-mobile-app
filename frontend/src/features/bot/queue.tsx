@@ -2,7 +2,7 @@
 // Only one card is expanded at a time, so the bot asks one question at a time.
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useNow } from '@/lib/useNow';
-import { useMyCheckins } from '@/features/tasks/hooks';
+import { useMyCheckins } from './hooks';
 import type { ID } from '@/types/models';
 
 /** Check-ins asked within this window count as "this round" for the progress bar. */
@@ -27,8 +27,8 @@ export function CheckinQueueProvider({ children }: { children: ReactNode }) {
   const [picked, setPicked] = useState<ID | null>(null);
   const now = useNow(60_000);
   const value = useMemo<Queue>(() => {
-    const pending = all.filter((c) => !c.answer).map((c) => c.id);
-    const round = all.filter((c) => now - Date.parse(c.askedAt) < ROUND_MS || !c.answer);
+    const pending = all.filter((c) => !c.answer && !c.closed).map((c) => c.id);
+    const round = all.filter((c) => !c.closed && (now - Date.parse(c.askedAt) < ROUND_MS || !c.answer));
     return {
       pending,
       // The user's pick while it is still waiting; otherwise the oldest waiting one.

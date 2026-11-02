@@ -23,6 +23,6 @@ async def current_user(authorization: str = Header(default="")) -> dict:
 
 
 async def language(accept_language: str = Header(default="en")) -> str:
-    """The reader's language for the company's own labels (stages, job titles)."""
+    """The reader's language for the company's own labels (job titles, problem types)."""
     code = accept_language.split(",")[0].split("-")[0].strip().lower()
     return code if code in LANGUAGES else "en"

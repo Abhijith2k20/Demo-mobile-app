@@ -1,7 +1,5 @@
 from app.core import uuid7
-from app.notify import flush_all
-from app.rules import normalize_task_change
-from conftest import channel_named, events_for, project_id, task_named
+from conftest import channel_named, events_for, project_id
 
 # ---- Auth ----
 
@@ -56,8 +54,8 @@ def test_project_permissions_come_from_the_server(login):
     amit, ravi = login("amit@paliath.in"), login("ravi@paliath.in")
     amit_perms = amit.get(f"/projects/{project_id(amit, 'Villa 99')}").json()["access"]["permissions"]
     ravi_access = ravi.get(f"/projects/{project_id(ravi, 'Villa 99')}").json()["access"]
-    assert "task.edit_any" in amit_perms and "project.archive" in amit_perms and "project.delete" not in amit_perms
-    assert ravi_access["role"] == "member" and ravi_access["permissions"] == ["task.create", "task.update_own"]
+    assert "channel.manage" in amit_perms and "project.archive" in amit_perms and "project.delete" not in amit_perms
+    assert ravi_access["role"] == "member" and ravi_access["permissions"] == []
     assert login("arjun@paliath.in").get("/me").json()["permissions"][:2] == ["company.users", "project.create"]
 
 
@@ -65,50 +63,6 @@ def test_private_channel_is_hidden_from_members_not_in_it(login):
     ravi = login("ravi@paliath.in")
     names = {c["name"] for c in ravi.get("/channels").json()["channels"] if c["projectId"]}
     assert "qs" not in names and "site-work" in names
-
-
-# ---- Tasks ----
-
-
-def test_member_can_update_own_progress_but_not_dates(login):
-    ravi = login("ravi@paliath.in")
-    t = task_named(ravi, "Villa 99", "False ceiling – living room")
-    assert ravi.patch(f"/tasks/{t['id']}", {"plannedFinish": "2030-01-01"}).json()["error"]["code"] == "FORBIDDEN"
-    r = ravi.patch(f"/tasks/{t['id']}", {"percent": 100}).json()
-    assert r["status"] == "done_pending_confirmation" and r["percent"] == 100  # waits for a manager
-
-
-def test_manager_confirms_and_shift_moves_both_dates(login):
-    amit = login("amit@paliath.in")
-    t = task_named(amit, "Villa 99", "False ceiling – kids bedroom")
-    moved = amit.post(f"/tasks/{t['id']}/shift?days=2").json()
-    assert (moved["plannedStart"], moved["plannedFinish"]) != (t["plannedStart"], t["plannedFinish"])
-    assert moved["varianceDays"] == t["varianceDays"] + 2
-    assert login("ravi@paliath.in").post(f"/tasks/{t['id']}/shift?days=1").status_code == 403
-
-
-def test_task_rules_fill_in_consequences():
-    task = {"status": "not_started", "percent": 0, "actualStart": None, "actualFinish": None}
-    out = normalize_task_change(task, {"percent": 50}, True, today="2026-10-26")
-    assert out == {"percent": 50, "status": "in_progress", "actualStart": "2026-10-26"}  # unchanged fields are dropped
-
-
-def test_new_task_validation_and_idempotency(login):
-    amit = login("amit@paliath.in")
-    pid = project_id(amit, "Villa 99")
-    bad = amit.post(f"/projects/{pid}/tasks", {"id": uuid7(), "name": "X", "phase": "Civil",
-                                               "plannedStart": "2026-01-05", "plannedFinish": "2026-01-01"})
-    assert bad.json()["error"]["details"]["fields"] == {"plannedFinish": "Finish must be on or after start"}
-    body = {"id": uuid7(), "name": "Skirting", "phase": "Finishing", "plannedStart": "2026-11-01", "plannedFinish": "2026-11-02"}
-    first, again = amit.post(f"/projects/{pid}/tasks", body).json(), amit.post(f"/projects/{pid}/tasks", body).json()
-    assert first["id"] == again["id"]
-    assert sum(1 for t in amit.get(f"/projects/{pid}/tasks").json()["tasks"] if t["name"] == "Skirting") == 1
-
-
-def test_my_tasks_are_grouped_by_the_server(login):
-    mine = login("ravi@paliath.in").get("/me/tasks").json()
-    assert {t["name"] for t in mine["today"]} >= {"False ceiling – living room", "False ceiling – master bedroom"}
-    assert all(not t["isLate"] or t["plannedFinish"] for t in mine["today"])
 
 
 # ---- Messages ----
@@ -179,25 +133,62 @@ def test_invite_and_deactivate(login, client):
 # ---- Bot ----
 
 
-def test_checkin_answer_updates_task_and_reports(login):
+def test_checkin_answer_is_written_to_the_pm_app_and_reported(login):
+    from app.pm import mock
+
     ravi, amit = login("ravi@paliath.in"), login("amit@paliath.in")
     pending = [c for c in ravi.get("/me/checkins").json()["checkins"] if not c["answer"]]
     assert len(pending) == 1
     c = pending[0]
-    r = ravi.post(f"/checkins/{c['id']}/answer", {"kind": "progress", "percent": 75})
-    assert r.json()["answer"]["percent"] == 75
-    task = ravi.get(f"/tasks/{c['taskId']}").json()
-    assert task["task"]["percent"] == 75 and task["history"][0]["via"] == "checkin"
-    flush_all()
+    assert c["taskName"] == c["task"]["name"] == "False ceiling – living room" and c["projectName"] == "Villa 99"
+    r = ravi.post(f"/checkins/{c['id']}/answer", {"kind": "progress", "percent": 75}).json()
+    assert r["answer"]["percent"] == 75 and r["pmWrite"] == "saved" and r["task"]["percent"] == 75
+    assert mock.get_task(c["taskId"])["percent"] == 75  # the PM app has it
     assert any(a["kind"] == "checkin_result" for a in amit.get("/activity").json()["items"])
+    sw = channel_named(amit, "Villa 99", "site-work")
+    cards = [m for m in amit.get(f"/channels/{sw['id']}/messages").json()["messages"] if m["type"] == "status_card"]
+    assert cards[0]["data"]["taskName"] == "False ceiling – living room"
     # Answering twice changes nothing.
     assert ravi.post(f"/checkins/{c['id']}/answer", {"kind": "done"}).json()["answer"]["percent"] == 75
+    assert mock.get_task(c["taskId"])["status"] == "in_progress"
 
 
-def test_opening_the_bot_asks_once_per_task(login):
+def test_the_pm_app_can_refuse_an_answer(login):
+    from app.pm import mock
+
+    ravi = login("ravi@paliath.in")
+    c = next(c for c in ravi.get("/me/checkins").json()["checkins"] if not c["answer"])
+    mock.write_status(c["taskId"], {"status": "done"}, key="closed-in-the-pm-app")
+    assert next(x for x in ravi.get("/me/checkins").json()["checkins"] if x["id"] == c["id"])["closed"] is True
+    r = ravi.post(f"/checkins/{c['id']}/answer", {"kind": "progress", "percent": 50}).json()
+    assert r["pmWrite"] == "refused" and r["pmError"] == "This task is already closed"
+    assert mock.get_task(c["taskId"])["percent"] == 100  # nothing written
+
+
+def test_pm_writes_are_idempotent():
+    from app.pm import mock
+    from app.store import reset_store
+
+    reset_store()
+    t = next(t for t in mock.list_tasks() if t["status"] == "in_progress")
+    once = mock.write_status(t["id"], {"status": "in_progress", "percent": 90}, key="k1")
+    twice = mock.write_status(t["id"], {"status": "in_progress", "percent": 25}, key="k1")
+    assert once == twice and mock.get_task(t["id"])["percent"] == 90
+
+
+def test_opening_the_bot_asks_once_per_active_task(login):
     imran = login("imran@paliath.in")
     asked = imran.post("/bot/checkins").json()["asked"]
     assert asked >= 1 and imran.post("/bot/checkins").json()["asked"] == 0
+    names = {c["taskName"] for c in imran.get("/me/checkins").json()["checkins"]}
+    assert "Kitchen carcass" in names and "Wardrobe – kids bedroom" not in names  # not started yet: not asked
+
+
+def test_project_tasks_come_from_the_pm_app_read_only(login):
+    amit = login("amit@paliath.in")
+    tasks = amit.get(f"/projects/{project_id(amit, 'Villa 99')}/tasks").json()["tasks"]
+    assert tasks and all(t["status"] != "done" for t in tasks) and {"name", "plannedFinish", "isOverdue"} <= set(tasks[0])
+    assert amit.patch(f"/tasks/{tasks[0]['id']}", {"percent": 10}).status_code in (404, 405)
 
 
 # ---- Projects ----
@@ -207,7 +198,7 @@ def test_create_project_archive_and_delete(login):
     arjun, amit = login("arjun@paliath.in"), login("amit@paliath.in")
     pid = uuid7()
     p = arjun.post("/projects", {"id": pid, "name": "Hebbal flat", "client": "Rao", "address": "Hebbal"}).json()
-    assert p["access"]["permissions"] and p["delayDays"] == 0
+    assert p["access"]["permissions"] and p["linked"] is False
     assert {c["name"] for c in arjun.get(f"/projects/{pid}/channels").json()["channels"]} == {"general", "design", "site-work", "qs"}
     villa = project_id(amit, "Villa 99")
     assert amit.patch(f"/projects/{villa}", {"archived": True}).json()["access"]["permissions"] == ["project.archive"]
@@ -261,13 +252,6 @@ def test_asking_for_a_new_code_does_not_reset_the_lock(client):
     assert client.post("/auth/otp/verify", json=bad).json()["error"]["code"] == "OTP_TOO_MANY_ATTEMPTS"
 
 
-def test_task_owner_must_be_on_the_project(login):
-    amit, lakshmi = login("amit@paliath.in"), login("lakshmi@paliath.in")  # Lakshmi isn't on Villa 99
-    t = task_named(amit, "Villa 99", "Study table")
-    r = amit.patch(f"/tasks/{t['id']}", {"ownerId": lakshmi.user["id"]})
-    assert r.json()["error"]["details"]["fields"] == {"ownerId": "Pick someone on this project"}
-
-
 def test_photo_upload_and_links_come_from_the_server(login):
     ravi = login("ravi@paliath.in")
     png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
@@ -314,13 +298,9 @@ def test_reusing_an_id_never_returns_someone_elses_record(login):
     secret = next(m for m in S().messages.values() if m["channelId"] == qs)
     villa, sw = _ids(S(), "Villa 99", "site-work")
     oith = _ids(S(), "OITH")
-    oith_task = next(t for t in S().tasks.values() if t["projectId"] == oith)
     r = ravi.post(f"/channels/{sw}/messages", {"id": secret["id"], "type": "text", "body": "x", "data": None})
     assert r.status_code == 422 and "Rate for Italian marble" not in r.text
     assert ravi.post("/projects", {"id": oith, "name": "xx", "client": "y"}).status_code == 403
-    r = ravi.post(f"/projects/{villa}/tasks", {"id": oith_task["id"], "name": "x", "phase": "Civil",
-                                               "plannedStart": "2026-01-01", "plannedFinish": "2026-01-02"})
-    assert r.status_code == 422 and oith_task["name"] not in r.text
     rv = _ids(S(), "RV University")
     rv_qs = next(c for c in S().channels.values() if c["projectId"] == rv and c["name"] == "qs")
     kavya_villa = _ids(S(), "Villa 99")  # Kavya is a member there, not a manager: no channel create
@@ -386,53 +366,21 @@ def test_setup_comes_from_the_server_in_the_readers_language(client, login):
     assert {"email": "ravi@paliath.in", "name": "Ravi Kumar", "companyRole": "member", "jobTitle": "कामगार"} in accounts
     amit = login("amit@paliath.in")
     meta = amit.client.get("/meta", headers={**amit.headers, "Accept-Language": "kn-IN"}).json()
-    assert meta["stages"][0] == {"key": "design", "label": "ಡಿಸೈನ್"}
     assert {"name": "Worker", "label": "ಕೆಲಸಗಾರ", "managersOnly": False} in meta["jobTitles"]
     assert meta["defaultJobTitle"] == "Worker"
     assert {"key": "Damage", "label": "ಹಾನಿ", "inCheckins": False} in meta["problemTypes"]
-    assert amit.get("/meta").json()["stages"][0]["label"] == "Design"
+    assert {"name": "Worker", "label": "Worker", "managersOnly": False} in amit.get("/meta").json()["jobTitles"]
     # Simple (big-button) layout follows the job titles the company marked simple.
     assert login("ravi@paliath.in").get("/me").json()["simpleMode"] is True
     assert amit.get("/me").json()["simpleMode"] is False
 
 
-def test_setup_checks_stages_and_job_titles(login):
+def test_setup_checks_job_titles(login):
     amit = login("amit@paliath.in")
     villa = project_id(amit, "Villa 99")
-    assert amit.get(f"/projects/{villa}").json()["nextStage"] == "finishing"
-    r = amit.patch(f"/projects/{villa}", {"stage": "launch"})
-    assert r.json()["error"]["details"]["fields"] == {"stage": "Pick one of the company's stages"}
     ravi = login("ravi@paliath.in")
     r = amit.patch(f"/projects/{villa}/members/{ravi.user['id']}", {"jobTitle": "Project Manager"})
     assert r.json()["error"]["details"]["fields"] == {"jobTitle": "This job title is for managers"}
-
-
-def test_schedule_is_filtered_and_ordered_by_the_server(login):
-    amit = login("amit@paliath.in")
-    villa = project_id(amit, "Villa 99")
-    everything = amit.get(f"/projects/{villa}/tasks").json()
-    assert everything["total"] == len(everything["tasks"]) > 0
-    names = [p["name"] for p in everything["phases"]]
-    assert everything["currentPhase"] in names and names == list(dict.fromkeys(t["phase"] for t in everything["tasks"]))
-    assert sum(p["total"] for p in everything["phases"]) == everything["total"]
-    assert everything["window"]["from"] <= everything["window"]["to"]
-    progress = amit.get(f"/projects/{villa}").json()["progress"]
-    assert progress["total"] == everything["total"] and progress["done"] == sum(p["done"] for p in everything["phases"])
-    mine = amit.get(f"/projects/{villa}/tasks", params={"owner": "me"}).json()
-    assert mine["tasks"] and all(t["ownerId"] == amit.user["id"] for t in mine["tasks"])
-    assert mine["total"] == everything["total"] and mine["phases"] == everything["phases"]
-    late = amit.get(f"/projects/{villa}/tasks", params={"due": "overdue"}).json()["tasks"]
-    assert all(t["isLate"] for t in late)
-
-
-def test_new_task_dates_come_from_the_server(login):
-    amit = login("amit@paliath.in")
-    villa = project_id(amit, "Villa 99")
-    d = amit.get(f"/projects/{villa}/task-defaults", params={"phase": "Painting"}).json()
-    assert d["phase"] == "Painting" and d["plannedStart"] <= d["plannedFinish"] and "Painting" in d["phaseChoices"]
-    t = amit.post(f"/projects/{villa}/tasks", {"id": uuid7(), "name": "Touch-up", "phase": "Painting"}).json()
-    assert (t["plannedStart"], t["plannedFinish"]) == (d["plannedStart"], d["plannedFinish"])
-    assert t["channelId"] == channel_named(amit, "Villa 99", "site-work")["id"]  # the company's work channel
 
 
 def test_channels_come_in_display_order(login):

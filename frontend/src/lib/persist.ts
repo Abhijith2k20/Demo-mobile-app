@@ -1,6 +1,6 @@
 // What survives closing the app: the sign-in (SecureStore) and the last data the screens showed
 // (AsyncStorage), so someone who reopens the app with no signal still sees projects, chats and
-// tasks, marked as offline. Only server replies are saved; nothing is worked out on the phone.
+// check-ins, marked as offline. Only server replies are saved; nothing is worked out on the phone.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dehydrate, hydrate, type DehydratedState } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';

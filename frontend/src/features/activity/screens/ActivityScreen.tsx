@@ -17,8 +17,6 @@ import { useRefresh } from '@/features/shared';
 const ICON: Record<ActivityKind, IconName> = {
   mention: 'at-sign',
   thread_reply: 'message-square',
-  task_assigned: 'user-check',
-  task_changes: 'calendar',
   checkin_result: 'activity',
   escalation: 'bell',
 };
@@ -29,7 +27,8 @@ function open(a: Activity): void {
     else if (a.channelId) router.push(`/channel/${a.channelId}`);
     return;
   }
-  if (a.taskIds.length === 1) router.push(`/task/${a.taskIds[0]}`);
+  // Check-in results and escalations open the channel the status card went to.
+  if (a.channelId) router.push(`/channel/${a.channelId}`);
   else if (a.projectId) router.push(`/project/${a.projectId}`);
 }
 
@@ -65,7 +64,7 @@ function ActivityScreen() {
           <EmptyState
             icon="bell"
             title={t('activity.emptyTitle', 'All quiet')}
-            hint={t('activity.emptyHint', 'Mentions, replies and task changes will show up here.')}
+            hint={t('activity.emptyHint', 'Mentions, replies and check-in results will show up here.')}
           />
         ) : (
           items.map((a) => {

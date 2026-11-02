@@ -66,7 +66,7 @@ export function Screen({ children }: { children: ReactNode }) {
   return <View style={{ flex: 1, backgroundColor: c.bg }}>{children}</View>;
 }
 
-/** Shown when the server can't be reached. Messages and task updates wait in the send queue. */
+/** Shown when the server can't be reached. Messages and check-in answers wait in the send queue. */
 export function OfflineBanner() {
   const online = useUi((s) => s.online);
   const unsent = useUnsentCount();
@@ -76,7 +76,7 @@ export function OfflineBanner() {
   return (
     <Banner
       icon="wifi-off"
-      text={t('offline.queued', "You're offline. Messages and task updates will send when you're back.")}
+      text={t('offline.queued', "You're offline. Messages and check-ins will send when you're back.")}
       right={waiting > 0 ? t('offline.waiting', '{{count}} waiting', { count: waiting }) : undefined}
     />
   );

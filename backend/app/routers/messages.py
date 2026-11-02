@@ -15,7 +15,7 @@ from ..services.messaging import post_message
 
 router = APIRouter(tags=["messages"])
 
-CLIENT_TYPES = {"text", "image", "voice", "file", "task_card", "issue_card", "daily_report"}
+CLIENT_TYPES = {"text", "image", "voice", "file", "issue_card", "daily_report"}
 
 
 def _touch(message: dict, kind: str, channel: dict) -> dict:

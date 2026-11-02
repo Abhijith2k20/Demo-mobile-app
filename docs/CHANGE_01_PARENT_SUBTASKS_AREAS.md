@@ -1,5 +1,7 @@
 # Change 01 — Parent/sub-tasks and areas (replaces phases)
 
+> **Superseded (2026-11-02):** tasks move to the PM app in the MVP (`SITELINE_SPEC.md` 2.0), so Siteline no longer structures tasks. Kept for history only.
+
 > **Status: NOT STARTED — parked for later.** Nothing in this document has been implemented yet.
 > See "Planning notes" at the end for what was found when the codebase was inspected and the
 > decisions that are still open.

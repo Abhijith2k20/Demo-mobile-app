@@ -1,14 +1,12 @@
 import { z } from 'zod';
 
 const id = z.string().min(8);
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date');
 
 export const messageTypes = [
   'text',
   'image',
   'voice',
   'file',
-  'task_card',
   'checkin',
   'issue_card',
   'daily_report',
@@ -33,38 +31,6 @@ export const messagePatchSchema = z.object({
   pinned: z.boolean().optional(),
 });
 
-export const taskStatuses = ['not_started', 'in_progress', 'blocked', 'done', 'done_pending_confirmation'] as const;
-
-export const taskCreateSchema = z
-  .object({
-    id,
-    name: z.string().trim().min(1, 'Give the task a name').max(120),
-    phase: z.string().min(1),
-    ownerId: id.nullable(),
-    plannedStart: isoDate,
-    plannedFinish: isoDate,
-    description: z.string().max(2000).nullable(),
-    channelId: id.nullable(),
-  })
-  .refine((v) => v.plannedFinish >= v.plannedStart, {
-    path: ['plannedFinish'],
-    message: 'Finish must be on or after start',
-  });
-export type TaskCreate = z.infer<typeof taskCreateSchema>;
-
-export const taskPatchSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    description: z.string().max(2000).nullable(),
-    phase: z.string().min(1),
-    ownerId: id.nullable(),
-    plannedStart: isoDate,
-    plannedFinish: isoDate,
-    status: z.enum(taskStatuses),
-    percent: z.number().int().min(0).max(100),
-  })
-  .partial();
-
 export const checkinAnswerSchema = z.object({
   kind: z.enum(['started', 'progress', 'problem', 'done', 'not_started']),
   percent: z.number().int().min(0).max(100).optional(),
@@ -84,14 +50,13 @@ export const memberPatchSchema = memberAddSchema.omit({ userId: true }).partial(
 
 export const projectPatchSchema = z
   .object({
-    stage: z.string().min(1), // the company's own stages; the server checks them
     name: z.string().trim().min(2, 'Give the project a name').max(80),
     client: z.string().trim().min(1, 'Who is the client?').max(80),
     address: z.string().trim().max(160),
     archived: z.boolean(),
   })
   .partial();
-export const projectDetailsSchema = projectPatchSchema.required({ name: true, client: true, address: true }).omit({ stage: true, archived: true });
+export const projectDetailsSchema = projectPatchSchema.required({ name: true, client: true, address: true }).omit({ archived: true });
 
 /** Channel names look like "team-updates": lowercase letters, numbers and hyphens. */
 export function normalizeChannelName(input: string): string {
@@ -131,24 +96,8 @@ export const userInviteSchema = z.object({
   companyRole: z.enum(['member', 'admin']),
 });
 export type UserInvite = z.infer<typeof userInviteSchema>;
-export const rebaselineSchema = z.object({ reason: z.string().trim().min(3, 'Give a short reason') });
 
 // ---- In-chat forms (§6) ----
-
-export const newTaskFormSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Give the task a name').max(120),
-    phase: z.string().min(1, 'Pick a phase'),
-    ownerId: z.string().nullable(),
-    plannedStart: isoDate,
-    plannedFinish: isoDate,
-    description: z.string().max(2000),
-  })
-  .refine((v) => v.plannedFinish >= v.plannedStart, {
-    path: ['plannedFinish'],
-    message: 'Finish must be on or after start',
-  });
-export type NewTaskForm = z.infer<typeof newTaskFormSchema>;
 
 /** Always offered after the company's own problem types; needs a description. */
 export const OTHER_PROBLEM = 'Other';

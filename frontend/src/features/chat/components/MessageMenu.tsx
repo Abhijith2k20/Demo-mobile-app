@@ -20,15 +20,13 @@ interface Props {
   message: MessageView | null;
   me: User;
   access: ProjectAccess;
-  canCreateTask: boolean;
   inThread?: boolean;
   onClose: () => void;
   onEdit: (m: Message) => void;
-  onCreateTask: (m: Message) => void;
 }
 
 /** Long-press menu. Controls the user may not use are hidden, not disabled. */
-export function MessageMenu({ message, me, access, canCreateTask, inThread, onClose, onEdit, onCreateTask }: Props) {
+export function MessageMenu({ message, me, access, inThread, onClose, onEdit }: Props) {
   const { c } = useTheme();
   const { t } = useTranslation();
   // Keep showing the last message while the sheet animates out.
@@ -101,9 +99,6 @@ export function MessageMenu({ message, me, access, canCreateTask, inThread, onCl
                   toast(t('chat.copied', 'Copied'), 'success');
                 })}
               />
-            ) : null}
-            {canCreateTask && m.body ? (
-              <SheetAction icon="check-square" label={t('chat.createTask', 'Create task from message')} onPress={act(() => onCreateTask(m))} />
             ) : null}
             {canEdit ? <SheetAction icon="edit-2" label={t('chat.edit', 'Edit')} onPress={act(() => onEdit(m))} /> : null}
             {canPin ? (

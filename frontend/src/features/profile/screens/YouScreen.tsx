@@ -170,7 +170,6 @@ function YouScreen() {
             {(
               [
                 ['messages', 'message-circle', t('you.notifyMessages', 'Messages and mentions')],
-                ['tasks', 'check-square', t('you.notifyTasks', 'Task changes')],
                 ['checkins', 'cpu', t('you.notifyCheckins', 'Bot check-ins')],
               ] as const
             ).map(([key, icon, label], i) => (

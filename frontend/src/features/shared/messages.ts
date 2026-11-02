@@ -1,4 +1,4 @@
-// Sending a message, used by chat, tasks (task cards, issues) and bot forms. It only adds to the
+// Sending a message, used by chat and its forms (issues, daily reports). It only adds to the
 // send queue; the server decides the rest.
 import * as Haptics from 'expo-haptics';
 import { uuidv7 } from 'uuidv7';
