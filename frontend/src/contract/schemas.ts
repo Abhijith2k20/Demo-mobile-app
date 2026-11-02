@@ -2,50 +2,6 @@ import { z } from 'zod';
 
 const id = z.string().min(8);
 
-export const messageTypes = [
-  'text',
-  'image',
-  'voice',
-  'file',
-  'checkin',
-  'issue_card',
-  'daily_report',
-  'status_card',
-  'system',
-] as const;
-
-
-export const messageCreateSchema = z.object({
-  id,
-  type: z.enum(messageTypes),
-  body: z.string().max(4000).nullable(),
-  data: z.record(z.string(), z.unknown()).nullable(),
-  threadParentId: id.nullable(),
-});
-export type MessageCreate = z.infer<typeof messageCreateSchema>;
-
-export const messagePatchSchema = z.object({
-  body: z.string().min(1).max(4000).optional(),
-  pinned: z.boolean().optional(),
-});
-
-export const checkinAnswerSchema = z.object({
-  kind: z.enum(['started', 'progress', 'problem', 'done', 'not_started']),
-  percent: z.number().int().min(0).max(100).optional(),
-  reason: z.string().max(200).optional(),
-  note: z.string().max(500).optional(),
-  voiceSec: z.number().int().min(1).max(600).optional(),
-  hasPhoto: z.boolean().optional(),
-});
-
-export const memberAddSchema = z.object({
-  userId: id,
-  role: z.enum(['manager', 'member']),
-  jobTitle: z.string().min(1), // the company's own titles; the server checks them
-  channelIds: z.array(id),
-});
-export const memberPatchSchema = memberAddSchema.omit({ userId: true }).partial();
-
 export const projectPatchSchema = z
   .object({
     name: z.string().trim().min(2, 'Give the project a name').max(80),
@@ -78,9 +34,6 @@ export const channelCreateSchema = z.object({
   isPrivate: z.boolean(),
   memberIds: z.array(id),
 });
-export const channelPatchSchema = z
-  .object({ name: channelName, isPrivate: z.boolean(), memberIds: z.array(id) })
-  .partial();
 export const projectCreateSchema = z.object({
   id,
   name: z.string().trim().min(2, 'Give the project a name').max(80),

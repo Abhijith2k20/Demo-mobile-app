@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 
 from .. import bot, db
 from ..core import not_found, now_iso
-from ..deps import current_user, language
+from ..deps import current_user
 from ..events import publish
 from ..notify import public_activity
 from ..rules import (
@@ -14,7 +14,6 @@ from ..rules import (
     PERCENT_STEPS,
     ROLES_IN_EVERY_CHANNEL,
     default_channel_names,
-    localized,
 )
 from ..schemas import CheckinAnswer, MePatch, PushToken
 from ..access import assert_project_active
@@ -68,16 +67,15 @@ def get_company(user: dict = Depends(current_user)):
 
 
 @router.get("/meta")
-def meta(user: dict = Depends(current_user), lang: str = Depends(language)):
-    """The company's setup and fixed rules the app needs to lay out forms (it never decides them itself).
-    Labels come in the reader's language."""
+def meta(user: dict = Depends(current_user)):
+    """The company's setup and fixed rules the app needs to lay out forms (it never decides them itself)."""
     st = setup()
     titles = [jt["name"] for jt in st["jobTitles"]]
     return {
-        "jobTitles": [{"name": jt["name"], "label": localized(jt.get("label", jt["name"]), lang),
-                       "managersOnly": jt.get("managersOnly", False)} for jt in st["jobTitles"]],
+        "jobTitles": [{"name": jt["name"], "label": jt["name"], "managersOnly": jt.get("managersOnly", False)}
+                      for jt in st["jobTitles"]],
         "defaultJobTitle": st["defaultJobTitle"],
-        "problemTypes": [{"key": p["key"], "label": localized(p["label"], lang), "inCheckins": p.get("inCheckins", True)}
+        "problemTypes": [{"key": p["key"], "label": p["key"], "inCheckins": p.get("inCheckins", True)}
                          for p in st["problemTypes"]],
         "percentSteps": PERCENT_STEPS,
         "editWindowMs": EDIT_WINDOW_MS,

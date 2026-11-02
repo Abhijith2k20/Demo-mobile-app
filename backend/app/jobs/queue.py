@@ -4,7 +4,7 @@ Jobs are queued in the same transaction as the change that causes them, so a cra
 and `dedupe_key` stops the same job being queued twice."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from .. import db
 from ..core import uuid7
@@ -15,10 +15,6 @@ BACKOFF = {
     "default": [30, 120, 600],
 }
 LOCK_SECONDS = 120
-
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def enqueue(kind: str, payload: dict | None = None, *, run_at: datetime | None = None, company_id: str | None = None,
@@ -65,7 +61,3 @@ def fail(job: dict, error: str, *, retry: bool = True) -> bool:
     db.run("UPDATE jobs SET status = 'failed', last_error = %(e)s, locked_until = NULL, updated_at = now() WHERE id = %(id)s",
            e=error[:500], id=job["id"])
     return False
-
-
-def at(delay_seconds: float) -> datetime:
-    return utcnow() + timedelta(seconds=delay_seconds)

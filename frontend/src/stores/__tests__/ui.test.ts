@@ -15,16 +15,14 @@ async function startApp(): Promise<typeof import('@/stores/ui')> {
   return mod;
 }
 
-it('keeps language and theme, not drafts, across a restart', async () => {
+it('keeps the theme, not drafts, across a restart', async () => {
   const first = await startApp();
-  first.useUi.getState().setLanguage('kn');
   first.useUi.getState().setTheme('dark');
   first.useUi.getState().setDraft('ch1', 'half typed');
   await new Promise((r) => setTimeout(r, 0)); // let the save finish
 
   const second = await startApp();
-  expect(second.useUi.getState().language).toBe('kn');
   expect(second.useUi.getState().theme).toBe('dark');
   expect(second.useUi.getState().drafts).toEqual({});
-  expect(await AsyncStorage.getItem('prefs')).toContain('"language":"kn"');
+  expect(await AsyncStorage.getItem('prefs')).toContain('"theme":"dark"');
 });

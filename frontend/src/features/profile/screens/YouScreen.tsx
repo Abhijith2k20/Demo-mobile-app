@@ -11,12 +11,12 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { useUnsentCount } from '@/lib/outbox';
 import { get, keys } from '@/lib/queries';
-import { deleteAccount, logOut, saveLanguage, saveNotifyPrefs, type NotifyPrefs } from '@/features/profile/api';
+import { deleteAccount, logOut, saveNotifyPrefs, type NotifyPrefs } from '@/features/profile/api';
 import { InviteSheet } from '@/features/people/components/InviteSheet';
 import { shortProjectName, useAllProjectMembers, useCan, useCompany, useMe, useProjects, useRoleLabels } from '@/features/shared';
 import { CompanySwitcher } from '@/features/shared/CompanySwitcher';
 import { useSession } from '@/stores/session';
-import { toast, useUi, type Language, type ThemePref } from '@/stores/ui';
+import { toast, useUi, type ThemePref } from '@/stores/ui';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 
@@ -162,24 +162,6 @@ function YouScreen() {
             ) : null}
           </Card>
           <InviteSheet visible={inviting} onClose={() => setInviting(false)} />
-        </View>
-
-        <View style={{ gap: space.sm }}>
-          <T variant="label" color="textMuted">
-            {t('you.language', 'Language')}
-          </T>
-          <Segmented<Language>
-            value={ui.language}
-            onChange={(language) => {
-              ui.setLanguage(language);
-              void saveLanguage(language); // the bot writes to you in it
-            }}
-            options={[
-              { value: 'en', label: 'English' },
-              { value: 'kn', label: 'ಕನ್ನಡ' },
-              { value: 'hi', label: 'हिंदी' },
-            ]}
-          />
         </View>
 
         {/* iOS follows the system appearance; Android users expect an in-app choice. */}

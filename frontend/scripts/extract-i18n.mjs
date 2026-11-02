@@ -1,6 +1,6 @@
 // Builds src/lib/i18n/en.json from the English defaults written next to each key in the code:
 //   t('home.jumpTo', 'Jump to…')
-// Run: node scripts/extract-i18n.mjs   (also reports keys missing from kn.json / hi.json)
+// Run: node scripts/extract-i18n.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -42,8 +42,3 @@ fs.writeFileSync(path.join(root, 'src/lib/i18n/en.json'), JSON.stringify(out, nu
 const flat = (obj, prefix = '') => Object.entries(obj).flatMap(([k, v]) => (typeof v === 'object' ? flat(v, `${prefix}${k}.`) : [`${prefix}${k}`]));
 const enKeys = flat(out);
 console.log(`en.json: ${enKeys.length} keys from ${files.length} files`);
-for (const lang of ['kn', 'hi']) {
-  const have = new Set(flat(JSON.parse(fs.readFileSync(path.join(root, `src/lib/i18n/${lang}.json`), 'utf8'))));
-  console.log(`${lang}.json: ${have.size} keys translated, ${enKeys.filter((k) => !have.has(k)).length} fall back to English`);
-  for (const k of have) if (!enKeys.includes(k)) console.warn(`! ${lang}.json has unknown key ${k}`);
-}

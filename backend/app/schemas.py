@@ -76,7 +76,6 @@ class Refresh(Body):
 
 class MePatch(Body):
     name: Optional[str] = None
-    language: Optional[Literal["en", "kn", "hi"]] = None
     notify: Optional[dict[str, Any]] = None
     v_n = field_validator("name")(lambda v: None if v is None else _name(2, 60, "Enter your name")(v))
 

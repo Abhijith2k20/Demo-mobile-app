@@ -18,7 +18,7 @@
 ## 0. What the MVP must deliver
 
 1. **Work chat for field teams:** a Slack-style workspace per company: project channels, company channels, DMs,
-   threads, photos, voice notes, files, simple enough for site workers, in English, Kannada and Hindi.
+   threads, photos, voice notes, files, simple enough for site workers. English only for now (§2).
 2. **Cards from the PM app:** the PM app sends a person a **card** (for example "How far is False ceiling?"
    with a one-tap scale), reminds, and posts status and escalation cards in project channels, all through the
    **Cards API**. Siteline delivers them in the person's Siteline Bot conversation, with push, and sends each
@@ -28,7 +28,7 @@
 4. **Ready to run for real customers:** data in Postgres with backups, real sign-in codes, push notifications,
    file storage, error tracking, staging and production, store builds.
 5. **Any industry:** no industry words in code. Each company has a **setup** (job titles, project channels,
-   problem types, the work channel, labels per language), copied from an industry template when the company is
+   problem types, the work channel), copied from an industry template when the company is
    created. Card wording comes from the PM app.
 
 **Thin client, as before:** every rule, permission and calculation lives on the server. The app shows what the
@@ -90,7 +90,7 @@ online at once, 50,000 messages and 5,000 cards a day.
 | Voice notes, files | `expo-audio`, `expo-document-picker` |
 | Push | `expo-notifications` through Expo's push service |
 | Sign-in storage | `expo-secure-store` |
-| i18n | `i18next` + `react-i18next` (English full; Kannada and Hindi for the site-worker flow) |
+| Text | `i18next` + `react-i18next`, English only: every text goes through `t('key', 'English')`, so a language can be added later as one file plus a picker |
 | Icons, fonts | `@expo/vector-icons` (Feather only), `@expo-google-fonts/inter` |
 | Backend | Python 3.13, FastAPI, Pydantic, uvicorn |
 | Database | Postgres 16, SQLAlchemy 2 (async), Alembic migrations, row-level security (§10.4) |
@@ -238,7 +238,7 @@ One layout (`AuthShell`): dark header with the Siteline mark, a rounded card hol
   - none and no invites → "You're not in a company on Siteline yet. Ask your admin to invite
     *ravi@example.com*." with **Use a different email or phone**.
 - **Join** on an invite creates the membership; first sign-in asks for **your name** (pre-filled from the
-  invite) and **language**.
+  invite).
 
 ### 5.2 Home (workspace)
 
@@ -286,8 +286,7 @@ newest first; unread items have an accent rule.
 
 ### 5.9 You
 
-- Avatar, name (editable), email, phone, language (English / ಕನ್ನಡ / हिंदी; saved on the server, so cards and
-  pushes show in it), theme.
+- Avatar, name (editable), email, phone, theme.
 - **Company:** current company with **Switch company** (when more than one); **People**; for Owner/Admin
   **Invites** and **PM link** (status, §9.3).
 - **Notifications:** All · Important (DMs, mentions, cards) · Off. Plus quiet hours (21:00–07:00, company
@@ -351,7 +350,7 @@ IDs are UUIDv7. Times are `timestamptz`.
 | Table | Key columns | Notes |
 |---|---|---|
 | **Global** | | |
-| `users` | id, name, email (unique, lower case, nullable), phone (unique, E.164, nullable), avatar_color, language, deleted_at | A person. At least one of email/phone. No company here. |
+| `users` | id, name, email (unique, lower case, nullable), phone (unique, E.164, nullable), avatar_color, notify (level, quiet hours), deleted_at | A person. At least one of email/phone. No company here. |
 | `companies` | id, name, slug, time_zone, setup (jsonb), pm_company_id, status (active / suspended / deleted), created_at | Created only by the platform (§9.2) |
 | `integrations` | company_id, kind (mock / http), api_key_hash (the key the PM app calls with), webhook_url, webhook_secret (encrypted), last_call_at, last_error, options | One per company (§9.3) |
 | `otp_codes` | id, identifier, code_hash, expires_at, attempts, created_at | Codes stored hashed |
@@ -384,10 +383,10 @@ Unknown type → "Update the app to see this message."
 | `ProjectView` | `members`, `access { role, jobTitle, permissions[] }`, `linked` (from PM) |
 | `ChannelView` | `memberIds`, `peerId`, `joined`, `unreadCount`, `lastReadMessageId`, `lastMessage`, `canPost` |
 | `MessageView` | `replyCount`, `lastReplyAt`, `canEdit`, `canDelete`, `canPin` |
-| `CardView` | the card's content in the reader's language, project name, `state`, `answer`, `delivery` (sending to the PM app / saved / not saved + reason), `queuePosition` |
+| `CardView` | the card's content, project name, `state`, `answer`, `delivery` (sending to the PM app / saved / not saved + reason), `queuePosition` |
 | `UserView` | `role`, `canDeactivate`, `canChangeRole` |
 | `GET /me` | user, current company, `companies[]` (with unread counts), `permissions[]`, `simpleMode` |
-| `GET /meta` | the company's setup in the reader's language: job titles, problem types, default channels, percent steps, edit/delete windows |
+| `GET /meta` | the company's setup: job titles, problem types, default channels, percent steps, edit/delete windows |
 
 ---
 
@@ -402,7 +401,7 @@ escalations. Siteline draws the cards, delivers answers, and keeps its guarantee
 - `POST /api/v1/cards` from the PM app: to one person (by email or phone), optionally about a project, with a
   title, subtitle, a badge (for example red "Overdue"), fields, and answer parts: a one-tap **scale**, up to 3
   **buttons** (a button can open a list of **choices**), and whether a **note** (text, voice note, photo) may be
-  added. Text comes in up to three languages; the person sees theirs.
+  added.
 - The PM app's own id makes sending safe to repeat. `PATCH` changes or closes an open card ("Changed in the PM
   app"); `nudge` adds a quiet reminder line and a push; `expiresAt` ends it ("Expired").
 - A card with no answer parts is information, for example a morning summary.
@@ -638,9 +637,9 @@ Secrets come only from the environment.
 | `POST /auth/invites/:id/accept` / `decline` | With the pending token or a session |
 | `POST /auth/session` `{companyId}` / `POST /auth/switch` | → `{accessToken, refreshToken, me}` |
 | `POST /auth/refresh` / `POST /auth/logout` | Rotating refresh; logout revokes the session |
-| `GET /me` / `PATCH /me` `{name?, language?, notifications?}` / `DELETE /me` | Profile, companies, permissions |
+| `GET /me` / `PATCH /me` `{name?, notify?}` / `DELETE /me` | Profile, companies, permissions |
 | `PUT /me/push-tokens` `{token, platform}` / `DELETE` | |
-| `GET /meta` | Company setup in the reader's language |
+| `GET /meta` | Company setup |
 | `GET /users` | Company directory (not for guests) |
 | `PATCH /members/:userId` `{role}` / `POST /members/:userId/deactivate` | |
 | `GET /invites` / `POST /invites` `{id, identifier, name, role, channelIds?}` / `POST /invites/:id/resend` / `DELETE /invites/:id` | Owner/Admin |
@@ -724,7 +723,7 @@ baseline, task defaults, stages.
 ALREADY_MEMBER, INVITE_EXPIRED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED, MESSAGE_EDIT_WINDOW_PASSED,
 CHANNEL_READ_ONLY, CHANNEL_NAME_TAKEN, CHANNEL_PRIVATE, PROJECT_ARCHIVED, PROJECT_LINKED, FILE_TOO_LARGE,
 CARD_CLOSED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE` (plus client-side `OFFLINE`,
-`TIMEOUT`, `UNKNOWN`), each with English, Kannada and Hindi messages.
+`TIMEOUT`, `UNKNOWN`), each with a plain English message in the app.
 
 ### 10.10 Operations
 
@@ -795,7 +794,7 @@ Screens never call the API directly.
 
 ### 12.3 API client
 
-As in the demo: one `api<T>()`, auth header, `X-Request-Id`, `Accept-Language`, `AppError` kinds, one shared
+As in the demo: one `api<T>()`, auth header, `X-Request-Id`, `AppError` kinds, one shared
 refresh on 401. The server address comes from the build profile (`EXPO_PUBLIC_API_URL`).
 
 ### 12.4 Send queue
@@ -812,7 +811,7 @@ Online only: edit, delete, react, pin, project/channel/member settings, invites,
 As in the demo:
 - Every screen reads through a query.
 - Events, reconnects, returning to the foreground and pull-to-refresh refetch.
-- Errors show translated messages by code, plus an offline banner, "Couldn't load" states and an error boundary
+- Errors show friendly messages by code, plus an offline banner, "Couldn't load" states and an error boundary
   per screen.
 
 ### 12.6 Push
@@ -870,11 +869,10 @@ production.
 14. **Files and voice:** photo, voice note and PDF upload to R2 and open for channel members only; a signed link
     stops working after 5 minutes.
 15. **Push:** DMs, mentions, cards and the PM app's notifications arrive; quiet hours hold card pushes.
-16. **Language:** Ravi in ಕನ್ನಡ → cards (when the PM app sends Kannada text), push text and errors in Kannada.
-17. **Account deletion** removes the person's details; their messages show "Former member".
-18. **Dark mode** looks intentional on every screen.
-19. **Restore:** a backup restores into a fresh database and the app works against it.
-20. **Load test** passes (§10.10).
+16. **Account deletion** removes the person's details; their messages show "Former member".
+17. **Dark mode** looks intentional on every screen.
+18. **Restore:** a backup restores into a fresh database and the app works against it.
+19. **Load test** passes (§10.10).
 
 ---
 
@@ -948,7 +946,6 @@ Before calling any step done: `npm run typecheck`, `npm run lint`, `npm test` in
    (what to ask, when, reminders, escalation)?
 2. How are people identified in the PM app: email, phone, or both? They must match how they sign in to Siteline.
 3. Files in answers: are 7-day links enough, or should the PM app copy the files when the webhook arrives?
-4. Should the PM app send cards in Kannada and Hindi too, or English only at first?
 
 ---
 

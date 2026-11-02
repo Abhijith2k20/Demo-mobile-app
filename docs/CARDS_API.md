@@ -69,33 +69,32 @@ A **card** is a message to one person in their Siteline Bot conversation, with b
   "id": "checkin-4411-2026-11-02",
   "to": "ravi@paliath.in",
   "project": "77",
-  "title": {"en": "False ceiling – living room", "kn": "ಫಾಲ್ಸ್ ಸೀಲಿಂಗ್ – ಲಿವಿಂಗ್ ರೂಮ್"},
-  "subtitle": {"en": "Villa 99 · due Wed 4 Nov"},
-  "badge": {"text": {"en": "Overdue"}, "tone": "danger"},
-  "fields": [{"label": {"en": "Now"}, "value": "50%"}],
+  "title": "False ceiling – living room",
+  "subtitle": "Villa 99 · due Wed 4 Nov",
+  "badge": {"text": "Overdue", "tone": "danger"},
+  "fields": [{"label": "Now", "value": "50%"}],
   "scale": [
     {"id": "25", "label": "25%"}, {"id": "50", "label": "50%"}, {"id": "75", "label": "75%"},
-    {"id": "90", "label": "90%"}, {"id": "done", "label": {"en": "Done", "hi": "पूरा"}}
+    {"id": "90", "label": "90%"}, {"id": "done", "label": "Done"}
   ],
   "scaleReached": "50",
   "buttons": [
-    {"id": "problem", "label": {"en": "Problem"}, "choices": [
-      {"id": "material", "label": {"en": "Material not arrived"}},
-      {"id": "other", "label": {"en": "Other"}, "noteRequired": true}
+    {"id": "problem", "label": "Problem", "choices": [
+      {"id": "material", "label": "Material not arrived"},
+      {"id": "other", "label": "Other", "noteRequired": true}
     ]},
-    {"id": "not_started", "label": {"en": "Not started"}}
+    {"id": "not_started", "label": "Not started"}
   ],
   "note": {"text": true, "voice": true, "photo": true},
   "ref": {"task": "4411"},
-  "push": {"title": {"en": "Siteline Bot"}, "body": {"en": "How is False ceiling – living room going?"}},
+  "push": {"title": "Siteline Bot", "body": "How is False ceiling – living room going?"},
   "expiresAt": "2026-11-03T18:30:00Z"
 }
 ```
 
 - `id`: the PM app's own id for this card. **Sending the same id again returns the same card** (no second
   card, no second push), so retries are safe. Ids are per company.
-- Text can be a plain string or `{"en": ..., "kn": ..., "hi": ...}`; Siteline shows the person's language and
-  falls back to English.
+- All text is plain strings (English for now).
 - **Answer parts** (all optional; a card with none is just information, like a morning summary):
   - `scale`: a one-tap row (up to 6 stops). `scaleReached` shades the stops already reached.
   - `buttons`: up to 3 quiet buttons; a button with `choices` opens a list (up to 8) instead of answering.
@@ -115,8 +114,8 @@ Only one card is open at a time on the phone: the others wait as one-line rows (
 Changes a card that's still open: any field above, or close it.
 
 ```json
-{"subtitle": {"en": "Villa 99 · due Fri 6 Nov"}, "fields": [{"label": {"en": "Now"}, "value": "60%"}]}
-{"closed": true, "closedText": {"en": "Changed in the PM app"}}
+{"subtitle": "Villa 99 · due Fri 6 Nov", "fields": [{"label": "Now", "value": "60%"}]}
+{"closed": true, "closedText": "Changed in the PM app"}
 ```
 
 The person's phone refreshes it at once. An answered card can't be changed (`409`).
@@ -142,12 +141,12 @@ Posts a card or a line in a project channel, for status updates and escalations.
   "project": "77",
   "channel": "site-work",
   "card": {
-    "title": {"en": "Ravi · False ceiling – living room → 75%"},
-    "lines": [{"en": "“Boards fixed, cove tomorrow”"}],
+    "title": "Ravi · False ceiling – living room → 75%",
+    "lines": ["“Boards fixed, cove tomorrow”"],
     "tone": "info",
     "photos": ["upl_..."]
   },
-  "notify": {"managers": true, "people": ["amit@paliath.in"], "push": {"en": "Ravi hasn't updated False ceiling"}}
+  "notify": {"managers": true, "people": ["amit@paliath.in"], "push": "Ravi hasn't updated False ceiling"}
 }
 ```
 
@@ -216,7 +215,7 @@ so the PM app knows who it can send cards to.
 
 ## 7. What Siteline guarantees
 
-- A card reaches only an active member of that company, in their language, in their Siteline Bot conversation.
+- A card reaches only an active member of that company, in their Siteline Bot conversation.
 - Answers made without signal are kept on the phone and delivered when it's back, in order, once.
 - Every answer is delivered to the PM app at least once (check `X-Siteline-Id` to ignore repeats).
 - Pushes respect each person's notification level and quiet hours.

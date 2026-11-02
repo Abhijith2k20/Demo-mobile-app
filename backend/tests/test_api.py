@@ -211,16 +211,16 @@ def test_websocket_needs_a_token(client, login):
         ws.send_text("ping")  # accepted and kept open
 
 
-def test_setup_comes_from_the_server_in_the_readers_language(client, login):
-    accounts = client.get("/auth/demo-accounts", headers={"Accept-Language": "hi"}).json()["accounts"]
+def test_setup_comes_from_the_server(client, login):
+    accounts = client.get("/auth/demo-accounts").json()["accounts"]
     assert {"identifier": "ravi@paliath.in", "email": "ravi@paliath.in", "name": "Ravi Kumar", "companyRole": "member",
-            "company": "Paliath Interiors", "jobTitle": "कामगार"} in accounts
+            "company": "Paliath Interiors", "jobTitle": "Worker"} in accounts
     assert any(a["identifier"] == "+919800000005" for a in accounts)  # a phone-only person in Brightline
     amit = login("amit@paliath.in")
     assert amit.get("/company").json()["name"] == "Paliath Interiors"
-    meta = amit.get("/meta", headers={"Accept-Language": "kn-IN"}).json()
-    assert {"name": "Worker", "label": "ಕೆಲಸಗಾರ", "managersOnly": False} in meta["jobTitles"]
-    assert {"key": "Damage", "label": "ಹಾನಿ", "inCheckins": False} in meta["problemTypes"]
+    meta = amit.get("/meta").json()
+    assert {"name": "Worker", "label": "Worker", "managersOnly": False} in meta["jobTitles"]
+    assert {"key": "Damage", "label": "Damage", "inCheckins": False} in meta["problemTypes"]
     assert login("ravi@paliath.in").get("/me").json()["simpleMode"] is True
     assert amit.get("/me").json()["simpleMode"] is False
 

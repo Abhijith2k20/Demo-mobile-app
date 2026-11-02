@@ -161,10 +161,10 @@ def test_roles_and_deactivation_are_per_company(login, client):
     assert [c["name"] for c in code(client, "suresh@paliath.in").json()["companies"]] == ["Paliath Interiors"]
 
 
-def test_profile_language_and_notifications(login):
+def test_profile_name_and_notifications(login):
     ravi = login("ravi@paliath.in")
-    me = ravi.patch("/me", {"language": "kn", "notify": {"level": "important", "quietFrom": "22:00", "quietTo": "06:30"}}).json()
-    assert me["user"]["language"] == "kn" and me["notify"] == {"level": "important", "quietFrom": "22:00", "quietTo": "06:30"}
+    me = ravi.patch("/me", {"name": "Ravi K", "notify": {"level": "important", "quietFrom": "22:00", "quietTo": "06:30"}}).json()
+    assert me["user"]["name"] == "Ravi K" and me["notify"] == {"level": "important", "quietFrom": "22:00", "quietTo": "06:30"}
     assert ravi.patch("/me", {"notify": {"level": "loud"}}).status_code == 422
     assert ravi.put("/me/push-tokens", {"token": "ExponentPushToken[abc123xyz]", "platform": "android"}).json() == {"saved": True}
 

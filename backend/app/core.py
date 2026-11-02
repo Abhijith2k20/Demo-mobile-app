@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import secrets
 import time
 from datetime import datetime, timezone
 
@@ -25,8 +24,6 @@ ERROR_STATUS = {
     "INVITE_EXPIRED": 410,
     "PROJECT_LINKED": 409,
     "FILE_TOO_LARGE": 413,
-    "PM_REFUSED": 409,
-    "PM_UNAVAILABLE": 503,
     "CHANNEL_PRIVATE": 403,
     "PROJECT_ARCHIVED": 409,
     "RATE_LIMITED": 429,
@@ -67,10 +64,6 @@ def uuid7() -> str:
     value = (ms & ((1 << 48) - 1)) << 80 | (0x7 << 76) | ((rand >> 62) & 0xFFF) << 64 | (0b10 << 62) | (rand & ((1 << 62) - 1))
     h = f"{value:032x}"
     return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
-
-
-def new_token(prefix: str) -> str:
-    return f"{prefix}_{secrets.token_urlsafe(24)}"
 
 
 # ---- Clock ----

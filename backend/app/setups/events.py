@@ -5,15 +5,14 @@ SETUP = {
     # The bot's status cards and escalations go here.
     "workChannel": "on-the-day",
     "jobTitles": [
-        {"name": "Event Lead", "label": {"en": "Event Lead", "kn": "ಈವೆಂಟ್ ಲೀಡ್", "hi": "इवेंट लीड"}, "managersOnly": True,
-         "channels": ["general", "vendors", "on-the-day"]},
-        {"name": "Coordinator", "label": {"en": "Coordinator", "kn": "ಸಂಯೋಜಕ", "hi": "समन्वयक"}, "channels": ["vendors", "general"]},
-        {"name": "Crew", "label": {"en": "Crew", "kn": "ತಂಡ", "hi": "क्रू"}, "channels": ["on-the-day", "general"], "simpleMode": True},
+        {"name": "Event Lead", "managersOnly": True, "channels": ["general", "vendors", "on-the-day"]},
+        {"name": "Coordinator", "channels": ["vendors", "general"]},
+        {"name": "Crew", "channels": ["on-the-day", "general"], "simpleMode": True},
     ],
     "defaultJobTitle": "Crew",
     "problemTypes": [
-        {"key": "Vendor late", "label": {"en": "Vendor late", "kn": "ವ್ಯಾಪಾರಿ ತಡ", "hi": "वेंडर देर से"}},
-        {"key": "Equipment missing", "label": {"en": "Equipment missing", "kn": "ಉಪಕರಣ ಇಲ್ಲ", "hi": "सामान गायब"}},
-        {"key": "Crew short", "label": {"en": "Crew short", "kn": "ತಂಡ ಕಡಿಮೆ", "hi": "क्रू कम"}},
+        {"key": "Vendor late"},
+        {"key": "Equipment missing"},
+        {"key": "Crew short"},
     ],
 }

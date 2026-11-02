@@ -14,7 +14,8 @@
 - Database: plain SQL through backend/app/db.py; schema changes are new files in backend/db/migrations (never edit one that ran in staging or production). Per-company tables get company_id and the row-level security policy.
 - Timed or retried work (bot check-ins, reminders, PM writes, sync, email/SMS/push) is a job (backend/app/jobs), queued in the same transaction as the change.
 - Backend: routers translate HTTP only; business actions live in backend/app/services, rules in rules.py, visibility in access.py. Only main.py imports routers (checked by a test). Backend changes need tests in backend/tests; run `npm run test:api`.
-- Errors: services/routes return the standard error format; the app shows translated messages by code.
+- Errors: services/routes return the standard error format; the app shows friendly messages by code.
+- English only. Keep writing every text as t('key', 'English') so a language can be added back later (DECISIONS.md).
 - Colours, spacing and type only from src/theme. No hard-coded colours.
 - Record any deviation from the spec in DECISIONS.md.
 

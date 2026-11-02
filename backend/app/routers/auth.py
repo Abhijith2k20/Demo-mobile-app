@@ -5,8 +5,7 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import config, db
 from ..core import ApiError
-from ..deps import current_account, language
-from ..rules import job_title_info, localized
+from ..deps import current_account
 from ..schemas import CodeRequest, CodeVerify, PickCompany, Refresh
 from ..services import accounts
 from ..store import person
@@ -93,7 +92,7 @@ def logout(user: dict = Depends(current_account)):
 
 
 @router.get("/demo-accounts")
-def demo_accounts(lang: str = Depends(language)):
+def demo_accounts():
     """Development and staging only: one sign-in per role in each seeded company (the code is fixed there)."""
     if not config.DEV_TOOLS:
         raise ApiError("NOT_FOUND", "Not found.")
@@ -109,9 +108,8 @@ def demo_accounts(lang: str = Depends(language)):
             if key in seen or (u["role"] == "member" and not u["title"]):
                 continue
             seen.add(key)
-            info = job_title_info(c["setup"], u["title"]) if u["title"] else None
             picked.append({"identifier": u["email"] or u["phone"], "email": u["email"], "name": u["name"],
                            "companyRole": u["role"], "company": c["name"],
-                           "jobTitle": localized(info["label"], lang) if info else None})
+                           "jobTitle": u["title"]})
     db.current().set_company(None)
     return {"accounts": picked}

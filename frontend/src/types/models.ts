@@ -252,7 +252,6 @@ export interface DemoAccount {
   company: string;
   name: string;
   companyRole: CompanyRole;
-  /** Already in the reader's language. */
   jobTitle: string | null;
 }
 

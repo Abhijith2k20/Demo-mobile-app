@@ -53,8 +53,7 @@ export function setAuthLostHandler(fn: () => void): void {
 async function send<T>(method: TransportRequest['method'], path: string, body: unknown, form?: FormData): Promise<T> {
   const requestId = `req_${uuidv7()}`;
   const token = useSession.getState().accessToken;
-  // The language picks the labels of the company's own setup (job titles, problem types).
-  const headers: Record<string, string> = { 'X-Request-Id': requestId, 'Accept-Language': useUi.getState().language };
+  const headers: Record<string, string> = { 'X-Request-Id': requestId };
   if (token) headers.Authorization = `Bearer ${token}`;
   const started = Date.now();
   const log = (status: number | 'offline' | 'timeout', code?: string) =>

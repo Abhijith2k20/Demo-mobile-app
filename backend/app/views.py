@@ -21,7 +21,7 @@ from .rules import (
 )
 from .pm import connector as pm
 from .services import accounts, files
-from .store import MESSAGE_COLUMNS, company, person, project, project_member, project_members, project_role, setup
+from .store import MESSAGE_COLUMNS, company, project, project_member, project_members, project_role, setup
 
 
 def public_user(u: dict, viewer: dict | None = None) -> dict:
@@ -37,7 +37,7 @@ def me_view(user: dict) -> dict:
     titles = [r["jobTitle"] for r in db.rows("SELECT job_title FROM project_members WHERE user_id = %(u)s", u=user["id"])]
     c = company()
     return {
-        "user": {**public_user(user), "language": user.get("language", "en")},
+        "user": public_user(user),
         "permissions": company_permissions(user),
         # The big-button layout, for people whose job titles the company marked as simple.
         "simpleMode": simple_mode(setup(), titles),
@@ -181,8 +181,3 @@ def checkin_view(c: dict) -> dict:
         "closed": c["answer"] is None and (task is None or task["status"] not in OPEN_TASK_STATUSES
                                            or task["ownerUserId"] != c["userId"]),
     }
-
-
-def person_view(user_id: str, viewer: dict) -> dict | None:
-    u = person(user_id)
-    return public_user(u, viewer) if u else None

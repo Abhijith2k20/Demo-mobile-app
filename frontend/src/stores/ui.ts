@@ -3,7 +3,6 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type ThemePref = 'system' | 'light' | 'dark';
-export type Language = 'en' | 'kn' | 'hi';
 export interface Toast {
   id: number;
   text: string;
@@ -12,7 +11,6 @@ export interface Toast {
 
 interface UiState {
   theme: ThemePref;
-  language: Language;
   /** Home sections and project rows the user has collapsed/expanded. */
   collapsed: Record<string, boolean>;
   drafts: Record<string, string>;
@@ -21,7 +19,6 @@ interface UiState {
   toast: Toast | null;
   demoPillHidden: boolean;
   setTheme: (t: ThemePref) => void;
-  setLanguage: (l: Language) => void;
   toggleCollapsed: (key: string, fallback?: boolean) => void;
   setDraft: (key: string, text: string) => void;
   set: (patch: Partial<Pick<UiState, 'online' | 'socketConnected' | 'demoPillHidden'>>) => void;
@@ -35,7 +32,6 @@ export const useUi = create<UiState>()(
   persist(
     (set) => ({
       theme: 'system',
-      language: 'en',
       collapsed: {},
       drafts: {},
       online: true,
@@ -43,7 +39,6 @@ export const useUi = create<UiState>()(
       toast: null,
       demoPillHidden: false,
       setTheme: (theme) => set({ theme }),
-      setLanguage: (language) => set({ language }),
       toggleCollapsed: (key, fallback = false) =>
         set((s) => ({ collapsed: { ...s.collapsed, [key]: !(s.collapsed[key] ?? fallback) } })),
       setDraft: (key, text) => set((s) => ({ drafts: { ...s.drafts, [key]: text } })),
@@ -57,7 +52,6 @@ export const useUi = create<UiState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         theme: s.theme,
-        language: s.language,
         demoPillHidden: s.demoPillHidden,
       }),
     },

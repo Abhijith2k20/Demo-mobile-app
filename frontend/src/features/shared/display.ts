@@ -9,7 +9,7 @@ export const firstName = (name: string | undefined): string => name?.split(' ')[
 
 export const shortProjectName = (name: string): string => name.split(' – ')[0];
 
-/** Names for company roles, project roles and the company's own job titles, in the user's language. */
+/** Names for company roles, project roles and the company's own job titles. */
 export function useRoleLabels() {
   const { t } = useTranslation();
   const jobTitles = useMeta()?.jobTitles;

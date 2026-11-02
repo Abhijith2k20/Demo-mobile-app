@@ -21,7 +21,6 @@ EDIT_WINDOW_MS = 15 * 60 * 1000
 DELETE_WINDOW_MS = 60 * 60 * 1000
 PERCENT_STEPS = [25, 50, 75, 90, 100]  # the check-in scale
 HOME_CHANNEL = "general"
-LANGUAGES = ("en", "kn", "hi")
 ROLES_IN_EVERY_CHANNEL = ["manager"]  # §9.3: managers are in every channel of their project
 
 
@@ -104,11 +103,6 @@ def can_post(user: dict, channel: dict) -> bool:
 
 # ---- The company's own setup (job titles, channels, problem types; see seed.py) ----
 # Nothing below knows an industry: each company's words and defaults are data.
-
-def localized(label: dict | str, lang: str) -> str:
-    """A setup label in the reader's language, falling back to English."""
-    return label if isinstance(label, str) else label.get(lang) or label["en"]
-
 
 def job_title_info(setup: dict, name: str) -> dict | None:
     return next((jt for jt in setup["jobTitles"] if jt["name"] == name), None)

@@ -599,3 +599,13 @@ Business API: the business system decides, WhatsApp delivers.
 - "Related task" in Report issue lists the tasks named in the project's cards from the last 30 days, since
   Siteline no longer has the PM app's task list.
 
+## English only (2026-11-02)
+
+The owner removed Kannada and Hindi for now.
+- Removed: `kn.json` and `hi.json`, the language picker on You, the `Accept-Language` header, the server's
+  per-language labels for job titles and problem types (`setups/*`, `rules.localized`, `deps.language`), and
+  `users.language` (migration `002_english_only.sql`, which also strips labels from companies' saved setups).
+- Kept: i18next with `en.json`, and every text written as `t('key', 'English')`. Adding a language back is a
+  translation file, a picker, and (for job titles and problem types) labels in the setup again.
+- The Cards API takes plain strings (no per-language text).
+

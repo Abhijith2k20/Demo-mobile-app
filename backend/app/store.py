@@ -13,7 +13,7 @@ BOT_ID = "siteline-bot"
 BOT_EMAIL = "bot@siteline.app"
 
 _PEOPLE = """
-  SELECT u.id, u.name, u.email, u.phone, u.avatar_color, u.language, m.role AS company_role,
+  SELECT u.id, u.name, u.email, u.phone, u.avatar_color, m.role AS company_role,
          (m.status = 'active' AND u.deleted_at IS NULL) AS is_active, m.updated_at
   FROM memberships m JOIN users u ON u.id = m.user_id
   WHERE m.company_id = current_company()
@@ -46,7 +46,7 @@ def person(user_id: str | None) -> dict | None:
         return None
     if user_id == BOT_ID:
         return {"id": BOT_ID, "name": "Siteline Bot", "email": BOT_EMAIL, "phone": None, "avatarColor": "slate",
-                "language": "en", "companyRole": "member", "isActive": True, "online": True}
+                "companyRole": "member", "isActive": True, "online": True}
     return _with_presence(db.row(_PEOPLE + " AND u.id = %(id)s", id=user_id))
 
 

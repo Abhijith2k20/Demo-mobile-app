@@ -10,13 +10,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastHost } from '@/components/chrome';
 import { DemoPill } from '@/features/demo/components/DemoPill';
-import i18n from '@/lib/i18n';
+import '@/lib/i18n'; // sets up the app's text before any screen renders
 import { queryClient } from '@/lib/queryClient';
 import { runOutbox } from '@/lib/outbox';
 import { restoreSession } from '@/lib/session';
-import { keys, refresh, refreshAll } from '@/lib/queries';
+import { refreshAll } from '@/lib/queries';
 import { useSession } from '@/stores/session';
-import { prefsLoaded, useUi } from '@/stores/ui';
+import { prefsLoaded } from '@/stores/ui';
 import { useTheme } from '@/theme/useTheme';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -42,18 +42,11 @@ export default function RootLayout() {
   }, []);
   const ready = (fontsLoaded || !!fontError) && restored;
   const { c, mode } = useTheme();
-  const language = useUi((s) => s.language);
   useAuthGate(ready);
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
-
-  useEffect(() => {
-    void i18n.changeLanguage(language);
-    // Labels from the company's setup come from the server in the chosen language.
-    void refresh(keys.meta, keys.demoAccounts);
-  }, [language]);
 
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
