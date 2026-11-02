@@ -574,3 +574,28 @@ the accounts listed in the README. Where it differs from the spec:
 - Local Docker: the compose project is named `siteline`, so it can't collide with other projects named
   `backend`. The API runs on a normal (non-superuser) database role so row-level security applies.
 
+## The PM app owns the bot (spec 2.1, 2026-11-02)
+
+The owner decided the PM app should own the bot's logic, with Siteline as the channel, like the WhatsApp
+Business API: the business system decides, WhatsApp delivers.
+- **Moves to the PM app:** what to ask about, whom, when (working days, time zones), reminders, escalation, what
+  an answer means for the task, and which status cards to post. Siteline keeps no copy of tasks and no task
+  rules.
+- **Siteline offers the Cards API** (`docs/CARDS_API.md`): `PUT /api/v1/projects/{ref}` (project spaces and
+  members), `POST /api/v1/cards` (a card to one person: scale, buttons with choices, note; texts in up to three
+  languages), `PATCH` (change or close), `nudge`, `POST /api/v1/messages` (channel cards with `notify`), and
+  signed webhooks back (`card.answered`, `person.joined|left`), retried for 24 hours. The PM app's reply to
+  `card.answered` can refuse an answer with a reason, which the person sees.
+- **Siteline keeps its guarantees:** cards only to active members of that company, quiet hours for pushes,
+  answers made offline delivered once and in order, each webhook with an id for de-duplication, one key per
+  company.
+- **Why:** one owner for all task logic; the PM team changes chasing rules without a Siteline release; Siteline
+  becomes a channel other tools could use later; custom cards per company come for free.
+- **Trade-offs accepted:** the PM app needs its own scheduler; if its job stops, nobody is asked (answers still
+  queue). Changing how cards look still needs a Siteline release.
+- Spec 2.0's bot (planner, PM sync, re-check, PM writes, saved copy of tasks, check-in times in the setup)
+  becomes the **mock PM app** (`mockpm/`), which uses the Cards API like the real PM app will, then the old code
+  is removed. Plan: `docs/PLAN_CARDS_API.md`. Not built yet.
+- "Related task" in Report issue lists the tasks named in the project's cards from the last 30 days, since
+  Siteline no longer has the PM app's task list.
+

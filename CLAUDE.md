@@ -3,7 +3,7 @@
 - Read SITELINE_SPEC.md before any change. It is the source of truth (version 2.0, the MVP; DECISIONS.md lists what differs).
 - The app runs as an EAS development build, not in Expo Go. Add libraries with `npx expo install`; configure native behaviour in app.json and config plugins, never in ios/ or android/.
 - Multi-company: every per-company record carries company_id, the company comes from the session (never the request), and another company's ids answer 404. Tenant-separation tests must cover every new route.
-- Projects and tasks belong to the PM app. Siteline talks to it only through backend/app/pm/connector.py and never edits a task except by sending a check-in answer.
+- Projects, tasks and every rule about chasing them belong to the PM app. Siteline only delivers its cards and sends answers back (Cards API: docs/CARDS_API.md). Siteline keeps no copy of tasks and decides nothing about them; the mock PM app (backend/app/mockpm) uses the same API the real one will.
 - Files in app/ are routes only: read URL params and render a screen from src/features/<area>/screens/. No layout or logic in app/ (except _layout files).
 - Features never import each other in a loop, and src/features/shared imports no feature (checked by a test). Put a piece two features need in shared.
 - Screens never call the API directly; use feature hooks (reads) and feature api.ts functions (writes).
