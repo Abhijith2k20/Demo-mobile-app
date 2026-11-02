@@ -1,59 +1,69 @@
 """Posting a message: the one write path for messages (routes, the bot, scripted teammates).
-Saves it, marks it read for the sender, publishes it and notifies mentions and thread replies."""
+Saves it, marks it read for the sender, publishes it, and notifies mentions, thread replies and DMs."""
 from __future__ import annotations
 
+from .. import db
 from ..core import now_iso, uuid7
 from ..events import publish
-from ..notify import add_activity
+from ..notify import add_activity, push
 from ..access import channel_audience
-from ..store import S, ensure_channel_member, first_name
+from ..store import BOT_ID, MESSAGE_COLUMNS, ensure_channel_member, first_name, message
 
 
 def channel_label(ch: dict) -> str:
     return "a direct message" if ch["kind"] in ("dm", "bot") else f"#{ch['name']}"
 
 
+def _preview(type: str, body: str | None, data: dict | None) -> str:
+    if body:
+        return body
+    return {"image": "Photo", "voice": "Voice note", "file": "File", "issue_card": "Issue reported",
+            "daily_report": "Daily report"}.get(type, "New message")
+
+
 def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, data: dict | None = None,
                  thread_parent_id: str | None = None, id: str | None = None) -> dict:
-    """The one write path for messages (routes, the bot, scripted teammates). Publishes and notifies."""
-    s = S()
     ts = now_iso()
-    message = {
-        "id": id or uuid7(),
-        "channelId": channel["id"],
-        "senderId": sender_id,
-        "type": type,
-        "body": body,
-        "data": data,
-        "threadParentId": thread_parent_id,
-        "reactions": {},
-        "status": "sent",
-        "createdAt": ts,
-        "updatedAt": ts,
-        "deletedAt": None,
-    }
-    s.messages[message["id"]] = message
-    if sender_id != s.bot_id and not thread_parent_id:
-        ensure_channel_member(sender_id, channel["id"])["lastReadMessageId"] = message["id"]
+    m = db.insert("messages", {
+        "id": id or uuid7(), "companyId": db.company_id(), "channelId": channel["id"], "senderId": sender_id,
+        "type": type, "body": body, "data": data, "threadParentId": thread_parent_id, "reactions": {},
+        "createdAt": ts, "updatedAt": ts, "deletedAt": None,
+    })
+    m = message(m["id"])
+    if sender_id != BOT_ID and not thread_parent_id:
+        ensure_channel_member(sender_id, channel["id"])
+        db.run("UPDATE channel_members SET last_read_message_id = %(m)s WHERE channel_id = %(c)s AND user_id = %(u)s",
+               m=m["id"], c=channel["id"], u=sender_id)
     audience = channel_audience(channel)
-    publish({"type": "message.new", "message": message}, audience)
+    publish({"type": "message.new", "message": {k: v for k, v in m.items() if k != "companyId"}}, audience)
+    if sender_id == BOT_ID:
+        return m
 
+    who = first_name(sender_id)
+    preview = _preview(type, body, data)
     mentions = [uid for uid in (data or {}).get("mentions", []) if uid in set(audience)]
     for uid in mentions:
         add_activity(
             userId=uid, kind="mention", actorId=sender_id, projectId=channel["projectId"], channelId=channel["id"],
-            messageId=thread_parent_id or message["id"], taskIds=[],
-            text=f"{first_name(sender_id)} mentioned you in {channel_label(channel)}",
-            lines=[body or (data or {}).get("what") or ""],
+            messageId=thread_parent_id or m["id"], taskIds=[],
+            text=f"{who} mentioned you in {channel_label(channel)}", lines=[body or (data or {}).get("what") or ""],
         )
+    url = f"/thread/{thread_parent_id}" if thread_parent_id else f"/channel/{channel['id']}"
+    push(mentions, f"{who} in {channel_label(channel)}", preview, {"url": url},
+         kind="issue" if type == "issue_card" else "mention")
+    if channel["kind"] == "dm":
+        push([uid for uid in audience if uid != sender_id], who, preview, {"url": url}, kind="dm")
     if thread_parent_id:
-        parent = s.messages.get(thread_parent_id)
+        parent = message(thread_parent_id)
         participants = {parent["senderId"]} if parent else set()
-        participants |= {m["senderId"] for m in s.messages.values() if m["threadParentId"] == thread_parent_id}
-        for uid in participants - set(mentions):
+        participants |= {r["senderId"] for r in db.rows(f"SELECT {MESSAGE_COLUMNS} FROM messages m WHERE thread_parent_id = %(p)s",
+                                                        p=thread_parent_id)}
+        repliers = participants - set(mentions) - {sender_id, BOT_ID}
+        for uid in repliers:
             add_activity(
                 userId=uid, kind="thread_reply", actorId=sender_id, projectId=channel["projectId"],
                 channelId=channel["id"], messageId=thread_parent_id, taskIds=[],
-                text=f"{first_name(sender_id)} replied in a thread in {channel_label(channel)}", lines=[body or ""],
+                text=f"{who} replied in a thread in {channel_label(channel)}", lines=[body or ""],
             )
-    return message
+        push(list(repliers), f"{who} replied in {channel_label(channel)}", preview, {"url": url}, kind="thread")
+    return m

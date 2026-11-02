@@ -1,15 +1,17 @@
-"""Scripted teammates (§10.6): every 20–40 s one of them posts or edits, so the demo feels alive.
-They act through the same write paths as real users, so everyone gets the same events."""
+"""Scripted teammates (development and staging only, spec §11): every 20–40 s one of them posts in the seeded
+Paliath company, so the app feels alive. They act through the same write paths as real users."""
 from __future__ import annotations
 
 import random
 
+from . import db
 from .core import uuid7
-from .events import cancel, later
-from .store import S, project_channel
+from .events import cancel, hub, later
 from .services.messaging import post_message
+from .store import project_channel
 
-_state = {"paused": False, "step": 0, "timer": None}
+_state: dict = {"paused": False, "step": 0, "timer": None, "loop": None}
+COMPANY_SLUG = "paliath-interiors"
 
 
 def paused() -> bool:
@@ -21,11 +23,12 @@ def set_paused(value: bool) -> None:
 
 
 def _user(prefix: str) -> str | None:
-    return next((u["id"] for u in S().users.values() if u["name"].startswith(prefix)), None)
+    return db.value("""SELECT u.id FROM users u JOIN memberships m ON m.user_id = u.id AND m.company_id = current_company()
+                       WHERE u.name LIKE %(p)s AND m.status = 'active' LIMIT 1""", p=prefix + "%")
 
 
 def _project(prefix: str) -> str | None:
-    return next((p["id"] for p in S().projects.values() if p["name"].startswith(prefix)), None)
+    return db.value("SELECT id FROM projects WHERE name LIKE %(p)s AND archived_at IS NULL", p=prefix + "%")
 
 
 def _img(tone: str, caption: str) -> dict:
@@ -40,14 +43,12 @@ def _post(user: str, project: str | None, channel: str, body: str | None, photos
     uid = _user(user)
     if not uid:
         return
-    s = S()
     if project:
-        ch = project_channel(_project(project) or "", channel)
+        ch = project_channel(_project(project), channel)
     else:
-        ch = next((c for c in s.channels.values() if c["kind"] == "company" and c["name"] == channel), None)
-    if not ch or (ch["projectId"] and s.projects.get(ch["projectId"], {}).get("archivedAt")):
-        return
-    post_message(ch, uid, type="image" if photos else "text", body=body, data={"attachments": photos} if photos else None)
+        ch = db.row("SELECT * FROM channels WHERE kind = 'company' AND name = %(n)s", n=channel)
+    if ch:
+        post_message(ch, uid, type="image" if photos else "text", body=body, data={"attachments": photos} if photos else None)
 
 
 def kavya_posts_design(n: int) -> None:
@@ -82,29 +83,39 @@ def owner_announces(n: int) -> None:
 SCRIPT = [kavya_posts_design, suresh_posts_site, rohan_posts_qs, suresh_posts_site, kavya_posts_design, owner_announces]
 
 
-def _someone_signed_in() -> bool:
-    # Someone has the app open (tokens never expire on their own, so they can't tell).
-    from .events import hub
-
-    return any(hub.conns.values())
-
-
 def _tick() -> None:
     from . import netsim
 
     _state["timer"] = None
-    if not _state["paused"] and netsim.state()["mode"] == "online" and _someone_signed_in():
-        SCRIPT[_state["step"] % len(SCRIPT)](_state["step"])
-        _state["step"] += 1
-    _plan()
+    try:
+        if not _state["paused"] and netsim.state()["mode"] == "online" and any(hub.conns.values()):
+            with db.transaction():
+                cid = db.value("SELECT id FROM companies WHERE slug = %(s)s AND status = 'active'", s=COMPANY_SLUG)
+            if cid:
+                with db.transaction(cid):
+                    SCRIPT[_state["step"] % len(SCRIPT)](_state["step"])
+            _state["step"] += 1
+    finally:
+        _plan()
 
 
 def _plan() -> None:
-    cancel(_state["timer"])
-    _state["timer"] = later(20 + random.random() * 20, _tick)
+    """Schedules the next tick on the server's event loop (ticks themselves run in a thread)."""
+    loop = _state.get("loop")
+    if loop is None:
+        return
+
+    def schedule() -> None:
+        cancel(_state["timer"])
+        _state["timer"] = later(20 + random.random() * 20, _tick)
+
+    loop.call_soon_threadsafe(schedule)
 
 
 def start() -> None:
+    import asyncio
+
+    _state["loop"] = asyncio.get_running_loop()
     if not _state["timer"]:
         _plan()
 

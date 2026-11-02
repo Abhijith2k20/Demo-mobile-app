@@ -1,101 +1,117 @@
-"""Sign-in by work email and a 6-digit code (always 123456 in the demo)."""
+"""Sign-in (spec §5.1, §9.4): a one-time code to a work email or phone, then a session for one company."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
-from .. import bot
-from ..core import ApiError, new_token, now_ms
-from ..deps import current_user, language, user_for_token
+from .. import config, db
+from ..core import ApiError
+from ..deps import current_account, language
 from ..rules import job_title_info, localized
-from ..services.people import end_sessions
-from ..schemas import OtpRequest, OtpVerify, Refresh
-from ..store import S, humans, setup
+from ..schemas import CodeRequest, CodeVerify, PickCompany, Refresh
+from ..services import accounts
+from ..store import person
 from ..views import me_view
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-DEMO_OTP = "123456"
-MAX_ATTEMPTS = 5
-LOCK_SECONDS = 15 * 60  # a lock (and its count) lasts this long, so the table can't only grow
+
+def _company_session(user_id: str, company_id: str) -> dict:
+    """Tokens and profile for one company (the caller checked the membership)."""
+    tokens = accounts.create_session(user_id, company_id)
+    db.current().set_company(company_id)
+    return {**tokens, **me_view(person(user_id))}
 
 
-@router.get("/demo-accounts")
-async def demo_accounts(lang: str = Depends(language)):
-    """Demo build only: one sign-in per role, so every point of view is a tap away (code 123456)."""
-    s = S()
-    first_title = {}
-    for m in s.project_members:
-        first_title.setdefault(m["userId"], m["jobTitle"])
-    picked, seen = [], set()
-    for u in humans():
-        title = first_title.get(u["id"])
-        role = u["companyRole"] if u["companyRole"] != "member" else f"member:{title}"
-        if role in seen or (u["companyRole"] == "member" and not title):
-            continue
-        seen.add(role)
-        info = job_title_info(setup(), title) if title else None
-        picked.append({"email": u["email"], "name": u["name"], "companyRole": u["companyRole"],
-                       "jobTitle": localized(info["label"], lang) if info else None})
-    return {"accounts": picked}
-
-
-def issue_tokens(user_id: str) -> dict:
-    s = S()
-    access, refresh = new_token("at"), new_token("rt")
-    s.tokens[access] = {"userId": user_id, "kind": "access", "expired": False, "refresh": refresh}
-    s.tokens[refresh] = {"userId": user_id, "kind": "refresh", "expired": False}
-    return {"accessToken": access, "refreshToken": refresh}
-
-
-def _attempts(email: str) -> int:
-    """Wrong codes for this email in the last 15 minutes; older counts are forgotten."""
-    s = S()
-    now = now_ms()
-    if len(s.otp_attempts) > 1000:
-        for key in [k for k, (_, since) in s.otp_attempts.items() if now - since > LOCK_SECONDS * 1000]:
-            del s.otp_attempts[key]
-    count, since = s.otp_attempts.get(email, (0, now))
-    return 0 if now - since > LOCK_SECONDS * 1000 else count
+def _choices(user: dict) -> dict:
+    return {"companies": accounts.companies_for(user["id"]), "invites": accounts.invites_for(user)}
 
 
 @router.post("/otp/request")
-async def otp_request(body: OtpRequest):
-    # Asking for a new code must not reset the wrong-code count (it's cleared only on success).
+def otp_request(body: CodeRequest, request: Request):
+    identifier = accounts.normalize_identifier(body.identifier)
+    accounts.request_code(identifier, request.client.host if request.client else "?")
     # Same answer for known and unknown addresses, so nobody can test who has an account.
-    return {"sent": True, "resendInSeconds": 30}
+    return {"sent": True, "resendInSeconds": 30, "channel": "sms" if accounts.is_phone(identifier) else "email"}
 
 
 @router.post("/otp/verify")
-async def otp_verify(body: OtpVerify):
-    s = S()
-    attempts = _attempts(body.email)
-    if attempts >= MAX_ATTEMPTS:
-        raise ApiError("OTP_TOO_MANY_ATTEMPTS", "Too many wrong codes. Request a new code.")
-    user = next((u for u in s.users.values() if u["email"] == body.email and u["isActive"] and u["id"] != s.bot_id), None)
-    if body.code != DEMO_OTP or not user:
-        since = s.otp_attempts.get(body.email, (0, now_ms()))[1] if attempts else now_ms()
-        s.otp_attempts[body.email] = (attempts + 1, since)
-        if attempts + 1 >= MAX_ATTEMPTS:
-            raise ApiError("OTP_TOO_MANY_ATTEMPTS", "Too many wrong codes. Request a new code.")
-        raise ApiError("OTP_INVALID", "That code is not right.", {"attemptsLeft": MAX_ATTEMPTS - attempts - 1})
-    s.otp_attempts.pop(body.email, None)
-    bot.on_login(user["id"])
-    return {**issue_tokens(user["id"]), **me_view(user)}
+def otp_verify(body: CodeVerify):
+    """The person's companies and invites. With exactly one company and no invites, its session too."""
+    identifier = accounts.normalize_identifier(body.identifier)
+    accounts.check_code(identifier, body.code)
+    user = accounts.account_for(identifier)
+    choices = _choices(user)
+    out = {"accessToken": accounts.create_session(user["id"], None)["accessToken"], **choices,
+           "user": {"id": user["id"], "name": user["name"]}}
+    if len(choices["companies"]) == 1 and not choices["invites"]:
+        out["session"] = _company_session(user["id"], choices["companies"][0]["id"])
+    return out
+
+
+@router.get("/companies")
+def companies(user: dict = Depends(current_account)):
+    """For the company picker and switcher."""
+    return _choices(user)
+
+
+@router.post("/session")
+@router.post("/switch")
+def pick_company(body: PickCompany, user: dict = Depends(current_account)):
+    """A session for one of the person's companies; the session that asked ends (switching company)."""
+    m = accounts.membership(user["id"], body.companyId)
+    if not m or m["status"] != "active":
+        raise ApiError("NOT_A_MEMBER", "You're not in this company.")
+    if m["companyStatus"] != "active":
+        raise ApiError("COMPANY_SUSPENDED", "This company isn't available on Siteline right now.")
+    out = _company_session(user["id"], body.companyId)
+    accounts.revoke_session(user["sessionId"])
+    return out
+
+
+@router.post("/invites/{invite_id}/accept")
+def accept_invite(invite_id: str, user: dict = Depends(current_account)):
+    invite = accounts.accept_invite(user, invite_id)
+    return {**_choices(user), "joined": invite["companyId"]}
+
+
+@router.post("/invites/{invite_id}/decline")
+def decline_invite(invite_id: str, user: dict = Depends(current_account)):
+    accounts.decline_invite(user, invite_id)
+    return _choices(user)
 
 
 @router.post("/refresh")
-async def refresh(body: Refresh):
-    user = user_for_token(body.refreshToken, kind="refresh")
-    s = S()
-    # Each refresh replaces that session's previous access token, so tokens don't pile up.
-    for old in [k for k, t in s.tokens.items() if t.get("refresh") == body.refreshToken]:
-        del s.tokens[old]
-    access = new_token("at")
-    s.tokens[access] = {"userId": user["id"], "kind": "access", "expired": False, "refresh": body.refreshToken}
-    return {"accessToken": access}
+def refresh(body: Refresh):
+    out = accounts.refresh_session(body.refreshToken)
+    return {"accessToken": out["accessToken"], "refreshToken": out["refreshToken"]}
 
 
 @router.post("/logout")
-async def logout(user: dict = Depends(current_user)):
-    end_sessions(user["id"])
+def logout(user: dict = Depends(current_account)):
+    accounts.revoke_session(user["sessionId"])
     return {"loggedOut": True}
+
+
+@router.get("/demo-accounts")
+def demo_accounts(lang: str = Depends(language)):
+    """Development and staging only: one sign-in per role in each seeded company (the code is fixed there)."""
+    if not config.DEV_TOOLS:
+        raise ApiError("NOT_FOUND", "Not found.")
+    picked = []
+    for c in db.rows("SELECT id, name, setup FROM companies WHERE status = 'active' ORDER BY created_at"):
+        db.current().set_company(c["id"])
+        seen = set()
+        for u in db.rows("""SELECT u.id, u.name, u.email, u.phone, m.role,
+                              (SELECT job_title FROM project_members pm WHERE pm.user_id = u.id ORDER BY joined_at LIMIT 1) AS title
+                            FROM memberships m JOIN users u ON u.id = m.user_id
+                            WHERE m.company_id = %(c)s AND m.status = 'active' ORDER BY m.joined_at, u.id""", c=c["id"]):
+            key = u["role"] if u["role"] != "member" else f"member:{u['title']}"
+            if key in seen or (u["role"] == "member" and not u["title"]):
+                continue
+            seen.add(key)
+            info = job_title_info(c["setup"], u["title"]) if u["title"] else None
+            picked.append({"identifier": u["email"] or u["phone"], "email": u["email"], "name": u["name"],
+                           "companyRole": u["role"], "company": c["name"],
+                           "jobTitle": localized(info["label"], lang) if info else None})
+    db.current().set_company(None)
+    return {"accounts": picked}

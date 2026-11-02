@@ -7,7 +7,6 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Id = str
-EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHANNEL_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 MessageType = Literal["text", "image", "voice", "file", "checkin", "issue_card", "daily_report", "status_card", "system"]
@@ -23,13 +22,6 @@ class Body(BaseModel):
 def _id(v: str) -> str:
     if not isinstance(v, str) or len(v) < 8:
         raise ValueError("Invalid id")
-    return v
-
-
-def _email(v: str) -> str:
-    v = (v or "").strip().lower()
-    if not EMAIL.match(v):
-        raise ValueError("Enter a valid work email")
     return v
 
 
@@ -65,19 +57,45 @@ def _channel_name(v: str) -> str:
 
 # ---- Auth ----
 
-class OtpRequest(Body):
-    email: str
-    v_e = field_validator("email")(_email)
+class CodeRequest(Body):
+    identifier: str = Field(min_length=3, max_length=120)  # work email or phone; normalised by services/accounts
 
 
-class OtpVerify(Body):
-    email: str
+class CodeVerify(Body):
+    identifier: str = Field(min_length=3, max_length=120)
     code: str = Field(min_length=6, max_length=6)
-    v_e = field_validator("email")(_email)
+
+
+class PickCompany(Body):
+    companyId: Id
 
 
 class Refresh(Body):
     refreshToken: str = ""
+
+
+class MePatch(Body):
+    name: Optional[str] = None
+    language: Optional[Literal["en", "kn", "hi"]] = None
+    notify: Optional[dict[str, Any]] = None
+    v_n = field_validator("name")(lambda v: None if v is None else _name(2, 60, "Enter your name")(v))
+
+    @field_validator("notify")
+    @classmethod
+    def notify_ok(cls, v):
+        if v is None:
+            return v
+        if v.get("level") not in ("all", "important", "off"):
+            raise ValueError("Pick a notification level")
+        for k in ("quietFrom", "quietTo"):
+            if v.get(k) is not None and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(v[k])):
+                raise ValueError("Use a time like 21:00")
+        return {k: v.get(k) for k in ("level", "quietFrom", "quietTo")}
+
+
+class PushToken(Body):
+    token: str = Field(min_length=10, max_length=300)
+    platform: Literal["ios", "android"]
 
 
 # ---- Messages ----
@@ -191,13 +209,45 @@ class ChannelPatch(Body):
 
 # ---- People ----
 
-class UserInvite(Body):
+class InviteCreate(Body):
     id: Id
+    identifier: str = Field(min_length=3, max_length=120)
     name: str
-    email: str
-    companyRole: Literal["member", "admin"]
+    role: Literal["admin", "member", "guest"]
+    channelIds: list[Id] = []
     v_n = field_validator("name")(_name(2, 60, "Enter their name"))
-    v_e = field_validator("email")(_email)
+
+
+class RoleChange(Body):
+    role: Literal["admin", "member", "guest"]
+
+
+# ---- Platform (the Siteline team) ----
+
+class CompanyCreate(Body):
+    name: str
+    timeZone: str = "Asia/Kolkata"
+    template: Literal["interiors", "events", "general"] = "general"
+    ownerName: str
+    ownerIdentifier: str = Field(min_length=3, max_length=120)
+    pmCompanyId: Optional[str] = None
+    pmKind: Literal["none", "mock", "http"] = "mock"
+    pmBaseUrl: Optional[str] = None
+    pmApiKey: Optional[str] = None
+    pmWebhookSecret: Optional[str] = None
+    v_n = field_validator("name")(_name(2, 80, "Give the company a name"))
+    v_o = field_validator("ownerName")(_name(2, 60, "Enter the owner's name"))
+
+    @field_validator("timeZone")
+    @classmethod
+    def tz_ok(cls, v):
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(v)
+        except Exception:
+            raise ValueError("Pick a time zone like Asia/Kolkata")
+        return v
 
 
 # ---- Demo panel ----

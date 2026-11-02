@@ -1,0 +1,13 @@
+# Local Postgres for development and tests: `docker compose up -d` in backend/.
+name: siteline
+services:
+  db:
+    image: postgres:16.6
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["5433:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init-local.sql:/docker-entrypoint-initdb.d/init.sql:ro
+volumes:
+  pgdata:

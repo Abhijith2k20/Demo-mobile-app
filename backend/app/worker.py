@@ -1,0 +1,83 @@
+"""The worker (spec §10.6): runs due jobs. Start it with `python -m app.worker`; in development the API can
+run one in a thread instead (SITELINE_WORKER=inline). More than one worker can run: jobs are claimed with
+SKIP LOCKED, so each is taken once."""
+from __future__ import annotations
+
+import logging
+import threading
+import time
+
+from . import db
+from .jobs import queue
+from .jobs.handlers import COMPANY_JOBS, HANDLERS, Retry, on_gave_up
+
+log = logging.getLogger("siteline.worker")
+
+
+def run_job(job: dict) -> None:
+    try:
+        with db.transaction(job["companyId"]):
+            active = job["companyId"] is None or db.value(
+                "SELECT status = 'active' FROM companies WHERE id = %(c)s", c=job["companyId"])
+            if active or job["kind"] not in COMPANY_JOBS:
+                HANDLERS[job["kind"]](job["payload"])
+            queue.finish(job)
+    except Exception as e:
+        if not isinstance(e, Retry):
+            log.exception("job %s (%s) failed", job["id"], job["kind"])
+        with db.transaction(job["companyId"]):
+            if not queue.fail(job, f"{type(e).__name__}: {e}", retry=job["kind"] in HANDLERS):
+                on_gave_up(job)
+
+
+def run_due(limit: int = 20) -> int:
+    """Runs the jobs that are due now; returns how many ran."""
+    with db.transaction():
+        jobs = queue.claim(limit)
+        db.run("""INSERT INTO worker_heartbeat (id, seen_at) VALUES (1, now())
+                  ON CONFLICT (id) DO UPDATE SET seen_at = now()""")
+    for job in jobs:
+        run_job(job)
+    return len(jobs)
+
+
+def ensure_schedules() -> None:
+    """Every active company has its daily plan and nightly sync queued, and cleanup runs hourly."""
+    with db.transaction():
+        companies = [r["id"] for r in db.rows("SELECT id FROM companies WHERE status = 'active'")]
+        queue.enqueue("cleanup", {}, company_id=None, dedupe_key=f"cleanup:{time.strftime('%Y-%m-%dT%H', time.gmtime())}")
+    for cid in companies:
+        with db.transaction(cid):
+            pending = db.value("""SELECT count(*) FROM jobs WHERE company_id = %(c)s AND kind = 'plan_day'
+                                  AND status IN ('pending', 'running')""", c=cid)
+            if not pending:
+                queue.enqueue("plan_day", {}, company_id=cid)
+            if not db.value("""SELECT count(*) FROM jobs WHERE company_id = %(c)s AND kind = 'pm_sync'
+                               AND status IN ('pending', 'running')""", c=cid):
+                queue.enqueue("pm_sync", {}, company_id=cid)
+
+
+def loop(stop: threading.Event | None = None) -> None:
+    ensure_schedules()
+    while not (stop and stop.is_set()):
+        try:
+            if run_due() == 0:
+                time.sleep(1)
+        except Exception:
+            log.exception("worker loop failed")
+            time.sleep(5)
+
+
+def start_inline() -> threading.Event:
+    stop = threading.Event()
+    threading.Thread(target=loop, args=(stop,), daemon=True, name="siteline-worker").start()
+    return stop
+
+
+if __name__ == "__main__":
+    from .logs import setup_logging
+
+    setup_logging()
+    db.migrate()
+    log.info("worker started")
+    loop()

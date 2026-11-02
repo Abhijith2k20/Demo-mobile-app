@@ -2,6 +2,12 @@ fastapi==0.128.0
 uvicorn[standard]==0.40.0
 pydantic==2.12.5
 python-multipart==0.0.20
+psycopg[binary]==3.2.13
+psycopg-pool==3.2.7
+httpx==0.28.1
+cryptography==46.0.3
+boto3==1.40.70
+sentry-sdk[fastapi]==2.44.0
 # tests
 pytest==8.3.4
-httpx==0.28.1
+pyflakes==3.4.0

@@ -1,123 +1,157 @@
-"""In-memory data. Records are plain dicts with the same camelCase keys the API returns.
-Everything resets on restart or `POST /internal/reset`; that is the "mock" part."""
+"""Lookups shared by routes, services and the bot. Everything reads the current transaction's company
+(app/db.py); row-level security keeps other companies' rows out even if a query forgot to filter.
+
+A "person" is a user as seen inside the current company: their account plus their membership
+(`companyRole`, `isActive`)."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
+from . import db
 from .core import now_iso
 from .rules import is_company_admin
 
+BOT_ID = "siteline-bot"
+BOT_EMAIL = "bot@siteline.app"
 
-@dataclass
-class Store:
-    company_id: str = ""
-    company: dict = field(default_factory=dict)  # id, name, setup (the company's own job titles, channels...)
-    bot_id: str = ""
-    users: dict[str, dict] = field(default_factory=dict)
-    projects: dict[str, dict] = field(default_factory=dict)
-    project_members: list[dict] = field(default_factory=list)  # + joinedAt
-    channels: dict[str, dict] = field(default_factory=dict)
-    channel_members: list[dict] = field(default_factory=list)  # + joinedAt
-    messages: dict[str, dict] = field(default_factory=dict)
-    checkins: dict[str, dict] = field(default_factory=dict)  # + messageId, remindedAt, escalatedAt
-    # The mock PM app's own data (pm/mock.py): projects, tasks, and answers already written (by key).
-    pm: dict = field(default_factory=lambda: {"projects": {}, "tasks": {}, "writes": {}})
-    activities: list[dict] = field(default_factory=list)  # + readAt (server-side read state)
-    uploads: dict[str, dict] = field(default_factory=dict)  # id -> {id, userId, path, contentType}
-    tokens: dict[str, dict] = field(default_factory=dict)  # token -> {userId, kind, expired}
-    otp_attempts: dict[str, tuple[int, int]] = field(default_factory=dict)  # email -> (wrong codes, since ms)
+_PEOPLE = """
+  SELECT u.id, u.name, u.email, u.phone, u.avatar_color, u.language, m.role AS company_role,
+         (m.status = 'active' AND u.deleted_at IS NULL) AS is_active, m.updated_at
+  FROM memberships m JOIN users u ON u.id = m.user_id
+  WHERE m.company_id = current_company()
+"""
 
 
-_store: Store | None = None
+def _with_presence(p: dict | None) -> dict | None:
+    if p is not None:
+        from .events import hub
+
+        p["online"] = hub.is_online(p["id"], db.company_id())
+    return p
 
 
-def S() -> Store:
-    global _store
-    if _store is None:
-        from .seed import build
+# ---- Company ----
 
-        _store = build()
-    return _store
+def company() -> dict:
+    return db.row("SELECT * FROM companies WHERE id = current_company()")
 
-
-def reset_store() -> Store:
-    global _store
-    from .seed import build
-
-    _store = build()
-    return _store
-
-
-# ---- Lookups ----
 
 def setup() -> dict:
     """The company's own words and defaults: job titles, standard channels, problem types."""
-    return S().company["setup"]
+    return company()["setup"]
+
+
+# ---- People ----
+
+def person(user_id: str | None) -> dict | None:
+    if not user_id:
+        return None
+    if user_id == BOT_ID:
+        return {"id": BOT_ID, "name": "Siteline Bot", "email": BOT_EMAIL, "phone": None, "avatarColor": "slate",
+                "language": "en", "companyRole": "member", "isActive": True, "online": True}
+    return _with_presence(db.row(_PEOPLE + " AND u.id = %(id)s", id=user_id))
+
+
+def people() -> list[dict]:
+    """Everyone in the company, deactivated people included, by name."""
+    return [_with_presence(p) for p in db.rows(_PEOPLE + " ORDER BY u.name")]
 
 
 def humans() -> list[dict]:
-    s = S()
-    return [u for u in s.users.values() if u["id"] != s.bot_id and u["isActive"]]
+    return [p for p in people() if p["isActive"]]
+
+
+def human_ids() -> list[str]:
+    return [p["id"] for p in humans()]
 
 
 def admins() -> list[str]:
-    return [u["id"] for u in humans() if is_company_admin(u)]
+    return [p["id"] for p in humans() if is_company_admin(p)]
 
 
-def project_role(user_id: str, project_id: str) -> str | None:
-    for m in S().project_members:
-        if m["userId"] == user_id and m["projectId"] == project_id:
-            return m["role"]
-    return None
+def first_name(user_id: str | None) -> str:
+    u = person(user_id)
+    return u["name"].split(" ")[0] if u else "Someone"
+
+
+# ---- Projects ----
+
+def project(project_id: str | None) -> dict | None:
+    return db.row("SELECT * FROM projects WHERE id = %(id)s", id=project_id) if project_id else None
 
 
 def project_member(user_id: str, project_id: str) -> dict | None:
-    return next((m for m in S().project_members if m["userId"] == user_id and m["projectId"] == project_id), None)
+    return db.row("SELECT * FROM project_members WHERE user_id = %(u)s AND project_id = %(p)s", u=user_id, p=project_id)
+
+
+def project_role(user_id: str, project_id: str | None) -> str | None:
+    m = project_member(user_id, project_id) if project_id else None
+    return m["role"] if m else None
+
+
+def project_members(project_id: str) -> list[dict]:
+    return db.rows("SELECT * FROM project_members WHERE project_id = %(p)s ORDER BY joined_at, user_id", p=project_id)
 
 
 def project_member_ids(project_id: str) -> set[str]:
-    return {m["userId"] for m in S().project_members if m["projectId"] == project_id}
+    return {m["userId"] for m in project_members(project_id)}
 
 
 def project_managers(project_id: str) -> list[str]:
-    return [m["userId"] for m in S().project_members if m["projectId"] == project_id and m["role"] == "manager"]
+    return [m["userId"] for m in project_members(project_id) if m["role"] == "manager"]
+
+
+def short_project(project_id: str | None) -> str:
+    p = project(project_id)
+    return p["name"].split(" – ")[0] if p else "the project"
+
+
+# ---- Channels ----
+
+def channel(channel_id: str | None) -> dict | None:
+    return db.row("SELECT * FROM channels WHERE id = %(id)s", id=channel_id) if channel_id else None
 
 
 def is_channel_member(user_id: str, channel_id: str) -> bool:
-    return any(m["userId"] == user_id and m["channelId"] == channel_id for m in S().channel_members)
+    return bool(db.value("SELECT 1 FROM channel_members WHERE user_id = %(u)s AND channel_id = %(c)s", u=user_id, c=channel_id))
 
 
 def channel_member_ids(channel_id: str) -> list[str]:
-    return [m["userId"] for m in S().channel_members if m["channelId"] == channel_id]
+    return [r["userId"] for r in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=channel_id)]
 
 
 def project_channels(project_id: str) -> list[dict]:
-    return [c for c in S().channels.values() if c["projectId"] == project_id]
+    return db.rows("SELECT * FROM channels WHERE project_id = %(p)s", p=project_id)
 
 
-def project_channel(project_id: str, name: str) -> dict | None:
-    return next((c for c in S().channels.values() if c["projectId"] == project_id and c["name"] == name), None)
+def project_channel(project_id: str | None, name: str) -> dict | None:
+    if not project_id:
+        return None
+    return db.row("SELECT * FROM channels WHERE project_id = %(p)s AND name = %(n)s", p=project_id, n=name)
 
 
 def bot_channel_for(user_id: str) -> dict | None:
-    return next((c for c in S().channels.values() if c["kind"] == "bot" and is_channel_member(user_id, c["id"])), None)
+    return db.row("""SELECT c.* FROM channels c JOIN channel_members m ON m.channel_id = c.id
+                     WHERE c.kind = 'bot' AND m.user_id = %(u)s LIMIT 1""", u=user_id)
+
+
+def add_channel_member(channel_id: str, user_id: str) -> bool:
+    """Adds the person; False if they were already in it."""
+    return db.insert("channel_members", {"companyId": db.company_id(), "channelId": channel_id, "userId": user_id,
+                                         "lastReadMessageId": None, "joinedAt": now_iso()},
+                     on_conflict_nothing=True) is not None
 
 
 def ensure_channel_member(user_id: str, channel_id: str) -> dict:
     """Admins read every project channel without being listed; they get a row for read markers."""
-    for m in S().channel_members:
-        if m["userId"] == user_id and m["channelId"] == channel_id:
-            return m
-    row = {"channelId": channel_id, "userId": user_id, "lastReadMessageId": None, "joinedAt": now_iso()}
-    S().channel_members.append(row)
-    return row
+    add_channel_member(channel_id, user_id)
+    return db.row("SELECT * FROM channel_members WHERE user_id = %(u)s AND channel_id = %(c)s", u=user_id, c=channel_id)
 
 
-def first_name(user_id: str) -> str:
-    u = S().users.get(user_id)
-    return u["name"].split(" ")[0] if u else "Someone"
+# ---- Messages ----
+
+MESSAGE_COLUMNS = "m.*, 'sent' AS status"
 
 
-def short_project(project_id: str | None) -> str:
-    p = S().projects.get(project_id or "")
-    return p["name"].split(" – ")[0] if p else "the project"
+def message(message_id: str | None) -> dict | None:
+    if not message_id:
+        return None
+    return db.row(f"SELECT {MESSAGE_COLUMNS} FROM messages m WHERE id = %(id)s", id=message_id)

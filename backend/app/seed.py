@@ -1,44 +1,37 @@
-"""All demo data (§11). Dates are relative to "now" so the demo always looks current."""
+"""Seed data for development and staging (spec §11): Paliath Interiors (the demo's people, projects and chat)
+and Brightline Events, with Suresh in both. Dates are relative to "now" so it always looks current.
+`build()` makes plain records; `load()` writes them to the database."""
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from . import db
 from .core import avatar_tone, iso_ms
 from .rules import default_channel_names
-from .store import Store
+from .setups.events import SETUP as EVENTS_SETUP
+from .setups.interiors import SETUP as PALIATH_SETUP
+from .store import BOT_ID, BOT_EMAIL
 
 _seq = 0
+PLATFORM_ADMIN = "admin@siteline.app"
 
-# Paliath is an interior-design studio, so its workspace speaks that language. Another company
-# gets its own job titles, channels and problem types; the code doesn't change.
-PALIATH_SETUP = {
-    "projectChannels": [
-        {"name": "general"}, {"name": "design"}, {"name": "site-work"}, {"name": "qs", "private": True},
-    ],
-    # The bot's status cards and escalations go here.
-    "workChannel": "site-work",
-    "jobTitles": [
-        {"name": "Project Manager", "label": {"en": "Project Manager", "kn": "ಪ್ರಾಜೆಕ್ಟ್ ಮ್ಯಾನೇಜರ್", "hi": "प्रोजेक्ट मैनेजर"},
-         "managersOnly": True, "channels": ["general", "design", "site-work"]},
-        {"name": "Designer", "label": {"en": "Designer", "kn": "ಡಿಸೈನರ್", "hi": "डिज़ाइनर"}, "channels": ["design", "general"]},
-        {"name": "QS", "label": {"en": "QS", "kn": "QS", "hi": "QS"}, "channels": ["qs", "general"]},
-        {"name": "Supervisor", "label": {"en": "Supervisor", "kn": "ಸೂಪರ್‌ವೈಸರ್", "hi": "सुपरवाइज़र"},
-         "channels": ["site-work", "general"]},
-        {"name": "Worker", "label": {"en": "Worker", "kn": "ಕೆಲಸಗಾರ", "hi": "कामगार"}, "channels": ["site-work", "general"],
-         "simpleMode": True},
-    ],
-    "defaultJobTitle": "Worker",
-    # Quick picks for "Report issue" and the bot's "Problem" answer; "Other" is always added by the app.
-    "problemTypes": [
-        {"key": "Material not arrived", "label": {"en": "Material not arrived", "kn": "ಸಾಮಗ್ರಿ ಬಂದಿಲ್ಲ", "hi": "सामान नहीं आया"}},
-        {"key": "Waiting for design", "label": {"en": "Waiting for design", "kn": "ಡಿಸೈನ್\u200cಗಾಗಿ ಕಾಯುತ್ತಿದ್ದೇವೆ",
-                                                "hi": "डिज़ाइन का इंतज़ार"}},
-        {"key": "Labour short", "label": {"en": "Labour short", "kn": "ಕೆಲಸಗಾರರು ಕಡಿಮೆ", "hi": "मज़दूर कम हैं"}},
-        {"key": "Damage", "label": {"en": "Damage", "kn": "ಹಾನಿ", "hi": "नुकसान"}, "inCheckins": False},
-    ],
-}
 
+@dataclass
+class Data:
+    company_id: str = ""
+    company: dict = field(default_factory=dict)
+    users: dict[str, dict] = field(default_factory=dict)
+    roles: dict[str, str] = field(default_factory=dict)  # user id -> company role
+    projects: dict[str, dict] = field(default_factory=dict)
+    project_members: list[dict] = field(default_factory=list)
+    channels: dict[str, dict] = field(default_factory=dict)
+    channel_members: list[dict] = field(default_factory=list)
+    messages: dict[str, dict] = field(default_factory=dict)
+    checkins: dict[str, dict] = field(default_factory=dict)
+    activities: list[dict] = field(default_factory=list)
+    pm: dict = field(default_factory=lambda: {"projects": {}, "tasks": {}, "members": []})
 
 def uuid_at(ms: float) -> str:
     """UUIDv7-shaped id for a given time, ordered by time then by creation order."""
@@ -49,7 +42,7 @@ def uuid_at(ms: float) -> str:
     return f"{t[:8]}-{t[8:12]}-7{s[:3]}-8{s[3:6]}-0000000{s[6:11]}"
 
 
-def build() -> Store:
+def build() -> Data:
     global _seq
     _seq = 0
     now = int(time.time() * 1000)
@@ -72,7 +65,8 @@ def build() -> Store:
         return int(now - mins * 60_000)
 
     company_id = uuid_at(epoch)
-    s = Store(company_id=company_id, company={"id": company_id, "name": "Paliath Interiors", "setup": PALIATH_SETUP})
+    s = Data(company_id=company_id, company={"id": company_id, "name": "Paliath Interiors", "slug": "paliath-interiors",
+                                             "setup": PALIATH_SETUP})
 
     # ---- Users ----
     U: dict[str, str] = {}
@@ -80,8 +74,8 @@ def build() -> Store:
     def add_user(key: str, name: str, email: str, role: str, online: bool = False) -> None:
         uid = uuid_at(epoch)
         U[key] = uid
-        s.users[uid] = {"id": uid, "name": name, "email": email, "companyRole": role, "avatarColor": avatar_tone(uid),
-                        "isActive": True, "updatedAt": iso(epoch), "online": online}
+        s.users[uid] = {"id": uid, "name": name, "email": email, "avatarColor": avatar_tone(uid)}
+        s.roles[uid] = role
 
     add_user("arjun", "Arjun Rao", "arjun@paliath.in", "owner", True)
     add_user("meera", "Meera Iyer", "meera@paliath.in", "admin", True)
@@ -94,8 +88,7 @@ def build() -> Store:
     add_user("imran", "Imran Pasha", "imran@paliath.in", "member", True)
     add_user("lakshmi", "Lakshmi Devi", "lakshmi@paliath.in", "member")
     add_user("prakash", "Prakash Naik", "prakash@paliath.in", "member")
-    add_user("bot", "Siteline Bot", "bot@siteline.app", "member", True)
-    s.bot_id = U["bot"]
+    U["bot"] = BOT_ID
     admin_keys = ["arjun", "meera"]
     human_keys = [k for k in U if k != "bot"]
 
@@ -119,7 +112,10 @@ def build() -> Store:
                    "pmProjectId": pm_id, "archivedAt": None, "updatedAt": iso(epoch)}
         s.projects[pid] = project
         for k, role, jt in members:
-            s.project_members.append({"projectId": pid, "userId": U[k], "role": role, "jobTitle": jt, "joinedAt": iso(epoch)})
+            s.project_members.append({"projectId": pid, "userId": U[k], "role": role, "jobTitle": jt, "source": "pm",
+                                      "joinedAt": iso(epoch)})
+            s.pm["members"].append({"projectId": pm_id, "personRef": s.users[U[k]]["email"], "name": s.users[U[k]]["name"],
+                                    "role": role, "roleName": jt})
         ch = {}
         for std in PALIATH_SETUP["projectChannels"]:
             cname = std["name"]
@@ -242,7 +238,7 @@ def build() -> Store:
             "id": mid, "channelId": channel_id, "senderId": U[sender], "type": type,
             "body": None if deleted else body, "data": None if deleted else data, "threadParentId": parent,
             "reactions": {e: [U[k] for k in keys] for e, keys in (reactions or {}).items()},
-            "status": "sent", "createdAt": iso(ms), "updatedAt": iso(ms),
+            "createdAt": iso(ms), "updatedAt": iso(ms),
             "deletedAt": iso(ms + 120_000) if deleted else None,
         }
         return mid
@@ -492,3 +488,152 @@ def build() -> Store:
         cm["lastReadMessageId"] = lst[idx]["id"] if idx >= 0 else None
 
     return s
+
+
+def build_brightline(paliath: Data) -> Data:
+    """A second, smaller company in another industry. Suresh (from Paliath) works here too, and Babu signs in
+    with a phone number."""
+    now = int(time.time() * 1000)
+    epoch = now - 30 * 86_400_000
+
+    def iso(ms: float) -> str:
+        return iso_ms(int(ms))
+
+    def day(offset: int) -> str:
+        return (date.today() + timedelta(days=offset)).isoformat()
+
+    cid = uuid_at(epoch)
+    s = Data(company_id=cid, company={"id": cid, "name": "Brightline Events", "slug": "brightline-events", "setup": EVENTS_SETUP})
+    suresh = next(u for u in paliath.users.values() if u["email"] == "suresh@paliath.in")
+    U: dict[str, str] = {"suresh": suresh["id"]}
+    s.users[suresh["id"]] = suresh
+    s.roles[suresh["id"]] = "member"
+
+    def add_user(key: str, name: str, email: str | None, role: str, phone: str | None = None) -> None:
+        uid = uuid_at(epoch)
+        U[key] = uid
+        s.users[uid] = {"id": uid, "name": name, "email": email, "phone": phone, "avatarColor": avatar_tone(uid)}
+        s.roles[uid] = role
+
+    add_user("nisha", "Nisha Rao", "nisha@brightline.events", "owner")
+    add_user("farhan", "Farhan Ali", "farhan@brightline.events", "member")
+    add_user("anu", "Anu Thomas", "anu@brightline.events", "member")
+    add_user("babu", "Babu M", None, "member", phone="+919800000005")
+    people = list(U)
+
+    def add_channel(name: str, kind: str, project_id: str | None, members: list[str], **opts) -> str:
+        ch_id = uuid_at(epoch)
+        s.channels[ch_id] = {"id": ch_id, "companyId": cid, "projectId": project_id, "name": name, "kind": kind,
+                             "isPrivate": False, "postingPolicy": "everyone", "updatedAt": iso(epoch), **opts}
+        for k in members:
+            s.channel_members.append({"channelId": ch_id, "userId": U[k], "lastReadMessageId": None, "joinedAt": iso(epoch)})
+        return ch_id
+
+    def say(channel_id: str, mins_ago: float, sender: str, body: str | None, **kw) -> str:
+        ms = now - mins_ago * 60_000
+        mid = uuid_at(ms)
+        s.messages[mid] = {"id": mid, "channelId": channel_id, "senderId": U.get(sender, BOT_ID), "type": kw.get("type", "text"),
+                           "body": body, "data": kw.get("data"), "threadParentId": None, "reactions": {},
+                           "createdAt": iso(ms), "updatedAt": iso(ms), "deletedAt": None}
+        return mid
+
+    add_channel("announcements", "company", None, people, postingPolicy="admins")
+    general = add_channel("general", "company", None, people)
+    bot_dm = {k: add_channel("Siteline Bot", "bot", None, [k], isPrivate=True) for k in people}
+
+    def add_project(name: str, client: str, members: list[tuple[str, str, str]]) -> dict:
+        pm_id, pid = uuid_at(epoch), uuid_at(epoch)
+        s.pm["projects"][pm_id] = {"id": pm_id, "name": name, "client": client, "address": "Bengaluru", "status": "active",
+                                   "url": None, "updatedAt": iso(epoch)}
+        s.projects[pid] = {"id": pid, "companyId": cid, "name": name, "client": client, "address": "Bengaluru",
+                           "pmProjectId": pm_id, "archivedAt": None, "updatedAt": iso(epoch)}
+        for k, role, jt in members:
+            s.project_members.append({"projectId": pid, "userId": U[k], "role": role, "jobTitle": jt, "source": "pm",
+                                      "joinedAt": iso(epoch)})
+            ref = s.users[U[k]]["email"] or s.users[U[k]]["phone"]
+            s.pm["members"].append({"projectId": pm_id, "personRef": ref, "name": s.users[U[k]]["name"], "role": role,
+                                    "roleName": jt})
+        ch = {}
+        for std in EVENTS_SETUP["projectChannels"]:
+            joined = [k for k, role, jt in members if std["name"] in default_channel_names(EVENTS_SETUP, role, jt)]
+            ch[std["name"]] = add_channel(std["name"], "project", pid, list(dict.fromkeys([*joined, "nisha"])),
+                                          isPrivate=std.get("private", False))
+        return {"id": pid, "pmId": pm_id, "ch": ch}
+
+    wedding = add_project("Sharma Wedding", "Sharma family", [
+        ("farhan", "manager", "Event Lead"), ("anu", "member", "Coordinator"), ("suresh", "member", "Coordinator"),
+        ("babu", "member", "Crew")])
+    conf = add_project("TechConf 2026", "TechConf", [("farhan", "manager", "Event Lead"), ("anu", "member", "Coordinator")])
+
+    def task(p: dict, name: str, start: int, finish: int, status: str, percent: int, owner: str | None) -> None:
+        tid = uuid_at(epoch)
+        ref = (s.users[U[owner]]["email"] or s.users[U[owner]]["phone"]) if owner else None
+        s.pm["tasks"][tid] = {"id": tid, "projectId": p["pmId"], "name": name, "plannedStart": day(start),
+                              "plannedFinish": day(finish), "ownerRef": ref, "status": status, "percent": percent,
+                              "updatedAt": iso(epoch)}
+
+    task(wedding, "Stage and mandap build", -2, 2, "in_progress", 40, "suresh")
+    task(wedding, "Lighting rig", -1, 3, "in_progress", 20, "babu")
+    task(wedding, "Flower delivery", 0, 0, "not_started", 0, "anu")
+    task(wedding, "Sound check", 3, 3, "not_started", 0, "suresh")
+    task(conf, "Venue walkthrough", -5, -3, "done", 100, "anu")
+    task(conf, "Speaker list", -3, 1, "in_progress", 60, "farhan")
+
+    say(general, 600, "nisha", "Welcome to Siteline, Brightline team. Event updates go here from now on.")
+    say(wedding["ch"]["on-the-day"], 300, "farhan", "Mandap frame goes up today. Suresh, Babu: on site by 8.")
+    say(wedding["ch"]["on-the-day"], 280, "suresh", "Reached. Unloading the truss now.")
+    say(wedding["ch"]["vendors"], 200, "anu", "Florist confirmed 6 am delivery for the day.")
+    for k in people:
+        say(bot_dm[k], 590, "bot", "Hi! I will check in on your tasks here. Tap a button to answer — no typing needed.")
+    return s
+
+
+def build_all() -> list[Data]:
+    paliath = build()
+    return [paliath, build_brightline(paliath)]
+
+
+def load(companies: list[Data]) -> None:
+    """Writes seed data to an empty database. The saved copy of PM tasks is made by a real PM sync."""
+    from .pm.sync import full_sync
+
+    with db.transaction():
+        db.insert("users", {"id": BOT_ID, "name": "Siteline Bot", "email": BOT_EMAIL, "avatarColor": "#5C6F80", "isBot": True})
+        users = {u["id"]: u for d in companies for u in d.users.values()}
+        db.insert_many("users", [{"id": u["id"], "name": u["name"], "email": u.get("email"), "phone": u.get("phone"),
+                                  "avatarColor": u["avatarColor"]} for u in users.values()])
+        db.insert("platform_admins", {"email": PLATFORM_ADMIN})
+        for d in companies:
+            db.insert("companies", {"id": d.company_id, "name": d.company["name"], "slug": d.company["slug"],
+                                    "timeZone": "Asia/Kolkata", "setup": d.company["setup"]})
+            db.insert_many("memberships", [{"companyId": d.company_id, "userId": uid, "role": role, "status": "active"}
+                                           for uid, role in d.roles.items()])
+            db.insert("pm_links", {"companyId": d.company_id, "kind": "mock", "options": {}})
+    for d in companies:
+        cid = d.company_id
+        with db.transaction(cid):
+            db.insert_many("projects", [{**p, "pmUrl": None} for p in d.projects.values()])
+            db.insert_many("project_members", [{"companyId": cid, **m} for m in d.project_members])
+            db.insert_many("channels", list(d.channels.values()))
+            db.insert_many("channel_members", [{"companyId": cid, **m} for m in d.channel_members])
+            db.insert_many("messages", [{"companyId": cid, **m} for m in d.messages.values()])
+            db.insert_many("checkins", [{"companyId": cid, **c} for c in d.checkins.values()])
+            db.insert_many("activities", [{"companyId": cid, **a} for a in d.activities])
+            db.insert_many("pm_mock_projects", [{"companyId": cid, **{k: p[k] for k in ("id", "name", "client", "address",
+                                                                                         "status", "url", "updatedAt")}}
+                                                for p in d.pm["projects"].values()])
+            db.insert_many("pm_mock_members", [{"companyId": cid, **m} for m in d.pm["members"]])
+            db.insert_many("pm_mock_tasks", [{"companyId": cid, **t} for t in d.pm["tasks"].values()])
+            full_sync()
+
+
+def reset_everything() -> None:
+    """Development and tests: empty database, then the seed."""
+    from . import actors, netsim
+    from .events import hub
+
+    db.wipe()
+    load(build_all())
+    actors.reset()
+    netsim.reset()
+    hub.clear()

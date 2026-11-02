@@ -1,9 +1,9 @@
-"""The signed-in person: profile, check-ins, activity, and the app's fixed settings."""
+"""The signed-in person: profile, settings, push tokens, check-ins, activity, and the company's setup."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from .. import bot
+from .. import bot, db
 from ..core import not_found, now_iso
 from ..deps import current_user, language
 from ..events import publish
@@ -16,28 +16,59 @@ from ..rules import (
     default_channel_names,
     localized,
 )
-from ..schemas import CheckinAnswer
+from ..schemas import CheckinAnswer, MePatch, PushToken
 from ..access import assert_project_active
-from ..store import S, setup
-from ..views import checkin_view, me_view
+from ..services import accounts
+from ..store import company, human_ids, person, setup
+from ..views import checkin_view, me_view, public_user
 
 router = APIRouter(tags=["me"])
 
 
 @router.get("/me")
-async def me(user: dict = Depends(current_user)):
-    return me_view(user)
+def me(user: dict = Depends(current_user)):
+    return {**me_view(user), "notify": db.value("SELECT notify FROM users WHERE id = %(u)s", u=user["id"])}
+
+
+@router.patch("/me")
+def patch_me(body: MePatch, user: dict = Depends(current_user)):
+    changes = body.model_dump(exclude_none=True)
+    if changes:
+        db.update("users", {"id": user["id"]}, {**changes, "updatedAt": now_iso()})
+        if "name" in changes:
+            publish({"type": "user.updated", "user": public_user(person(user["id"]))}, human_ids())
+    return me(person(user["id"]))
+
+
+@router.delete("/me")
+def delete_me(user: dict = Depends(current_user)):
+    """Delete my account (§9.8). Messages stay under "Former member"."""
+    accounts.delete_account(user["id"])
+    return {"deleted": True}
+
+
+@router.put("/me/push-tokens")
+def add_push_token(body: PushToken, user: dict = Depends(current_user)):
+    db.run("""INSERT INTO push_tokens (token, user_id, platform) VALUES (%(t)s, %(u)s, %(p)s)
+              ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform, updated_at = now()""",
+           t=body.token, u=user["id"], p=body.platform)
+    return {"saved": True}
+
+
+@router.delete("/me/push-tokens/{token}")
+def remove_push_token(token: str, user: dict = Depends(current_user)):
+    db.run("DELETE FROM push_tokens WHERE token = %(t)s AND user_id = %(u)s", t=token, u=user["id"])
+    return {"removed": True}
 
 
 @router.get("/company")
-async def company():
-    """The workspace's name, shown on the sign-in screen (so no token needed)."""
-    c = S().company
+def get_company(user: dict = Depends(current_user)):
+    c = company()
     return {"id": c["id"], "name": c["name"]}
 
 
 @router.get("/meta")
-async def meta(user: dict = Depends(current_user), lang: str = Depends(language)):
+def meta(user: dict = Depends(current_user), lang: str = Depends(language)):
     """The company's setup and fixed rules the app needs to lay out forms (it never decides them itself).
     Labels come in the reader's language."""
     st = setup()
@@ -59,41 +90,37 @@ async def meta(user: dict = Depends(current_user), lang: str = Depends(language)
 
 
 @router.get("/me/checkins")
-async def my_checkins(user: dict = Depends(current_user)):
-    mine = sorted((c for c in S().checkins.values() if c["userId"] == user["id"]), key=lambda c: (c["askedAt"], c["id"]))
+def my_checkins(user: dict = Depends(current_user)):
+    mine = db.rows("SELECT * FROM checkins WHERE user_id = %(u)s ORDER BY asked_at, id", u=user["id"])
     return {"checkins": [checkin_view(c) for c in mine]}
 
 
 @router.post("/checkins/{checkin_id}/answer")
-async def answer_checkin(checkin_id: str, body: CheckinAnswer, user: dict = Depends(current_user)):
-    s = S()
-    c = s.checkins.get(checkin_id)
+def answer_checkin(checkin_id: str, body: CheckinAnswer, user: dict = Depends(current_user)):
+    c = db.row("SELECT * FROM checkins WHERE id = %(id)s", id=checkin_id)
     if not c or c["userId"] != user["id"]:
         raise not_found("Check-in")
     if not c["answer"]:
         assert_project_active(c["projectId"])
-        bot.apply_checkin_answer(c, body.model_dump(exclude_none=True))  # repeating it changes nothing
+        c = bot.apply_checkin_answer(c, body.model_dump(exclude_none=True))  # repeating it changes nothing
     return checkin_view(c)
 
 
 @router.post("/bot/checkins")
-async def ask_checkins(user: dict = Depends(current_user)):
+def ask_checkins(user: dict = Depends(current_user)):
     """The app calls this when the bot conversation opens."""
     return {"asked": bot.ask_about_open_tasks(user["id"])}
 
 
 @router.get("/activity")
-async def activity(user: dict = Depends(current_user)):
-    mine = [a for a in S().activities if a["userId"] == user["id"]]
-    mine.sort(key=lambda a: (a["createdAt"], a["id"]), reverse=True)
-    return {"items": [public_activity(a) for a in mine[:100]], "unreadCount": sum(1 for a in mine if not a["readAt"])}
+def activity(user: dict = Depends(current_user)):
+    mine = db.rows("SELECT * FROM activities WHERE user_id = %(u)s ORDER BY created_at DESC, id DESC LIMIT 100", u=user["id"])
+    unread = db.value("SELECT count(*) FROM activities WHERE user_id = %(u)s AND read_at IS NULL", u=user["id"])
+    return {"items": [public_activity(a) for a in mine], "unreadCount": unread}
 
 
 @router.post("/activity/read")
-async def activity_read(user: dict = Depends(current_user)):
-    ts = now_iso()
-    for a in S().activities:
-        if a["userId"] == user["id"] and not a["readAt"]:
-            a["readAt"] = ts
+def activity_read(user: dict = Depends(current_user)):
+    db.run("UPDATE activities SET read_at = now() WHERE user_id = %(u)s AND read_at IS NULL", u=user["id"])
     publish({"type": "activity.read"}, [user["id"]])
     return {"unreadCount": 0}

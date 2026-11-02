@@ -3,21 +3,18 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from .. import db
 from ..core import ApiError, forbidden, invalid, not_found, now_iso
 from ..deps import current_user
 from ..events import publish
-from ..rules import HOME_CHANNEL, can, channel_rank, is_company_admin
+from ..rules import HOME_CHANNEL, can, channel_rank, is_company_admin, is_guest
 from ..schemas import ChannelCreate, ChannelPatch
-from ..access import (
-    can_see_channel,
-    channel_audience,
-    project_audience,
-    visible_channel,
-    visible_project,
-)
+from ..access import can_see_channel, channel_audience, project_audience, visible_channel, visible_project
 from ..store import (
-    S,
+    BOT_ID,
+    add_channel_member,
     admins,
+    channel,
     ensure_channel_member,
     first_name,
     is_channel_member,
@@ -37,13 +34,12 @@ def _manager(user: dict, project_id: str) -> bool:
 
 
 def _project_channel(user: dict, channel_id: str) -> tuple[dict, dict]:
-    ch = S().channels.get(channel_id)
+    ch = channel(channel_id)
     if not ch or ch["kind"] != "project" or not ch["projectId"]:
         raise not_found("Channel")
     project = visible_project(user, ch["projectId"])
     # Private channels are invisible to project members who aren't in them (managers excepted).
-    if ch["isPrivate"] and not is_company_admin(user) and not is_channel_member(user["id"], ch["id"]) \
-            and not _manager(user, project["id"]):
+    if not can_see_channel(user, ch) and not _manager(user, project["id"]) and (ch["isPrivate"] or is_guest(user)):
         raise not_found("Channel")
     return ch, project
 
@@ -54,25 +50,22 @@ def _require_manage(user: dict, project: dict) -> None:
 
 
 def _assert_name_free(project_id: str, name: str, except_id: str | None = None) -> None:
-    if any(c["projectId"] == project_id and c["name"] == name and c["id"] != except_id for c in S().channels.values()):
+    if db.value("SELECT 1 FROM channels WHERE project_id = %(p)s AND name = %(n)s AND id <> %(id)s",
+                p=project_id, n=name, id=except_id or ""):
         raise ApiError("CHANNEL_NAME_TAKEN", "This project already has a channel with that name.",
                        {"fields": {"name": "Name already used"}})
 
 
 def _add(ch: dict, user_id: str) -> None:
-    if is_channel_member(user_id, ch["id"]):
-        return
-    S().channel_members.append({"channelId": ch["id"], "userId": user_id, "lastReadMessageId": None, "joinedAt": now_iso()})
-    publish({"type": "channel.member_added", "channelId": ch["id"], "userId": user_id}, [*channel_audience(ch), user_id])
+    if add_channel_member(ch["id"], user_id):
+        publish({"type": "channel.member_added", "channelId": ch["id"], "userId": user_id}, [*channel_audience(ch), user_id])
 
 
 def _remove(ch: dict, user_id: str) -> None:
-    s = S()
-    row = next((m for m in s.channel_members if m["channelId"] == ch["id"] and m["userId"] == user_id), None)
-    if not row:
+    if not is_channel_member(user_id, ch["id"]):
         return
     audience = [*channel_audience(ch), user_id]
-    s.channel_members.remove(row)
+    db.delete("channel_members", {"channelId": ch["id"], "userId": user_id})
     publish({"type": "channel.member_removed", "channelId": ch["id"], "userId": user_id}, audience)
 
 
@@ -81,7 +74,8 @@ def _set_members(ch: dict, ids: list[str]) -> None:
     allowed = project_member_ids(ch["projectId"])
     # Managers are in every channel of their project (§9.3), so they're never removed.
     want = {i for i in ids if i in allowed} | set(project_managers(ch["projectId"]))
-    current = [m["userId"] for m in S().channel_members if m["channelId"] == ch["id"] and m["userId"] in allowed]
+    current = [r["userId"] for r in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=ch["id"])
+               if r["userId"] in allowed]
     for uid in current:
         if uid not in want:
             _remove(ch, uid)
@@ -90,18 +84,17 @@ def _set_members(ch: dict, ids: list[str]) -> None:
 
 
 @router.get("/channels")
-async def list_channels(user: dict = Depends(current_user)):
+def list_channels(user: dict = Depends(current_user)):
     """Every channel the user can read, with unread count, last message and members."""
-    s = S()
-    has_messages = {m["channelId"] for m in s.messages.values()}
+    candidates = db.rows("""SELECT c.* FROM channels c
+                            WHERE c.kind <> 'dm' OR EXISTS (SELECT 1 FROM messages m WHERE m.channel_id = c.id)""")
     # A DM opened but never written in stays invisible, for both people.
-    visible = [c for c in s.channels.values() if can_see_channel(user, c) and (c["kind"] != "dm" or c["id"] in has_messages)]
+    visible = [c for c in candidates if can_see_channel(user, c)]
     for c in visible:
         if c["kind"] not in ("dm", "bot"):
             ensure_channel_member(user["id"], c["id"])  # read markers for Owner/Admin
-    stats = channel_stats(user)
-    views = [channel_view(c, user, stats) for c in visible]
-    return {"channels": _in_display_order(views)}
+    stats = channel_stats(user, [c["id"] for c in visible])
+    return {"channels": _in_display_order([channel_view(c, user, stats) for c in visible])}
 
 
 def _in_display_order(views: list[dict]) -> list[dict]:
@@ -116,63 +109,66 @@ def _in_display_order(views: list[dict]) -> list[dict]:
 
 
 @router.get("/channels/{channel_id}")
-async def get_channel(channel_id: str, user: dict = Depends(current_user)):
+def get_channel(channel_id: str, user: dict = Depends(current_user)):
     return channel_view(visible_channel(user, channel_id), user)
 
 
 @router.get("/projects/{project_id}/channels")
-async def browse_channels(project_id: str, user: dict = Depends(current_user)):
-    """Every channel the user may know about in a project, joined or not (for "Browse channels")."""
-    s = S()
+def browse_channels(project_id: str, user: dict = Depends(current_user)):
+    """Every channel the user may know about in a project, joined or not (for "Browse channels").
+    Guests only see the channels they're in."""
     project = visible_project(user, project_id)
     manager = _manager(user, project["id"])
     on_project = project_member_ids(project["id"])
     out = []
-    for c in s.channels.values():
-        if c["projectId"] != project["id"] or (c["isPrivate"] and not manager and not is_channel_member(user["id"], c["id"])):
+    for c in db.rows("SELECT * FROM channels WHERE project_id = %(p)s", p=project["id"]):
+        joined = is_channel_member(user["id"], c["id"])
+        if (c["isPrivate"] or is_guest(user)) and not manager and not joined:
             continue
-        count = sum(1 for m in s.channel_members if m["channelId"] == c["id"] and m["userId"] in on_project)
+        count = sum(1 for uid in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=c["id"])
+                    if uid["userId"] in on_project)
         out.append({**channel_view(c, user), "memberCount": count})
     return {"channels": sorted(out, key=lambda v: channel_rank(setup(), v))}
 
 
 @router.post("/projects/{project_id}/channels")
-async def create_channel(project_id: str, body: ChannelCreate, user: dict = Depends(current_user)):
-    s = S()
+def create_channel(project_id: str, body: ChannelCreate, user: dict = Depends(current_user)):
     project = visible_project(user, project_id)
     _require_manage(user, project)
-    if existing := s.channels.get(body.id):
+    if existing := channel(body.id):
         if existing["projectId"] == project["id"]:
             return {"channel": channel_view(existing, user)}  # a retry
         raise ApiError("VALIDATION_FAILED", "Some fields need attention.", {"fields": {"id": "Already used"}})
     _assert_name_free(project["id"], body.name)
-    ch = {"id": body.id, "companyId": s.company_id, "projectId": project["id"], "name": body.name, "kind": "project",
-          "isPrivate": body.isPrivate, "postingPolicy": "everyone", "updatedAt": now_iso()}
-    s.channels[ch["id"]] = ch
+    ch = db.insert("channels", {"id": body.id, "companyId": db.company_id(), "projectId": project["id"], "name": body.name,
+                                "kind": "project", "isPrivate": body.isPrivate, "postingPolicy": "everyone",
+                                "updatedAt": now_iso()})
     members = {i for i in body.memberIds if i in project_member_ids(project["id"])}
     for uid in [*members, *project_managers(project["id"]), *admins(), user["id"]]:
         _add(ch, uid)
-    post_message(ch, s.bot_id, type="system", body=f"{first_name(user['id'])} created #{ch['name']}")
+    post_message(ch, BOT_ID, type="system", body=f"{first_name(user['id'])} created #{ch['name']}")
     return {"channel": channel_view(ch, user)}
 
 
 @router.patch("/channels/{channel_id}")
-async def patch_channel(channel_id: str, body: ChannelPatch, user: dict = Depends(current_user)):
+def patch_channel(channel_id: str, body: ChannelPatch, user: dict = Depends(current_user)):
     ch, project = _project_channel(user, channel_id)
     _require_manage(user, project)
     home = ch["name"] == HOME_CHANNEL
+    changes: dict = {}
     if body.name is not None and body.name != ch["name"]:
         if home:
             raise invalid({"name": "#general cannot be renamed"})
         _assert_name_free(project["id"], body.name, ch["id"])
-        ch["name"] = body.name
+        changes["name"] = body.name
     if body.isPrivate is not None and body.isPrivate != ch["isPrivate"]:
         if home and body.isPrivate:
             raise invalid({"isPrivate": "#general stays open to the whole project"})
-        ch["isPrivate"] = body.isPrivate
-        post_message(ch, S().bot_id, type="system",
+        changes["isPrivate"] = body.isPrivate
+    ch = db.update("channels", {"id": ch["id"]}, {**changes, "updatedAt": now_iso()})
+    if "isPrivate" in changes:
+        post_message(ch, BOT_ID, type="system",
                      body=f"{first_name(user['id'])} made this channel {'private' if ch['isPrivate'] else 'public'}")
-    ch["updatedAt"] = now_iso()
     if body.memberIds is not None:
         _set_members(ch, body.memberIds)
     publish({"type": "channel.updated", "channel": ch}, [*channel_audience(ch), *project_audience(project["id"])])
@@ -180,37 +176,36 @@ async def patch_channel(channel_id: str, body: ChannelPatch, user: dict = Depend
 
 
 @router.delete("/channels/{channel_id}")
-async def delete_channel(channel_id: str, user: dict = Depends(current_user)):
-    s = S()
-    if channel_id not in s.channels:
+def delete_channel(channel_id: str, user: dict = Depends(current_user)):
+    if not channel(channel_id):
         return {"deleted": True}  # already gone: safe to repeat
     ch, project = _project_channel(user, channel_id)
     _require_manage(user, project)
     if ch["name"] == HOME_CHANNEL:
         raise invalid({"name": "#general cannot be deleted"})
     audience = channel_audience(ch)
-    s.messages = {k: m for k, m in s.messages.items() if m["channelId"] != ch["id"]}
-    s.channel_members = [m for m in s.channel_members if m["channelId"] != ch["id"]]
-    del s.channels[ch["id"]]
+    db.delete("channels", {"id": ch["id"]})  # its messages and members go with it
     publish({"type": "channel.deleted", "channelId": ch["id"]}, audience)
     return {"deleted": True}
 
 
 @router.post("/channels/{channel_id}/join")
-async def join_channel(channel_id: str, user: dict = Depends(current_user)):
-    ch = S().channels.get(channel_id)
+def join_channel(channel_id: str, user: dict = Depends(current_user)):
+    ch = channel(channel_id)
     if not ch or ch["kind"] != "project" or not ch["projectId"]:
         raise not_found("Channel")
     visible_project(user, ch["projectId"])
-    if ch["isPrivate"] and not is_channel_member(user["id"], ch["id"]):
+    if is_guest(user) and not is_channel_member(user["id"], ch["id"]):
+        raise not_found("Channel")
+    if ch["isPrivate"] and not is_channel_member(user["id"], ch["id"]) and not is_company_admin(user):
         raise ApiError("CHANNEL_PRIVATE", "This channel is private. Ask a manager to add you.")
     _add(ch, user["id"])
     return {"channel": channel_view(ch, user)}
 
 
 @router.post("/channels/{channel_id}/leave")
-async def leave_channel(channel_id: str, user: dict = Depends(current_user)):
-    ch = S().channels.get(channel_id)
+def leave_channel(channel_id: str, user: dict = Depends(current_user)):
+    ch = channel(channel_id)
     if not ch or ch["kind"] != "project":
         return {"left": True}
     if ch["name"] == HOME_CHANNEL:

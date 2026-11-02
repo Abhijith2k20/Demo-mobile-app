@@ -1,43 +1,50 @@
-"""Photo uploads. Files are kept on disk under backend/uploads/ and served by an unguessable id."""
+"""Uploads (spec §10.3): photos up to 10 MB, voice notes up to 5 MB, PDFs and images as files up to 25 MB.
+Files are fetched only through signed links (services/files.py)."""
 from __future__ import annotations
 
-from pathlib import Path
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
-from fastapi.responses import FileResponse
-
-from ..core import invalid, not_found, uuid7
+from .. import config, db
+from ..core import ApiError, invalid, not_found, uuid7
 from ..deps import current_user
-from ..store import S
+from ..services import files
 
 router = APIRouter(tags=["uploads"])
 
-UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads"
-MAX_BYTES = 10 * 1024 * 1024
-ALLOWED = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/heic": ".heic"}
-
 
 @router.post("/uploads")
-async def upload(request: Request, file: UploadFile = File(...), user: dict = Depends(current_user)):
-    ext = ALLOWED.get(file.content_type or "")
-    if not ext:
-        raise invalid({"file": "Only photos can be uploaded"})
-    data = await file.read(MAX_BYTES + 1)
-    if len(data) > MAX_BYTES:
-        raise invalid({"file": "Photos must be under 10 MB"})
-    UPLOAD_DIR.mkdir(exist_ok=True)
+def upload(file: UploadFile = File(...), kind: str = Form("image"), user: dict = Depends(current_user)):
+    rule = files.KINDS.get(kind)
+    if not rule:
+        raise invalid({"kind": "Unknown kind"})
+    data = file.file.read(rule["max"] + 1)
+    if len(data) > rule["max"]:
+        raise ApiError("FILE_TOO_LARGE", f"Files like this must be under {rule['max'] // (1024 * 1024)} MB.",
+                       {"fields": {"file": "Too large"}})
+    content_type = files.sniff(data)
+    if content_type not in rule["types"]:
+        raise invalid({"file": "Only photos can be uploaded" if kind == "image" else "This kind of file can't be sent"})
     upload_id = uuid7()
-    path = UPLOAD_DIR / f"{upload_id}{ext}"
-    path.write_bytes(data)
-    url = str(request.url_for("get_file", upload_id=upload_id))
-    S().uploads[upload_id] = {"id": upload_id, "userId": user["id"], "path": str(path), "contentType": file.content_type, "url": url}
-    return {"uploadId": upload_id, "url": url}
+    key = files.key_for(db.company_id(), upload_id, content_type)
+    files.save(key, data, content_type)
+    db.insert("uploads", {"id": upload_id, "companyId": db.company_id(), "userId": user["id"], "key": key, "kind": kind,
+                          "name": (file.filename or "")[:120] or None, "contentType": content_type, "size": len(data)})
+    return {"uploadId": upload_id, "url": files.signed_url(db.company_id(), upload_id)}
 
 
-@router.get("/files/{upload_id}", name="get_file")
-async def get_file(upload_id: str):
-    # shortcut: no auth on reads, the 128-bit id is the capability; add signed URLs for a real deployment.
-    u = S().uploads.get(upload_id)
-    if not u or not Path(u["path"]).exists():
+@router.get("/files/{company_id}/{upload_id}", name="get_file")
+def get_file(company_id: str, upload_id: str, exp: int = Query(0), sig: str = Query("")):
+    """Works only with a signature made when the message was shown to someone allowed to see it."""
+    if not files.check_signature(company_id, upload_id, exp, sig):
         raise not_found("File")
-    return FileResponse(u["path"], media_type=u["contentType"])
+    db.current().set_company(company_id)  # the signature proves this link was handed out by that company
+    up = db.row("SELECT * FROM uploads WHERE id = %(id)s", id=upload_id)
+    if not up:
+        raise not_found("File")
+    if config.STORAGE == "r2":
+        return RedirectResponse(files.r2_link(up["key"]), status_code=302)
+    path = files.local_path(up["key"])
+    if not path.exists():
+        raise not_found("File")
+    return FileResponse(path, media_type=up["contentType"], headers={"Cache-Control": "private, max-age=3600"})
