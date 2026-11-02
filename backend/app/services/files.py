@@ -84,10 +84,10 @@ def _sig(company_id: str, upload_id: str, exp: int) -> str:
     return hmac.new(config.SECRET.encode(), msg, hashlib.sha256).hexdigest()[:32]
 
 
-def signed_url(company_id: str, upload_id: str) -> str:
-    """A link that works until the end of the next hour. It stays the same within the hour, so the phone's
-    image cache keeps working. The company is part of the signed link, so it can't point anywhere else."""
-    exp = (int(time.time()) // 3600 + 2) * 3600
+def signed_url(company_id: str, upload_id: str, days: int | None = None) -> str:
+    """A link that works until the end of the next hour (or for `days`, for the PM app). It stays the same within
+    the hour, so the phone's image cache keeps working. The company is part of the signed link."""
+    exp = (int(time.time()) // 3600 + 2) * 3600 if days is None else int(time.time()) + days * 86400
     return f"{config.PUBLIC_URL}/files/{company_id}/{upload_id}?exp={exp}&sig={_sig(company_id, upload_id, exp)}"
 
 

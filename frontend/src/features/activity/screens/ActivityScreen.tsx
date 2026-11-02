@@ -17,8 +17,7 @@ import { useRefresh } from '@/features/shared';
 const ICON: Record<ActivityKind, IconName> = {
   mention: 'at-sign',
   thread_reply: 'message-square',
-  checkin_result: 'activity',
-  escalation: 'bell',
+  notice: 'activity',
 };
 
 function open(a: Activity): void {
@@ -27,7 +26,7 @@ function open(a: Activity): void {
     else if (a.channelId) router.push(`/channel/${a.channelId}`);
     return;
   }
-  // Check-in results and escalations open the channel the status card went to.
+  // Notices from the PM app open the channel its card went to.
   if (a.channelId) router.push(`/channel/${a.channelId}`);
   else if (a.projectId) router.push(`/project/${a.projectId}`);
 }
@@ -85,11 +84,11 @@ function ActivityScreen() {
                       height: 36,
                       borderRadius: 8,
                       marginLeft: space.sm,
-                      backgroundColor: a.kind === 'escalation' ? c.warningSoft : c.surfaceAlt,
+                      backgroundColor: c.surfaceAlt,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}>
-                    <Feather name={ICON[a.kind]} size={17} color={a.kind === 'escalation' ? c.warning : c.textMuted} />
+                    <Feather name={ICON[a.kind]} size={17} color={c.textMuted} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <T variant={unread ? 'bodyStrong' : 'body'}>{a.text}</T>

@@ -80,8 +80,8 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
   }
 
   // The bot conversation is one full-width column, so every card lines up on the same edges.
-  if ((chat.isBotChat || m.type === 'checkin') && !m.deletedAt) {
-    const card = m.type === 'checkin' || !!m.data?.kind;
+  if (chat.isBotChat && !m.deletedAt) {
+    const card = m.type === 'card';
     return (
       <View style={{ paddingHorizontal: space.lg, paddingVertical: 4 }}>
         {card ? (

@@ -10,7 +10,6 @@ from ..core import ApiError, invalid, uuid7
 from ..jobs.queue import enqueue
 from ..setups import TEMPLATES
 from . import accounts
-from .secrets import encrypt
 
 
 def _slug(name: str) -> str:
@@ -23,15 +22,13 @@ def _slug(name: str) -> str:
 
 
 def create(*, name: str, time_zone: str, template: str, owner_name: str, owner_identifier: str, actor: str,
-           pm_kind: str = "mock", pm_company_id: str | None = None, pm_base_url: str | None = None,
-           pm_api_key: str | None = None, pm_webhook_secret: str | None = None, company_id: str | None = None) -> dict:
-    """The company with its setup, both company channels, the owner's invite and the PM link. The invite is
-    sent and a first PM sync runs as jobs once this commits."""
+           pm_kind: str = "mock", pm_company_id: str | None = None, webhook_url: str | None = None,
+           company_id: str | None = None) -> dict:
+    """The company with its setup, both company channels, the owner's invite and the PM link. The PM app's API
+    key is made on the platform panel (shown once)."""
     identifier = accounts.normalize_identifier(owner_identifier)
     if template not in TEMPLATES:
         raise invalid({"template": "Pick a template"})
-    if pm_kind == "http" and not (pm_base_url and pm_api_key):
-        raise invalid({"pmBaseUrl": "The PM app's address and API key are needed"})
     cid = company_id or uuid7()
     c = db.insert("companies", {"id": cid, "name": name, "slug": _slug(name), "timeZone": time_zone,
                                 "setup": copy.deepcopy(TEMPLATES[template]), "pmCompanyId": pm_company_id})
@@ -46,12 +43,11 @@ def create(*, name: str, time_zone: str, template: str, owner_name: str, owner_i
     finally:
         t.set_company(previous)
     if pm_kind != "none":  # without a link the company makes its own projects in Siteline
-        db.insert("pm_links", {"companyId": cid, "kind": pm_kind, "baseUrl": pm_base_url, "apiKey": encrypt(pm_api_key),
-                               "webhookSecret": encrypt(pm_webhook_secret), "options": {}})
-        enqueue("pm_sync", {}, company_id=cid, dedupe_key=f"pm_sync:first:{cid}")
+        db.insert("integrations", {"companyId": cid, "kind": pm_kind, "webhookUrl": webhook_url, "options": {}})
+        if pm_kind == "mock":
+            enqueue("mock_plan_day", {}, company_id=cid, dedupe_key=f"mock_plan_day:first:{cid}")
     invite_owner(cid, owner_name, identifier, actor)
     accounts.audit(cid, actor, "company.created", cid, {"name": name, "template": template, "pmKind": pm_kind})
-    enqueue("plan_day", {}, company_id=cid, dedupe_key=f"plan_day:first:{cid}")
     return c
 
 
@@ -70,15 +66,15 @@ def invite_owner(company_id: str, name: str, identifier: str, actor: str) -> dic
 
 
 def set_status(company_id: str, status: str, actor: str) -> None:
-    """Suspend: nobody can open it, sessions end, the bot and sync stop. Active again restores it."""
+    """Suspend: nobody can open it, sessions end, the mock PM app's timers stop. Active again restores it."""
     if status not in ("active", "suspended"):
         raise invalid({"status": "Pick active or suspended"})
     db.run("UPDATE companies SET status = %(s)s, updated_at = now() WHERE id = %(c)s", s=status, c=company_id)
     if status == "suspended":
         db.run("UPDATE sessions SET revoked_at = now() WHERE company_id = %(c)s AND revoked_at IS NULL", c=company_id)
         db.run("UPDATE jobs SET status = 'cancelled' WHERE company_id = %(c)s AND status = 'pending'", c=company_id)
-    else:
-        enqueue("plan_day", {}, company_id=company_id)
+    elif db.value("SELECT 1 FROM integrations WHERE company_id = %(c)s AND kind = 'mock'", c=company_id):
+        enqueue("mock_plan_day", {}, company_id=company_id)
     accounts.audit(company_id, actor, f"company.{status}", company_id)
 
 
@@ -106,14 +102,11 @@ def update_setup(company_id: str, setup: dict, actor: str) -> None:
     accounts.audit(company_id, actor, "setup.changed", company_id)
 
 
-def update_pm_link(company_id: str, *, kind: str, base_url: str | None, api_key: str | None, webhook_secret: str | None,
-                   pm_company_id: str | None, actor: str) -> None:
-    changes = {"kind": kind, "baseUrl": base_url}
-    if api_key:
-        changes["apiKey"] = encrypt(api_key)
-    if webhook_secret:
-        changes["webhookSecret"] = encrypt(webhook_secret)
-    db.update("pm_links", {"companyId": company_id}, changes)
+def update_pm_link(company_id: str, *, kind: str, webhook_url: str | None, pm_company_id: str | None, actor: str) -> None:
+    if kind not in ("mock", "http"):
+        raise invalid({"kind": "Pick mock or http"})
+    db.run("""INSERT INTO integrations (company_id, kind, webhook_url, options) VALUES (%(c)s, %(k)s, %(u)s, '{}')
+              ON CONFLICT (company_id) DO UPDATE SET kind = excluded.kind, webhook_url = excluded.webhook_url""",
+           c=company_id, k=kind, u=webhook_url)
     db.run("UPDATE companies SET pm_company_id = %(p)s WHERE id = %(c)s", p=pm_company_id, c=company_id)
-    enqueue("pm_sync", {}, company_id=company_id)
     accounts.audit(company_id, actor, "pm_link.changed", company_id, {"kind": kind})

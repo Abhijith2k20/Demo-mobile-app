@@ -7,7 +7,6 @@ from .core import now_ms, parse_iso_ms
 from .rules import (
     DELETE_WINDOW_MS,
     EDIT_WINDOW_MS,
-    OPEN_TASK_STATUSES,
     can,
     can_change_role,
     can_deactivate,
@@ -17,9 +16,7 @@ from .rules import (
     joins_projects,
     project_permissions,
     simple_mode,
-    task_is_overdue,
 )
-from .pm import connector as pm
 from .services import accounts, files
 from .store import MESSAGE_COLUMNS, company, project, project_member, project_members, project_role, setup
 
@@ -43,7 +40,7 @@ def me_view(user: dict) -> dict:
         "simpleMode": simple_mode(setup(), titles),
         "company": {"id": c["id"], "name": c["name"],
                     # Linked companies get projects from the PM app; the app hides "New project" then.
-                    "pmLinked": bool(db.value("SELECT 1 FROM pm_links WHERE company_id = current_company()"))},
+                    "pmLinked": bool(db.value("SELECT 1 FROM integrations WHERE company_id = current_company()"))},
         "companies": accounts.companies_for(user["id"]),
     }
 
@@ -150,6 +147,8 @@ def with_links(m: dict) -> dict:
                                for a in data["attachments"]]
     if data.get("uploadId"):
         data["uri"] = files.signed_url(company_id, data["uploadId"])
+    if (data.get("content") or {}).get("photos"):  # a PM app's channel card with photos from answers
+        data["photoUrls"] = [files.signed_url(company_id, u) for u in data["content"]["photos"]]
     return {**m, "data": data}
 
 
@@ -160,24 +159,3 @@ def reply_info(parents: list[dict]) -> dict[str, tuple[int, str]]:
     found = db.rows("""SELECT thread_parent_id AS parent, count(*) AS n, max(created_at) AS last FROM messages
                        WHERE thread_parent_id = ANY(%(ids)s) AND deleted_at IS NULL GROUP BY thread_parent_id""", ids=ids)
     return {r["parent"]: (r["n"], r["last"]) for r in found}
-
-
-def pm_task_view(t: dict) -> dict:
-    """A PM task as the app shows it (read-only): name, finish date, progress, overdue."""
-    return {**{k: t[k] for k in ("id", "name", "plannedStart", "plannedFinish", "status", "percent")},
-            "isOverdue": task_is_overdue(t)}
-
-
-def checkin_view(c: dict) -> dict:
-    """A check-in with what the card shows: the task as Siteline last saw it in the PM app (None once
-    it's gone), its project, whether the answer reached the PM app, and `closed` when there's nothing left
-    to answer (the task was finished, removed or given to someone else in the PM app)."""
-    task = pm.saved_task(c["taskId"])
-    p = project(c["projectId"])
-    return {
-        **{k: c[k] for k in ("id", "taskId", "taskName", "projectId", "userId", "askedAt", "answer", "pmWrite", "pmError")},
-        "projectName": p["name"] if p else None,
-        "task": pm_task_view(task) if task else None,
-        "closed": c["answer"] is None and (task is None or task["status"] not in OPEN_TASK_STATUSES
-                                           or task["ownerUserId"] != c["userId"]),
-    }

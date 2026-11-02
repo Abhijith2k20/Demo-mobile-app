@@ -9,9 +9,9 @@ from datetime import datetime
 from .. import db
 from ..core import uuid7
 
-# Retries after a failure, then the job is marked failed. pm_write follows the spec (§9.3).
+# Retries after a failure, then the job is marked failed. Webhooks to the PM app: 1, 5, 15 minutes, then hourly for 24 hours (docs/CARDS_API.md §5).
 BACKOFF = {
-    "pm_write": [60, 300, 900] + [3600] * 21,
+    "webhook": [60, 300, 900] + [3600] * 23,
     "default": [30, 120, 600],
 }
 LOCK_SECONDS = 120

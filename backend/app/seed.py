@@ -29,7 +29,7 @@ class Data:
     channels: dict[str, dict] = field(default_factory=dict)
     channel_members: list[dict] = field(default_factory=list)
     messages: dict[str, dict] = field(default_factory=dict)
-    checkins: dict[str, dict] = field(default_factory=dict)
+    asks: list[tuple[str, str]] = field(default_factory=list)  # (person, task id): the mock PM app sends these cards
     activities: list[dict] = field(default_factory=list)
     pm: dict = field(default_factory=lambda: {"projects": {}, "tasks": {}, "members": []})
 
@@ -249,9 +249,12 @@ def build() -> Data:
     def file(name: str, size_kb: int) -> dict:
         return {"type": "file", "data": {"name": name, "sizeKb": size_kb}}
 
-    def status(user: str, task_name: str, answer: dict, has_photo: bool = False) -> dict:
-        return {"type": "status_card", "data": {"kind": "checkin", "userId": U[user], "taskId": T[task_name],
-                                                "taskName": task_name, "answer": answer, "hasPhoto": has_photo}}
+    def status(user: str, task_name: str, percent: int, ms: int) -> dict:
+        """A status card the PM app posted after an answer (as the mock PM app does)."""
+        first = s.users[U[user]]["name"].split(" ")[0]
+        return {"type": "card", "data": {"extId": f"status-seed-{ms}",
+                                         "content": {"title": f"{first} · {task_name} → {percent}%", "lines": [], "tone": "info",
+                                                     "photos": []}}}
 
     # Villa 99 — #site-work
     sw = sharma["ch"]["site-work"]
@@ -279,7 +282,7 @@ def build() -> Data:
         "taskId": T["False ceiling – master bedroom"], "taskName": "False ceiling – master bedroom",
         "attachments": [img("stone", "Master bedroom – empty bay")], "mentions": [U["amit"]],
     })
-    say(sw, at(6, 18, 4), "bot", None, **status("ravi", "False ceiling – living room", {"kind": "progress", "percent": 25}))
+    say(sw, at(6, 18, 4), "bot", None, **status("ravi", "False ceiling – living room", 25, at(6, 18, 4)))
     say(sw, at(6, 18, 20), "suresh", None, type="daily_report", data={
         "workDone": "Living room boarding started, 8 boards fixed. Kitchen wall cleared for carpentry.", "workers": 6,
         "problems": "Master bedroom boards not delivered.", "tomorrow": "Continue living room boarding. Receive gypsum boards.",
@@ -295,7 +298,7 @@ def build() -> Data:
     say(sw, at(3, 10, 5), "imran", "Carcass cutting started. 18mm BWP for base units.", **photos(img("sand", "Carcass panels cut")))
     say(sw, at(3, 10, 30), "amit", "Imran, please check drawing rev C — the TV unit is 6 inches wider now.", data={"edited": True})
     say(sw, at(3, 10, 36), "imran", "Seen. Will follow rev C.")
-    say(sw, at(3, 18, 2), "bot", None, **status("ravi", "False ceiling – living room", {"kind": "progress", "percent": 50}, True))
+    say(sw, at(3, 18, 2), "bot", None, **status("ravi", "False ceiling – living room", 50, at(3, 18, 2)))
     say(sw, at(2, 9, 30), "suresh", "Electrician coming at 3 pm for cove light points. Ravi, keep the channel open on the window side.")
     say(sw, at(2, 9, 41), "ravi", "Ok sir")
     say(sw, at(2, 15, 10), "amit", "Latest false ceiling layout for site.", **file("Villa99_FC_layout_revC.pdf", 842))
@@ -434,18 +437,7 @@ def build() -> Data:
     # Bot DMs
     for k in human_keys:
         say(bot_dm[k], at(8, 9, 1), "bot", "Hi! I will check in on your tasks here. Tap a button to answer — no typing needed.")
-    summary = [s.pm["tasks"][T[n]] for n in ("False ceiling – living room", "False ceiling – master bedroom")]
-    say(bot_dm["ravi"], ago(420), "bot", None, data={
-        "kind": "morning_summary", "tasks": [{k: t[k] for k in ("id", "name", "plannedFinish", "percent")} for t in summary],
-    })
-    ci_time = ago(6)
-    checkin_id = uuid_at(ci_time)
-    checkin_msg = say(bot_dm["ravi"], ci_time, "bot", None, type="checkin",
-                      data={"checkinId": checkin_id, "taskId": T["False ceiling – living room"]})
-    s.checkins[checkin_id] = {"id": checkin_id, "taskId": T["False ceiling – living room"],
-                              "taskName": "False ceiling – living room", "projectId": sharma["id"], "userId": U["ravi"],
-                              "askedAt": iso(ci_time), "answer": None, "messageId": checkin_msg, "updatedAt": iso(ci_time),
-                              "remindedAt": None, "escalatedAt": None, "pmWrite": None, "pmError": None}
+    s.asks.append((s.users[U["ravi"]]["email"], T["False ceiling – living room"]))
 
     # ---- Activity ----
     def activity(user: str, kind: str, actor: str, created: str, *, channel_id=None, message_id=None, task_ids=(),
@@ -460,7 +452,7 @@ def build() -> Data:
         if m:
             activity(who, "mention", "amit", m["createdAt"], channel_id=sw, message_id=m["id"],
                      text="Amit mentioned you in #site-work", lines=[m["body"] or ""])
-    activity("amit", "checkin_result", "ravi", iso(at(3, 18, 2)), channel_id=sw, task_ids=[T["False ceiling – living room"]],
+    activity("amit", "notice", "ravi", iso(at(3, 18, 2)), channel_id=sw, task_ids=[T["False ceiling – living room"]],
              text="Ravi updated False ceiling – living room to 50%")
     activity("suresh", "thread_reply", "ravi", iso(at(6, 9, 48)), channel_id=sw, message_id=thread,
              text="Ravi replied to your message in #site-work", lines=["Ok sir, we will continue living room till then."])
@@ -594,8 +586,9 @@ def build_all() -> list[Data]:
 
 
 def load(companies: list[Data]) -> None:
-    """Writes seed data to an empty database. The saved copy of PM tasks is made by a real PM sync."""
-    from .pm.sync import full_sync
+    """Writes seed data to an empty database. The mock PM app then sends its projects and a few cards through
+    the Cards API functions, as it would live."""
+    from .mockpm import bot
 
     with db.transaction():
         db.insert("users", {"id": BOT_ID, "name": "Siteline Bot", "email": BOT_EMAIL, "avatarColor": "#5C6F80", "isBot": True})
@@ -608,7 +601,7 @@ def load(companies: list[Data]) -> None:
                                     "timeZone": "Asia/Kolkata", "setup": d.company["setup"]})
             db.insert_many("memberships", [{"companyId": d.company_id, "userId": uid, "role": role, "status": "active"}
                                            for uid, role in d.roles.items()])
-            db.insert("pm_links", {"companyId": d.company_id, "kind": "mock", "options": {}})
+            db.insert("integrations", {"companyId": d.company_id, "kind": "mock", "options": {}})
     for d in companies:
         cid = d.company_id
         with db.transaction(cid):
@@ -617,14 +610,16 @@ def load(companies: list[Data]) -> None:
             db.insert_many("channels", list(d.channels.values()))
             db.insert_many("channel_members", [{"companyId": cid, **m} for m in d.channel_members])
             db.insert_many("messages", [{"companyId": cid, **m} for m in d.messages.values()])
-            db.insert_many("checkins", [{"companyId": cid, **c} for c in d.checkins.values()])
             db.insert_many("activities", [{"companyId": cid, **a} for a in d.activities])
             db.insert_many("pm_mock_projects", [{"companyId": cid, **{k: p[k] for k in ("id", "name", "client", "address",
                                                                                          "status", "url", "updatedAt")}}
                                                 for p in d.pm["projects"].values()])
             db.insert_many("pm_mock_members", [{"companyId": cid, **m} for m in d.pm["members"]])
             db.insert_many("pm_mock_tasks", [{"companyId": cid, **t} for t in d.pm["tasks"].values()])
-            full_sync()
+            bot.publish_projects()
+            for ref, task_id in d.asks:
+                bot.morning_summary(ref)
+                bot.ask(next(t for t in bot.open_tasks_for(ref) if t["id"] == task_id), timers=False)
 
 
 def reset_everything() -> None:

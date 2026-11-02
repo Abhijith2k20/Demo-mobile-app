@@ -246,7 +246,7 @@ function DemoPanel() {
           </View>
         </Section>
 
-        <Section title="4 · Bot" hint="Sent to the current user's Siteline Bot DM.">
+        <Section title="4 · Bot" hint="The mock PM app sends these cards to the current user's Siteline Bot DM, through the Cards API.">
           <Button small kind="secondary" icon="sun" label="Send morning summary now" onPress={needUser(demo.morningSummary)} />
           <Button small kind="secondary" icon="moon" label="Send evening check-in now" onPress={needUser(demo.eveningCheckin)} />
           <Button
@@ -256,13 +256,13 @@ function DemoPanel() {
             label="Trigger escalation now"
             onPress={needUser(async () => {
               const r = await demo.escalate();
-              toast(r.escalated ? 'Escalated to the project managers.' : 'No unanswered check-in to escalate. Send a check-in first.');
+              toast(r.escalated ? 'Escalated to the project managers.' : 'No open check-in card to escalate. Send a check-in first.');
             })}
           />
         </Section>
 
-        <Section title="PM app (mock)" hint="The bot reads tasks from the company's mock PM app. Edit tasks in the platform panel (/platform).">
-          <Button small kind="secondary" icon="refresh-cw" label="Sync with the PM app now" onPress={() => void run(demo.pmSync, 'Sync queued.')} />
+        <Section title="PM app (mock)" hint="Stands in for the company's PM app: it decides what to ask. Edit its tasks in the platform panel (/platform).">
+          <Button small kind="secondary" icon="refresh-cw" label="Send projects and members again" onPress={() => void run(demo.pmPublish, 'Projects sent.')} />
           <Button small kind="secondary" icon="wifi-off" label="Make the PM app stop answering" onPress={() => void run(() => demo.pmDown(true), 'The mock PM app is down: answers wait and retry.')} />
           <Button small kind="secondary" icon="wifi" label="Bring the PM app back" onPress={() => void run(() => demo.pmDown(false), 'The mock PM app answers again.')} />
         </Section>

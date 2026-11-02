@@ -20,9 +20,9 @@ export const keys = {
   thread: (parentId: string) => ['thread', parentId] as const,
   pins: (channelId: string) => ['pins', channelId] as const,
   dm: (userId: string) => ['dm', userId] as const,
-  /** A project's open tasks, read-only from the PM app. */
+  /** Tasks the PM app asked about in a project lately. */
   tasks: (projectId: string) => ['tasks', projectId] as const,
-  checkins: ['checkins'] as const,
+  cards: ['cards'] as const,
   activity: ['activity'] as const,
   updates: (projectId: string) => ['updates', projectId] as const,
   files: (projectId: string) => ['files', projectId] as const,
@@ -70,9 +70,9 @@ export function keysFor(e: ServerEvent): QueryKey[] {
       return [keys.channels, ['channel'], ['browse'], ['messages']];
     case 'channel.read':
       return [keys.channels, keys.channel(e.channelId)];
-    case 'checkin.new':
-    case 'checkin.updated':
-      return [keys.checkins, ['tasks']];
+    case 'card.new':
+    case 'card.updated':
+      return [keys.cards, ['tasks']];
     case 'activity.new':
     case 'activity.read':
       return [keys.activity];

@@ -65,10 +65,9 @@ export type MessageType =
   | 'image'
   | 'voice'
   | 'file'
-  | 'checkin'
+  | 'card'
   | 'issue_card'
   | 'daily_report'
-  | 'status_card'
   | 'system';
 
 /** 'pending' and 'failed' only exist on the phone, for messages still in the send queue. */
@@ -89,50 +88,76 @@ export interface Message {
   deletedAt: string | null;
 }
 
-/** A task as the PM app has it. Siteline only reads tasks; the bot sends answers back. */
-export type TaskStatus = 'not_started' | 'in_progress' | 'blocked' | 'done';
-
-export interface PmTask {
+/** A task the PM app asked about in this project lately (for "Related task" in Report issue). */
+export interface RelatedTask {
   id: ID;
   name: string;
-  plannedStart: string;
-  plannedFinish: string;
-  status: TaskStatus;
-  percent: number;
-  /** Not done and its finish date has passed (worked out by the server). */
-  isOverdue: boolean;
 }
 
-export interface CheckinAnswer {
-  kind: 'started' | 'progress' | 'problem' | 'done' | 'not_started';
-  percent?: number;
-  reason?: string;
+// ---- Cards from the PM app (docs/CARDS_API.md). The app draws them from their content and decides nothing. ----
+
+export type Tone = 'info' | 'success' | 'warning' | 'danger';
+
+export interface CardChoice {
+  id: string;
+  label: string;
+  noteRequired?: boolean;
+}
+
+export interface CardButton extends CardChoice {
+  choices?: CardChoice[];
+}
+
+export interface CardContent {
+  title: string;
+  subtitle?: string;
+  badge?: { text: string; tone: Tone };
+  fields?: { label: string; value: string }[];
+  scale?: { id: string; label: string }[];
+  /** Stops up to this one are shaded as already reached. */
+  scaleReached?: string;
+  buttons?: CardButton[];
+  note?: { text?: boolean; voice?: boolean; photo?: boolean };
+}
+
+export interface CardAnswer {
+  scale?: string;
+  button?: string;
+  choice?: string;
   note?: string;
-  /** Length of an attached voice note, in seconds. */
+  voiceUploadId?: ID;
   voiceSec?: number;
-  hasPhoto?: boolean;
-  at?: string;
+  photoUploadIds?: ID[];
+  answeredAt?: string;
 }
 
-export interface Checkin {
+export interface Card {
   id: ID;
-  /** The task in the PM app. */
-  taskId: ID;
-  taskName: string;
+  extId: string;
+  userId: ID;
   projectId: ID | null;
   projectName: string | null;
-  userId: ID;
+  content: CardContent;
+  /** expired: an open card past its expiry (worked out by the server). */
+  state: 'open' | 'answered' | 'closed' | 'expired';
+  closedText: string | null;
+  answer: CardAnswer | null;
+  answeredAt: string | null;
+  /** Whether the answer reached the PM app. */
+  delivery: 'pending' | 'delivered' | 'refused' | 'failed' | null;
+  deliveryError: string | null;
   askedAt: string;
-  answer: null | CheckinAnswer;
-  /** The task as the PM app has it now; null once it was removed there. */
-  task: PmTask | null;
-  /** Whether the answer reached the PM app: pending (sending to it), saved, refused (reason in `pmError`), or nothing to save. */
-  pmWrite: 'pending' | 'saved' | 'refused' | null;
-  pmError: string | null;
-  /** Nothing left to answer: the task was finished or removed in the PM app. */
-  closed: boolean;
   /** The answer is in the send queue on this phone. */
   sending?: boolean;
+}
+
+/** A card the PM app posted in a project channel (status updates, escalations). */
+export interface ChannelCard {
+  title: string;
+  lines?: string[];
+  tone?: Tone;
+  /** Upload ids; the server adds signed links in `photoUrls`. */
+  photos?: ID[];
 }
 
 // ---- Additions beyond the spec's model list (see DECISIONS.md) ----
@@ -152,8 +177,7 @@ export interface Attachment {
 export type ActivityKind =
   | 'mention'
   | 'thread_reply'
-  | 'checkin_result'
-  | 'escalation';
+  | 'notice';
 
 export interface Activity {
   id: ID;
@@ -272,9 +296,8 @@ export interface Meta {
   jobTitles: { name: JobTitle; label: string; managersOnly: boolean }[];
   /** Job title a new project member starts with. */
   defaultJobTitle: JobTitle;
-  /** Quick picks for problems; `inCheckins: false` ones aren't offered in bot check-ins. "Other" is added by the app. */
+  /** Quick picks for Report issue. "Other" is added by the app. */
   problemTypes: { key: string; label: string; inCheckins: boolean }[];
-  percentSteps: number[];
   editWindowMs: number;
   deleteWindowMs: number;
   /** role → job title → channel names a new member joins by default */
@@ -291,7 +314,7 @@ export type ServerEvent =
   | { type: 'channel.read'; channelId: ID; userId: ID }
   | { type: 'project.updated'; project: Project }
   | { type: 'project.deleted'; projectId: ID }
-  | { type: 'checkin.new' | 'checkin.updated'; checkin: Checkin }
+  | { type: 'card.new' | 'card.updated'; card: Card }
   | { type: 'session.ended' }
   | { type: 'membership.removed' }
   | { type: 'activity.new'; activity: Activity }

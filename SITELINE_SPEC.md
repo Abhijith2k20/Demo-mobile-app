@@ -10,7 +10,7 @@
 > Version 2.0 had Siteline's own bot reading the PM app's tasks and deciding when to ask; 2.1 moves those
 > decisions to the PM app (`DECISIONS.md`, "The PM app owns the bot").
 >
-> **Status:** steps 1–7 of §15 are built as 2.0; step 8 (the Cards API, this version) is next; step 9 (launch)
+> **Status:** steps 1–7 of §15 are built as 2.0; step 8 (the Cards API, this version) is built; step 9 (launch)
 > needs the accounts listed in the README. `DECISIONS.md` says where the build differs.
 
 ---

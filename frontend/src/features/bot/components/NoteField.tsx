@@ -1,12 +1,16 @@
-// Optional note on a check-in: type it, or tap the microphone to record a voice note.
+// Optional note on a card answer: type it, or tap the microphone to record a voice note (up to 2 minutes).
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
 import type { IconName } from '@/components/basics';
 import { T } from '@/components/T';
 import { radius, space, touch } from '@/theme/spacing';
+import { toast } from '@/stores/ui';
 import { useTheme } from '@/theme/useTheme';
+
+const MAX_VOICE_SECONDS = 120;
 
 export const clock = (sec: number): string => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
@@ -41,20 +45,42 @@ export function VoiceChip({ seconds, onRemove }: { seconds: number; onRemove?: (
 
 export interface NoteValue {
   text: string;
-  voiceSec: number | null;
+  voice: { uri: string; seconds: number } | null;
 }
 
-export function NoteField({ value, onChange }: { value: NoteValue; onChange: (v: NoteValue) => void }) {
+export function NoteField({ value, onChange, voice }: { value: NoteValue; onChange: (v: NoteValue) => void; voice: boolean }) {
   const { c, type } = useTheme();
   const { t } = useTranslation();
-  const [recording, setRecording] = useState<number | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const state = useAudioRecorderState(recorder);
+  const recording = state.isRecording ? Math.floor(state.durationMillis / 1000) : null;
   const isRecording = recording !== null;
 
+  const start = async () => {
+    try {
+      if (!(await requestRecordingPermissionsAsync()).granted) {
+        toast(t('chat.micDenied', 'Allow microphone access in Settings to record voice notes.'), 'danger');
+        return;
+      }
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (e) {
+      console.warn('[voice]', e);
+      toast(t('chat.recordFailed', "Couldn't start recording."), 'danger');
+    }
+  };
+
+  const stop = async (keep: boolean) => {
+    const seconds = Math.max(1, recording ?? 1);
+    await recorder.stop();
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+    if (keep && recorder.uri) onChange({ ...value, voice: { uri: recorder.uri, seconds } });
+  };
+
   useEffect(() => {
-    if (!isRecording) return;
-    const timer = setInterval(() => setRecording((s) => (s === null ? null : Math.min(599, s + 1))), 1000);
-    return () => clearInterval(timer);
-  }, [isRecording]);
+    if (recording !== null && recording >= MAX_VOICE_SECONDS) void stop(true);
+  }, [recording]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const round = (icon: IconName, label: string, onPress: () => void, danger?: boolean) => (
     <Pressable
@@ -81,7 +107,7 @@ export function NoteField({ value, onChange }: { value: NoteValue; onChange: (v:
           <T variant="metaStrong" style={{ flex: 1 }}>
             {t('chat.recording', 'Recording…')} {clock(recording ?? 0)}
           </T>
-          <Pressable onPress={() => setRecording(null)} hitSlop={10} style={{ minHeight: touch.min, justifyContent: 'center' }}>
+          <Pressable onPress={() => void stop(false)} hitSlop={10} style={{ minHeight: touch.min, justifyContent: 'center' }}>
             <T variant="metaStrong" color="textMuted">
               {t('common.cancel', 'Cancel')}
             </T>
@@ -89,10 +115,7 @@ export function NoteField({ value, onChange }: { value: NoteValue; onChange: (v:
           {round(
             'square',
             t('checkin.stopRecording', 'Stop recording'),
-            () => {
-              onChange({ ...value, voiceSec: Math.max(1, recording ?? 1) });
-              setRecording(null);
-            },
+            () => void stop(true),
             true,
           )}
         </View>
@@ -123,10 +146,10 @@ export function NoteField({ value, onChange }: { value: NoteValue; onChange: (v:
               },
             ]}
           />
-          {round('mic', t('checkin.recordNote', 'Record a voice note'), () => setRecording(0))}
+          {voice ? round('mic', t('checkin.recordNote', 'Record a voice note'), () => void start()) : null}
         </View>
       )}
-      {value.voiceSec && !isRecording ? <VoiceChip seconds={value.voiceSec} onRemove={() => onChange({ ...value, voiceSec: null })} /> : null}
+      {value.voice && !isRecording ? <VoiceChip seconds={value.voice.seconds} onRemove={() => onChange({ ...value, voice: null })} /> : null}
     </View>
   );
 }

@@ -39,9 +39,6 @@ function DmsScreen() {
     const body = (() => {
       switch (m.type) {
         case 'text':
-          if (m.data?.kind === 'morning_summary') return t('dms.previewSummary', 'Your tasks for today');
-          if (m.data?.kind === 'checkin_intro') return t('dms.previewIntro', 'Please update your open tasks');
-          if (m.data?.kind === 'no_open_tasks') return t('bot.noTasks', 'You have no open tasks at the moment.');
           return m.body ?? '';
         case 'image':
           return m.body || t('dms.previewPhoto', 'Photo');
@@ -49,8 +46,8 @@ function DmsScreen() {
           return t('chat.voiceNote', 'Voice note');
         case 'file':
           return String(m.data?.name ?? t('plus.file', 'File'));
-        case 'checkin':
-          return t('dms.previewCheckin', 'Check-in: tap to update a task');
+        case 'card':
+          return m.data?.cardId ? t('dms.previewCard', 'A card to answer') : String((m.data?.content as { title?: string } | undefined)?.title ?? '');
         case 'issue_card':
           return t('issue.card', 'Issue');
         case 'daily_report':

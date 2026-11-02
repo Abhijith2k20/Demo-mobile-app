@@ -1,6 +1,6 @@
-"""A stand-in for a company's PM app (spec §9.3) until its API exists. It keeps projects, members and tasks in
-its own tables and answers the same calls as the real API (pm/http.py). Changes made to it (from the platform
-panel or the dev panel) are announced the way the real app's webhooks will be: pm/sync.apply_event."""
+"""The mock PM app's own data: projects, members and tasks in `pm_mock_*` tables, edited on the platform panel.
+Only the mock reads these; Siteline itself never sees them (it only gets cards and projects through the Cards
+API, like from a real PM app)."""
 from __future__ import annotations
 
 from .. import db
@@ -18,7 +18,7 @@ class Unavailable(Exception):
 
 
 def _check_up() -> None:
-    if db.value("SELECT (options->>'down')::boolean FROM pm_links WHERE company_id = current_company()"):
+    if is_down():
         raise Unavailable("The PM app isn't answering")
 
 
@@ -26,6 +26,11 @@ def _task(t: dict) -> dict:
     return {"id": t["id"], "projectId": t["projectId"], "name": t["name"], "plannedStart": t["plannedStart"],
             "plannedFinish": t["plannedFinish"], "ownerRef": t["ownerRef"], "status": t["status"], "percent": t["percent"],
             "updatedAt": t["updatedAt"]}
+
+
+def is_down() -> bool:
+    """Dev panel / platform panel switch: the mock stops answering, so answers wait and retry."""
+    return bool(db.value("SELECT (options->>'down')::boolean FROM integrations WHERE company_id = current_company()"))
 
 
 def list_projects() -> list[dict]:
@@ -75,8 +80,8 @@ def write_status(task_id: str, change: dict, key: str) -> dict:
 # ---- Editing the mock (platform panel, dev panel, seed) ----
 
 def save_task(task: dict) -> dict:
-    """Creates or changes a task and sends the matching webhook to Siteline."""
-    from . import sync
+    """Creates or changes a task; the mock then refreshes or closes any open card about it."""
+    from .bot import task_changed
 
     company = db.company_id()
     existing = db.row("SELECT * FROM pm_mock_tasks WHERE id = %(id)s", id=task.get("id") or "")
@@ -85,24 +90,24 @@ def save_task(task: dict) -> dict:
         t = db.update("pm_mock_tasks", {"companyId": company, "id": existing["id"]}, {**fields, "updatedAt": now_iso()})
     else:
         t = db.insert("pm_mock_tasks", {"companyId": company, "id": task.get("id") or uuid7(), **fields})
-    sync.apply_event({"id": uuid7(), "type": "task.updated" if existing else "task.created", "data": _task(t)})
+    task_changed(t["id"])
     return _task(t)
 
 
 def delete_task(task_id: str) -> None:
-    from . import sync
+    from .bot import task_changed
 
     db.run("UPDATE pm_mock_tasks SET deleted_at = now() WHERE id = %(id)s", id=task_id)
-    sync.apply_event({"id": uuid7(), "type": "task.deleted", "data": {"id": task_id}})
+    task_changed(task_id)
 
 
 def set_project_status(project_id: str, status: str) -> None:
-    from . import sync
+    from .bot import publish_projects
 
     db.run("UPDATE pm_mock_projects SET status = %(s)s, updated_at = now() WHERE id = %(id)s", s=status, id=project_id)
-    sync.apply_event({"id": uuid7(), "type": "project.updated", "data": {"id": project_id}})
+    publish_projects()
 
 
 def set_down(down: bool) -> None:
-    db.run("""UPDATE pm_links SET options = jsonb_set(options, '{down}', to_jsonb(%(d)s::boolean))
+    db.run("""UPDATE integrations SET options = jsonb_set(options, '{down}', to_jsonb(%(d)s::boolean))
               WHERE company_id = current_company()""", d=down)

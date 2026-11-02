@@ -10,9 +10,9 @@
 - The app is a thin client: business rules, permissions and calculations live only in backend/app (rules.py, views.py). The app shows what the server returns (access.permissions, can* flags, computed fields) and never re-derives them.
 - Only src/lib/api/transport.ts knows the server address. The dev panel (development and preview builds only) uses /internal/* through src/features/demo/api.ts; production refuses those routes.
 - Server data is TanStack Query cache, refreshed by WebSocket events; the last loaded data is saved to the phone (src/lib/persist.ts) only to show while offline.
-- Site actions (messages and photos, check-in answers) go through the send queue (src/lib/outbox.ts). Everything else is online-only. The phone never works out results: queued items show as "sending" until the server answers.
+- Site actions (messages and photos, card answers) go through the send queue (src/lib/outbox.ts). Everything else is online-only. The phone never works out results: queued items show as "sending" until the server answers.
 - Database: plain SQL through backend/app/db.py; schema changes are new files in backend/db/migrations (never edit one that ran in staging or production). Per-company tables get company_id and the row-level security policy.
-- Timed or retried work (bot check-ins, reminders, PM writes, sync, email/SMS/push) is a job (backend/app/jobs), queued in the same transaction as the change.
+- Timed or retried work (webhooks to the PM app, the mock PM app's timers, email/SMS/push) is a job (backend/app/jobs), queued in the same transaction as the change.
 - Backend: routers translate HTTP only; business actions live in backend/app/services, rules in rules.py, visibility in access.py. Only main.py imports routers (checked by a test). Backend changes need tests in backend/tests; run `npm run test:api`.
 - Errors: services/routes return the standard error format; the app shows friendly messages by code.
 - English only. Keep writing every text as t('key', 'English') so a language can be added back later (DECISIONS.md).

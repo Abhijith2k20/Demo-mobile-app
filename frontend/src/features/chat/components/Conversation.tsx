@@ -11,7 +11,7 @@ import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
 import type { ID, Message, MessageView } from '@/types/models';
 import { BotProgress } from '../../bot/components/BotProgress';
-import { CheckinQueueProvider } from '../../bot/queue';
+import { CardQueueProvider } from '../../bot/queue';
 import { leaveChannel } from '../../projects/api';
 import { firstName, useMe, useProject, useProjectAccess, useUsers } from '../../shared';
 import { ChatContext, type ChatContextValue } from '../context';
@@ -25,7 +25,7 @@ function renderItem({ item }: { item: ListItem }) {
   if (item.kind === 'day') return <DayDivider label={item.label} />;
   if (item.kind === 'new') return <NewDivider />;
   // Cards with their own state must not be recycled into another message.
-  return <MessageRow key={item.message.type === 'checkin' ? item.key : undefined} item={item} />;
+  return <MessageRow key={item.message.data?.cardId ? item.key : undefined} item={item} />;
 }
 
 export function Conversation({ channelId }: { channelId: ID }) {
@@ -58,8 +58,8 @@ export function Conversation({ channelId }: { channelId: ID }) {
     [me, users.byId, info.jobTitles, info.members, info.isBot, onOpenThread],
   );
 
-  // The bot conversation shows one open check-in at a time.
-  const Queue = info.isBot ? CheckinQueueProvider : Fragment;
+  // The bot conversation shows one open card at a time.
+  const Queue = info.isBot ? CardQueueProvider : Fragment;
   const projectId = info.channel?.projectId ?? null;
   const placeholder = info.channel?.kind === 'dm' ? t('chat.messagePerson', 'Message {{name}}', { name: firstName(info.peer?.name) }) : t('chat.messageChannel', 'Message {{name}}', { name: info.title });
 

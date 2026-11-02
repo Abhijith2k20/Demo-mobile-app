@@ -24,7 +24,7 @@ function UnsentScreen() {
   const [discarding, setDiscarding] = useState<OutboxItem | null>(null);
 
   const title = (i: OutboxItem): string => {
-    if (i.kind === 'checkin') return t('unsent.checkin', 'Check-in: {{task}}', { task: i.taskName });
+    if (i.kind === 'card') return t('unsent.card', 'Answer: {{title}}', { title: i.title });
     const ch = channels.byId.get(i.channelId);
     const where = ch?.kind === 'dm' ? (users.byId.get(ch.peerId ?? '')?.name ?? '') : ch?.kind === 'bot' ? 'Siteline Bot' : `#${ch?.name ?? ''}`;
     const what = i.body ? `“${i.body.slice(0, 60)}”` : i.photos.length ? t('unsent.photos', '{{count}} photos', { count: i.photos.length }) : '';

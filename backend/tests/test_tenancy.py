@@ -89,7 +89,7 @@ def test_platform_creates_a_company_with_its_owner(client):
     assert client.post("/platform/companies", json=body, headers={"X-Platform-Key": "wrong"}).status_code == 403
     c = client.post("/platform/companies", json=body, headers={"X-Platform-Key": "dev-platform-key"}).json()["company"]
     assert c["slug"] == "acme-fitouts"
-    run_jobs({"pm_sync", "send_invite"})
+    run_jobs({"send_invite"})
     client.post("/auth/otp/request", json={"identifier": "asha@acme.example"})
     v = client.post("/auth/otp/verify", json={"identifier": "asha@acme.example", "code": "123456"}).json()
     h = {"Authorization": f"Bearer {v['accessToken']}"}

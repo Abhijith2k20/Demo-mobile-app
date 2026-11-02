@@ -10,7 +10,7 @@ from ..events import publish
 from ..jobs.queue import enqueue
 from ..rules import can_change_role, can_deactivate, can_invite_as, is_company_admin, is_guest
 from ..schemas import InviteCreate, RoleChange
-from ..services import accounts
+from ..services import accounts, integrations
 from ..store import company, human_ids, people, person
 from ..views import public_user
 
@@ -150,8 +150,8 @@ def integration(user: dict = Depends(current_user)):
     """The PM link's status for the Owner and Admins (§5.12). The link itself is set by the Siteline team."""
     if not is_company_admin(user):
         raise forbidden()
-    lk = db.row("SELECT kind, last_sync_at, last_error, options FROM pm_links WHERE company_id = current_company()")
+    lk = integrations.current()
     if not lk:
         return {"connected": False}
-    return {"connected": True, "kind": lk["kind"], "lastSyncAt": lk["lastSyncAt"], "lastError": lk["lastError"],
-            "unmatched": (lk["options"] or {}).get("unmatched", [])}
+    return {"connected": True, "kind": lk["kind"], "lastCallAt": lk["lastCallAt"], "lastError": lk["lastError"],
+            "unmatched": integrations.unmatched()}

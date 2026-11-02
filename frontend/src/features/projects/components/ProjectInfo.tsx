@@ -6,21 +6,20 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Badge, Card, Row } from '@/components/basics';
+import { Badge, Card, Row } from '@/components/basics';
 import { T } from '@/components/T';
 import { BrowseChannels } from '@/features/projects/components/BrowseChannels';
 import { useProjectChannels, useRecentUpdates } from '@/features/projects/hooks';
-import { firstName, useProjectAccess, useUnreadCounts, useUsers } from '@/features/shared';
+import { useProjectAccess, useUnreadCounts } from '@/features/shared';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { CheckinAnswer, ID, ProjectView } from '@/types/models';
+import type { ChannelCard, ProjectView } from '@/types/models';
 
 
 export function ProjectInfo({ project }: { project: ProjectView }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const access = useProjectAccess(project.id);
-  const users = useUsers();
   const channels = useProjectChannels(project.id);
   const unread = useUnreadCounts();
   const updates = useRecentUpdates(project.id);
@@ -96,36 +95,20 @@ export function ProjectInfo({ project }: { project: ProjectView }) {
         {updates.length === 0 ? (
           <Card>
             <T variant="meta" color="textMuted">
-              Check-in results from the team will show up here.
+              Updates from the PM app will show up here.
             </T>
           </Card>
         ) : (
           <Card style={{ padding: 0 }}>
             {updates.map((m, i) => {
-              const d = m.data ?? {};
-              const who = users.byId.get(d.userId as ID);
-              const a = d.answer as CheckinAnswer | undefined;
-              const what =
-                d.kind === 'escalation'
-                  ? 'no update yet'
-                  : a?.kind === 'progress'
-                    ? `${a.percent}%`
-                    : a?.kind === 'problem'
-                      ? `Problem${a.reason ? ` · ${a.reason}` : ''}`
-                      : a?.kind === 'done'
-                        ? 'Done'
-                        : a?.kind === 'not_started'
-                          ? 'Not started'
-                          : 'Started';
+              const card = (m.data?.content ?? { title: '' }) as ChannelCard;
               return (
                 <View
                   key={m.id}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
-                  {who ? <Avatar id={who.id} name={who.name} size={28} /> : null}
                   <View style={{ flex: 1 }}>
                     <T variant="body" numberOfLines={2}>
-                      <T variant="bodyStrong">{firstName(who?.name)}</T> · {String(d.taskName ?? '')} → <T variant="bodyStrong">{what}</T>
-                      {d.hasPhoto ? ' · photo attached' : ''}
+                      {card.title}
                     </T>
                     <T variant="meta" color="textMuted">
                       {format(parseISO(m.createdAt), 'EEE d MMM, h:mm a')}

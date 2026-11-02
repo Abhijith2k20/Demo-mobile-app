@@ -63,12 +63,9 @@
   },
   "bot": {
     "allDone": "All caught up. Thanks!",
-    "left": "{{count}} tasks need an update",
-    "morningTitle": "Good morning, {{name}}",
-    "noTasks": "You have no open tasks at the moment.",
-    "oneLeft": "1 task needs an update",
-    "progress": "{{done}} of {{total}} done",
-    "todayCount": "{{count}} today"
+    "left": "{{count}} cards need an answer",
+    "oneLeft": "1 card needs an answer",
+    "progress": "{{done}} of {{total}} done"
   },
   "channel": {
     "botSubtitle": "Check-ins and reminders",
@@ -130,37 +127,12 @@
     "voiceNote": "Voice note"
   },
   "checkin": {
-    "addNote": "Add a note",
-    "addPhoto": "Add a photo",
-    "archived": "Archived",
-    "closed": "Changed in the PM app",
-    "done": "Done",
-    "due": "due {{date}}",
-    "hideNote": "Hide note",
-    "howFar": "How far along is it?",
-    "loading": "Loading check-in…",
-    "note": "Note",
-    "noteHint": "Your note is sent with the answer you tap above.",
     "notePlaceholder": "Type a note, or record one",
     "notes": "Notes (optional)",
-    "notSaved": "Not saved: {{reason}}",
-    "notStarted": "Not started",
-    "now": "Now {{percent}}%",
-    "overdue": "Overdue · {{date}}",
-    "photoAdded": "Photo added · tap to remove",
-    "problem": "Problem",
     "recordNote": "Record a voice note",
-    "reminderLine": "Reminder: {{task}} still needs an update",
     "removeVoice": "Remove voice note",
-    "saving": "Saving to the PM app…",
-    "setTo": "Set progress to {{percent}}%",
-    "started": "Started",
     "stopRecording": "Stop recording",
-    "update": "Update",
-    "whatProblem": "What's the problem?",
-    "withPhoto": "photo attached",
-    "you": "You",
-    "yourTask": "your task"
+    "you": "You"
   },
   "common": {
     "back": "Back",
@@ -176,12 +148,10 @@
     "emptyHint": "Message someone on your team to get started.",
     "emptyTitle": "No direct messages yet",
     "noMessages": "No messages yet",
-    "previewCheckin": "Check-in: tap to update a task",
-    "previewIntro": "Please update your open tasks",
     "previewPhoto": "Photo",
-    "previewSummary": "Your tasks for today",
     "search": "Find a conversation",
-    "title": "Direct messages"
+    "title": "Direct messages",
+    "previewCard": "A card to answer"
   },
   "forms": {
     "dailyReport": "Daily report",
@@ -340,12 +310,6 @@
     "tomorrow": "Tomorrow's plan",
     "workersCount": "{{count}} people working"
   },
-  "status": {
-    "blocked": "Blocked",
-    "escalation": "{{name}} hasn't updated {{task}}.",
-    "noUpdate": "No update yet",
-    "update": "Check-in update"
-  },
   "tabs": {
     "activity": "Activity",
     "dms": "DMs",
@@ -359,7 +323,6 @@
     "title": "Thread"
   },
   "unsent": {
-    "checkin": "Check-in: {{task}}",
     "discard": "Discard",
     "discardBody": "It hasn't reached the server and will be lost.",
     "discardTitle": "Discard this change?",
@@ -372,7 +335,8 @@
     "sendNow": "Try sending now",
     "title": "Unsent items",
     "waiting": "Waiting to send",
-    "waitingReason": "Waiting for a connection."
+    "waitingReason": "Waiting for a connection.",
+    "card": "Answer: {{title}}"
   },
   "you": {
     "admin": "Admin",
@@ -408,5 +372,20 @@
     "themeDark": "Dark",
     "themeLight": "Light",
     "themeSystem": "System"
+  },
+  "card": {
+    "loading": "Loading…",
+    "reminderLine": "Reminder: {{title}} still needs an answer",
+    "delivering": "Sending to the PM app…",
+    "notSaved": "Not saved: {{reason}}",
+    "archived": "Archived",
+    "expired": "Expired",
+    "closed": "Closed",
+    "update": "Update",
+    "note": "Note",
+    "photoAdded": "Photo added · tap to remove",
+    "addPhoto": "Add a photo",
+    "send": "Send",
+    "noteHint": "Your note is sent with the answer you tap above."
   }
 }

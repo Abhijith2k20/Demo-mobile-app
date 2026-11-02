@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from .. import actors, bot, db, netsim
+from .. import actors, db, netsim
 from ..deps import current_user
 from ..events import hub
-from ..jobs.queue import enqueue
-from ..pm import mock
+from ..mockpm import bot, data
 from ..schemas import ActorsConfig, NetworkConfig
 from ..services import accounts
 
@@ -59,32 +58,33 @@ def deactivate(user: dict = Depends(current_user)):
     return {"ok": True}
 
 
+# The mock PM app's bot, for the signed-in person (spec §13).
+
 @router.post("/bot/morning-summary")
 def morning(user: dict = Depends(current_user)):
-    bot.send_morning_summary(user["id"])
+    bot.morning_summary(bot.ref_of(user["id"]))
     return {"ok": True}
 
 
 @router.post("/bot/evening-checkin")
 def evening(user: dict = Depends(current_user)):
-    bot.send_evening_checkin(user["id"])
-    return {"ok": True}
+    return {"asked": bot.checkin_now(bot.ref_of(user["id"]))}
 
 
 @router.post("/bot/escalate")
 def escalate(user: dict = Depends(current_user)):
-    return {"escalated": bot.trigger_escalation(user["id"])}
+    return {"escalated": bot.escalate_first(bot.ref_of(user["id"]))}
 
 
-@router.post("/pm/sync")
-def pm_sync(user: dict = Depends(current_user)):
-    enqueue("pm_sync", {}, dedupe_key=None)
-    return {"queued": True}
+@router.post("/pm/publish")
+def pm_publish(user: dict = Depends(current_user)):
+    bot.publish_projects()
+    return {"published": True}
 
 
 @router.post("/pm/down")
 def pm_down(body: dict, user: dict = Depends(current_user)):
-    mock.set_down(bool(body.get("down")))
+    data.set_down(bool(body.get("down")))
     return {"down": bool(body.get("down"))}
 
 

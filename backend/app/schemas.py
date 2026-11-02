@@ -1,15 +1,17 @@
 """Request bodies. Validation errors become 422 VALIDATION_FAILED with `details.fields`."""
 from __future__ import annotations
 
+import json
 import re
+from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Id = str
 CHANNEL_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
-MessageType = Literal["text", "image", "voice", "file", "checkin", "issue_card", "daily_report", "status_card", "system"]
+MessageType = Literal["text", "image", "voice", "file", "card", "issue_card", "daily_report", "system"]
 # Job titles are the company's own (see the setup); routes check them against it.
 JobTitle = str
 ProjectRole = Literal["manager", "member"]
@@ -125,15 +127,147 @@ class DmOpen(Body):
     userId: Id
 
 
-# ---- Check-ins ----
+# ---- Cards (docs/CARDS_API.md) ----
 
-class CheckinAnswer(Body):
-    kind: Literal["started", "progress", "problem", "done", "not_started"]
-    percent: Optional[int] = Field(default=None, ge=0, le=100)
-    reason: Optional[str] = Field(default=None, max_length=200)
+Text = Field(min_length=1, max_length=200)
+
+
+class Badge(Body):
+    text: str = Field(min_length=1, max_length=40)
+    tone: Literal["info", "success", "warning", "danger"] = "info"
+
+
+class CardField(Body):
+    label: str = Field(min_length=1, max_length=40)
+    value: str = Field(max_length=120)
+
+
+class ScaleStop(Body):
+    id: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=20)
+
+
+class Choice(Body):
+    id: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=60)
+    noteRequired: bool = False
+
+
+class CardButton(Body):
+    id: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=30)
+    choices: list[Choice] = Field(default=[], max_length=8)
+    noteRequired: bool = False
+
+
+class NoteRules(Body):
+    text: bool = False
+    voice: bool = False
+    photo: bool = False
+
+
+class PushText(Body):
+    title: Optional[str] = Field(default=None, max_length=60)
+    body: Optional[str] = Field(default=None, max_length=180)
+
+
+class CardContent(Body):
+    title: str = Text
+    subtitle: Optional[str] = Field(default=None, max_length=200)
+    badge: Optional[Badge] = None
+    fields: list[CardField] = Field(default=[], max_length=8)
+    scale: list[ScaleStop] = Field(default=[], max_length=6)
+    scaleReached: Optional[str] = None
+    buttons: list[CardButton] = Field(default=[], max_length=3)
+    note: Optional[NoteRules] = None
+    push: Optional[PushText] = None
+
+    @model_validator(mode="after")
+    def ids_unique(self):
+        ids = [x.id for x in self.scale] + [b.id for b in self.buttons]
+        if len(ids) != len(set(ids)):
+            raise ValueError("buttons|Every scale stop and button needs its own id")
+        if self.scaleReached and self.scaleReached not in {x.id for x in self.scale}:
+            raise ValueError("scaleReached|Not one of the scale's ids")
+        return self
+
+
+class CardCreate(CardContent):
+    id: str = Field(min_length=1, max_length=120)
+    to: str = Field(min_length=3, max_length=120)
+    project: Optional[str] = Field(default=None, max_length=120)
+    ref: dict[str, Any] = {}
+    expiresAt: Optional[datetime] = None
+
+    @field_validator("ref")
+    @classmethod
+    def ref_small(cls, v):
+        if len(json.dumps(v)) > 2000:
+            raise ValueError("Keep ref under 2 KB")
+        return v
+
+
+class CardPatch(Body):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    subtitle: Optional[str] = Field(default=None, max_length=200)
+    badge: Optional[Badge] = None
+    fields: Optional[list[CardField]] = Field(default=None, max_length=8)
+    scale: Optional[list[ScaleStop]] = Field(default=None, max_length=6)
+    scaleReached: Optional[str] = None
+    buttons: Optional[list[CardButton]] = Field(default=None, max_length=3)
+    note: Optional[NoteRules] = None
+    expiresAt: Optional[datetime] = None
+    closed: bool = False
+    closedText: Optional[str] = Field(default=None, max_length=120)
+
+
+class ChannelCard(Body):
+    title: str = Text
+    lines: list[str] = Field(default=[], max_length=8)
+    tone: Literal["info", "success", "warning", "danger"] = "info"
+    photos: list[str] = Field(default=[], max_length=4)
+
+
+class Notify(Body):
+    managers: bool = False
+    people: list[str] = Field(default=[], max_length=50)
+    push: Optional[str] = Field(default=None, max_length=180)
+
+
+class ChannelMessageCreate(Body):
+    id: str = Field(min_length=1, max_length=120)
+    project: str = Field(min_length=1, max_length=120)
+    channel: Optional[str] = Field(default=None, max_length=30)
+    card: ChannelCard
+    notify: Optional[Notify] = None
+
+
+class PmMember(Body):
+    ref: str = Field(min_length=3, max_length=120)
+    name: Optional[str] = Field(default=None, max_length=80)
+    role: Literal["manager", "member"]
+    roleName: Optional[str] = Field(default=None, max_length=60)
+
+
+class PmProject(Body):
+    name: str = Field(min_length=1, max_length=120)
+    client: str = Field(default="", max_length=120)
+    address: str = Field(default="", max_length=200)
+    url: Optional[str] = Field(default=None, max_length=500)
+    status: Literal["active", "closed"] = "active"
+    members: list[PmMember] = Field(default=[], max_length=500)
+
+
+class CardAnswer(Body):
+    """From the app (through the send queue)."""
+    scale: Optional[str] = Field(default=None, max_length=40)
+    button: Optional[str] = Field(default=None, max_length=40)
+    choice: Optional[str] = Field(default=None, max_length=40)
     note: Optional[str] = Field(default=None, max_length=500)
-    voiceSec: Optional[int] = Field(default=None, ge=1, le=600)
-    hasPhoto: Optional[bool] = None
+    voiceUploadId: Optional[Id] = None
+    voiceSec: Optional[int] = Field(default=None, ge=1, le=120)
+    photoUploadIds: list[Id] = Field(default=[], max_length=4)
+    answeredAt: Optional[datetime] = None
 
 
 # ---- Projects, members, channels ----
@@ -231,9 +365,7 @@ class CompanyCreate(Body):
     ownerIdentifier: str = Field(min_length=3, max_length=120)
     pmCompanyId: Optional[str] = None
     pmKind: Literal["none", "mock", "http"] = "mock"
-    pmBaseUrl: Optional[str] = None
-    pmApiKey: Optional[str] = None
-    pmWebhookSecret: Optional[str] = None
+    pmWebhookUrl: Optional[str] = Field(default=None, max_length=500)
     v_n = field_validator("name")(_name(2, 80, "Give the company a name"))
     v_o = field_validator("ownerName")(_name(2, 60, "Enter the owner's name"))
 

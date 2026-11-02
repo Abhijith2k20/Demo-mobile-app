@@ -6,7 +6,7 @@ import { AppState } from 'react-native';
 import { api } from '@/lib/api/client';
 import { useOutbox, type OutboxItem } from '@/lib/outbox';
 import { get, keys } from '@/lib/queries';
-import type { ChannelView, ID, JobTitle, MessageView, PmTask, User } from '@/types/models';
+import type { ChannelView, ID, JobTitle, MessageView, RelatedTask, User } from '@/types/models';
 import { shortProjectName, useChannels, useMe, useProject, useUsers } from '../shared';
 import { markRead } from './api';
 import { buildItems } from './messageList';
@@ -212,9 +212,9 @@ export function useDmChannelId(userId: string): ID | null | undefined {
 }
 
 /** A project's open tasks as the PM app has them (read-only; for "Related task" in Report issue). */
-export function useProjectTasks(projectId: ID | null | undefined): PmTask[] {
+export function useProjectTasks(projectId: ID | null | undefined): RelatedTask[] {
   return (
-    useQuery({ queryKey: keys.tasks(projectId ?? ''), queryFn: get<{ tasks: PmTask[] }>(`/projects/${projectId}/tasks`), enabled: !!projectId }).data
+    useQuery({ queryKey: keys.tasks(projectId ?? ''), queryFn: get<{ tasks: RelatedTask[] }>(`/projects/${projectId}/tasks`), enabled: !!projectId }).data
       ?.tasks ?? []
   );
 }

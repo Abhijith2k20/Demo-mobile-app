@@ -1,25 +1,23 @@
-"""The signed-in person: profile, settings, push tokens, check-ins, activity, and the company's setup."""
+"""The signed-in person: profile, settings, push tokens, activity, and the company's setup."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from .. import bot, db
-from ..core import not_found, now_iso
+from .. import db
+from ..core import now_iso
 from ..deps import current_user
 from ..events import publish
 from ..notify import public_activity
 from ..rules import (
     DELETE_WINDOW_MS,
     EDIT_WINDOW_MS,
-    PERCENT_STEPS,
     ROLES_IN_EVERY_CHANNEL,
     default_channel_names,
 )
-from ..schemas import CheckinAnswer, MePatch, PushToken
-from ..access import assert_project_active
+from ..schemas import MePatch, PushToken
 from ..services import accounts
 from ..store import company, human_ids, person, setup
-from ..views import checkin_view, me_view, public_user
+from ..views import me_view, public_user
 
 router = APIRouter(tags=["me"])
 
@@ -77,7 +75,6 @@ def meta(user: dict = Depends(current_user)):
         "defaultJobTitle": st["defaultJobTitle"],
         "problemTypes": [{"key": p["key"], "label": p["key"], "inCheckins": p.get("inCheckins", True)}
                          for p in st["problemTypes"]],
-        "percentSteps": PERCENT_STEPS,
         "editWindowMs": EDIT_WINDOW_MS,
         "deleteWindowMs": DELETE_WINDOW_MS,
         "rolesInEveryChannel": ROLES_IN_EVERY_CHANNEL,
@@ -85,29 +82,6 @@ def meta(user: dict = Depends(current_user)):
             role: {jt: default_channel_names(st, role, jt) for jt in titles} for role in ("manager", "member")
         },
     }
-
-
-@router.get("/me/checkins")
-def my_checkins(user: dict = Depends(current_user)):
-    mine = db.rows("SELECT * FROM checkins WHERE user_id = %(u)s ORDER BY asked_at, id", u=user["id"])
-    return {"checkins": [checkin_view(c) for c in mine]}
-
-
-@router.post("/checkins/{checkin_id}/answer")
-def answer_checkin(checkin_id: str, body: CheckinAnswer, user: dict = Depends(current_user)):
-    c = db.row("SELECT * FROM checkins WHERE id = %(id)s", id=checkin_id)
-    if not c or c["userId"] != user["id"]:
-        raise not_found("Check-in")
-    if not c["answer"]:
-        assert_project_active(c["projectId"])
-        c = bot.apply_checkin_answer(c, body.model_dump(exclude_none=True))  # repeating it changes nothing
-    return checkin_view(c)
-
-
-@router.post("/bot/checkins")
-def ask_checkins(user: dict = Depends(current_user)):
-    """The app calls this when the bot conversation opens."""
-    return {"asked": bot.ask_about_open_tasks(user["id"])}
 
 
 @router.get("/activity")

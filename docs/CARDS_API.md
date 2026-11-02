@@ -153,7 +153,8 @@ Posts a card or a line in a project channel, for status updates and escalations.
 - `channel`: a channel name in the project; left out = the company's work channel (from its setup).
 - `card.tone`: `info`, `success`, `warning` or `danger` (the colour of the card's edge).
 - `card.photos`: upload ids from answers (see §5), so a status card can show the person's photo.
-- `notify.managers`: an Activity item (and push) for the project's Managers; `people`: for these refs.
+- `notify.managers`: an Activity item for the project's Managers; `people`: for these refs. `push`: the push text
+  sent to them too (left out = Activity only).
 - Same `id` again = the same message.
 
 ## 5. Webhooks to the PM app

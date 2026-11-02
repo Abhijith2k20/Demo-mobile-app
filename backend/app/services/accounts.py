@@ -224,8 +224,18 @@ def join_company(company_id: str, user_id: str, role: str, channel_ids: list[str
         from ..views import public_user
 
         publish({"type": "user.updated", "user": public_user(person(user_id))}, human_ids())
+        _tell_pm_app("person.joined", user_id)
     finally:
         t.set_company(previous)
+
+
+def _tell_pm_app(event: str, user_id: str) -> None:
+    """person.joined / person.left, so the PM app knows who it can send cards to (in the current company)."""
+    from .integrations import send_event
+
+    u = db.row("SELECT name, email, phone FROM users WHERE id = %(u)s", u=user_id)
+    if u and (u["email"] or u["phone"]):
+        send_event(event, {"person": u["email"] or u["phone"], "name": u["name"]}, f"evt_{uuid7()}")
 
 
 def accept_invite(user: dict, invite_id: str) -> dict:
@@ -249,10 +259,17 @@ def deactivate_member(user_id: str) -> None:
     db.run("""UPDATE memberships SET status = 'deactivated', updated_at = now()
               WHERE company_id = current_company() AND user_id = %(u)s""", u=user_id)
     end_company_sessions(user_id, company_id)
+    _tell_pm_app("person.left", user_id)
 
 
 def delete_account(user_id: str) -> None:
     """Spec §9.8: details removed, every membership deactivated, messages stay as "Former member"."""
+    t = db.current()
+    previous = t.company_id
+    for m in db.rows("SELECT company_id FROM memberships WHERE user_id = %(u)s AND status = 'active'", u=user_id):
+        t.set_company(m["companyId"])
+        _tell_pm_app("person.left", user_id)
+    t.set_company(previous)
     db.run("""UPDATE users SET name = 'Former member', email = NULL, phone = NULL, deleted_at = now(), updated_at = now()
               WHERE id = %(u)s""", u=user_id)
     db.run("UPDATE memberships SET status = 'deactivated', updated_at = now() WHERE user_id = %(u)s", u=user_id)

@@ -18,9 +18,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import config, db
 from ..core import ApiError, uuid7
 from ..jobs.queue import enqueue
-from ..pm import mock
+from ..mockpm import bot as mock_bot
+from ..mockpm import data as mock
 from ..schemas import CompanyCreate
-from ..services import accounts, companies
+from ..services import accounts, companies, integrations
 
 router = APIRouter(prefix="/platform", tags=["platform"])
 COOKIE = "siteline_platform"
@@ -35,8 +36,7 @@ def api_create_company(body: CompanyCreate, x_platform_key: str = Header("")):
         raise ApiError("FORBIDDEN", "A valid X-Platform-Key is needed.")
     c = companies.create(name=body.name, time_zone=body.timeZone, template=body.template, owner_name=body.ownerName,
                          owner_identifier=body.ownerIdentifier, actor="platform-api", pm_kind=body.pmKind,
-                         pm_company_id=body.pmCompanyId, pm_base_url=body.pmBaseUrl, pm_api_key=body.pmApiKey,
-                         pm_webhook_secret=body.pmWebhookSecret)
+                         pm_company_id=body.pmCompanyId, webhook_url=body.pmWebhookUrl)
     return {"company": {"id": c["id"], "name": c["name"], "slug": c["slug"]}}
 
 
@@ -82,14 +82,14 @@ def panel(siteline_platform: str | None = Cookie(None), error: str = ""):
 <form method="post" action="/platform/login"><label>Email <input name="email" type="email" required></label>
 <button>Send code</button></form>""")
     rows = db.rows("""SELECT c.*, (SELECT count(*) FROM memberships m WHERE m.company_id = c.id AND m.status = 'active') AS people,
-                      l.kind AS pm_kind, l.last_sync_at, l.last_error FROM companies c LEFT JOIN pm_links l ON l.company_id = c.id
+                      l.kind AS pm_kind, l.last_call_at, l.last_error FROM companies c LEFT JOIN integrations l ON l.company_id = c.id
                       ORDER BY c.created_at DESC""")
     table = "".join(f"""<tr><td><a href="/platform/companies/{_e(c['id'])}">{_e(c['name'])}</a></td><td>{_e(c['status'])}</td>
-<td>{c['people']}</td><td>{_e(c['pmKind'])}</td><td>{_e(c['lastSyncAt'])}</td><td class="err">{_e(c['lastError'])}</td></tr>"""
+<td>{c['people']}</td><td>{_e(c['pmKind'])}</td><td>{_e(c['lastCallAt'])}</td><td class="err">{_e(c['lastError'])}</td></tr>"""
                     for c in rows)
     return _page("Companies", f"""<h1>Companies</h1><p class="muted">Signed in as {_e(admin)} ·
 <a href="/platform/audit">Audit log</a></p><p class="err">{_e(error)}</p>
-<table><tr><th>Company</th><th>Status</th><th>People</th><th>PM link</th><th>Last sync</th><th>Last error</th></tr>{table}</table>
+<table><tr><th>Company</th><th>Status</th><th>People</th><th>PM link</th><th>Last API call</th><th>Last error</th></tr>{table}</table>
 <h2>New company</h2><form method="post" action="/platform/companies/new">
 <label>Name <input name="name" required></label>
 <label>Time zone <input name="time_zone" value="Asia/Kolkata" required></label>
@@ -99,8 +99,7 @@ def panel(siteline_platform: str | None = Cookie(None), error: str = ""):
 <label>PM company id <input name="pm_company_id"></label>
 <label>PM link <select name="pm_kind"><option value="mock">Mock PM app</option><option value="http">PM app API</option>
 <option value="none">None (projects made in Siteline)</option></select></label>
-<label>PM API address <input name="pm_base_url"></label><label>PM API key <input name="pm_api_key" type="password"></label>
-<label>PM webhook secret <input name="pm_webhook_secret" type="password"></label>
+<label>PM webhook URL <input name="pm_webhook_url"></label>
 <button>Create company and invite owner</button></form>""")
 
 
@@ -152,16 +151,14 @@ def _back(company_id: str, note: str = "") -> RedirectResponse:
 @router.post("/companies/new")
 def panel_create(siteline_platform: str | None = Cookie(None), name: str = Form(...), time_zone: str = Form(...),
                  template: str = Form(...), owner_name: str = Form(...), owner_identifier: str = Form(...),
-                 pm_company_id: str = Form(""), pm_kind: str = Form("mock"), pm_base_url: str = Form(""),
-                 pm_api_key: str = Form(""), pm_webhook_secret: str = Form("")):
+                 pm_company_id: str = Form(""), pm_kind: str = Form("mock"), pm_webhook_url: str = Form("")):
     admin = _require(siteline_platform)
     try:
         body = CompanyCreate(name=name, timeZone=time_zone, template=template, ownerName=owner_name,
                              ownerIdentifier=owner_identifier, pmKind=pm_kind)
         c = companies.create(name=body.name, time_zone=body.timeZone, template=body.template, owner_name=body.ownerName,
                              owner_identifier=body.ownerIdentifier, actor=admin, pm_kind=pm_kind,
-                             pm_company_id=pm_company_id or None, pm_base_url=pm_base_url or None,
-                             pm_api_key=pm_api_key or None, pm_webhook_secret=pm_webhook_secret or None)
+                             pm_company_id=pm_company_id or None, webhook_url=pm_webhook_url or None)
     except (ApiError, ValueError) as e:
         msg = getattr(e, "details", {}).get("fields") or str(e)
         return RedirectResponse(f"/platform?error={html.escape(str(msg))[:200].replace(' ', '+')}", status_code=303)
@@ -174,7 +171,7 @@ def company_page(company_id: str, siteline_platform: str | None = Cookie(None), 
     c = db.row("SELECT * FROM companies WHERE id = %(c)s", c=company_id)
     if not c:
         return RedirectResponse("/platform?error=No+such+company", status_code=303)
-    link = db.row("SELECT * FROM pm_links WHERE company_id = %(c)s", c=company_id) or {}
+    link = db.row("SELECT * FROM integrations WHERE company_id = %(c)s", c=company_id) or {}
     members = db.rows("""SELECT u.id, u.name, u.email, u.phone, m.role, m.status FROM memberships m JOIN users u ON u.id = m.user_id
                          WHERE m.company_id = %(c)s ORDER BY m.role, u.name""", c=company_id)
     invites = db.rows("""SELECT identifier, name, role, expires_at FROM invites WHERE company_id = %(c)s AND status = 'pending'
@@ -197,18 +194,17 @@ PM company {_e(c['pmCompanyId'])}</p><p>{_e(note)}</p>
 <input name="name" required> email or phone <input name="identifier" required></label><button class="quiet">Send owner invite</button></form>
 <form method="post" action="/platform/companies/{_e(company_id)}/transfer"><label>Transfer ownership to
 <select name="user_id">{options}</select></label><button class="quiet">Transfer</button></form>
-<h2>PM link</h2><p class="muted">Last sync {_e(link.get('lastSyncAt'))} <span class="err">{_e(link.get('lastError'))}</span>
-· Not on Siteline yet: {_e(', '.join((link.get('options') or {}).get('unmatched', [])))}</p>
+<h2>PM link</h2><p class="muted">Last API call {_e(link.get('lastCallAt'))} <span class="err">{_e(link.get('lastError'))}</span>
+· Not on Siteline yet: {_e(', '.join(sorted({r for refs in ((link.get('options') or {}).get('unmatchedByProject') or {}).values() for r in refs})))}</p>
 <form method="post" action="/platform/companies/{_e(company_id)}/pm-link">
 <label>Kind <select name="kind"><option value="mock" {'selected' if link.get('kind') == 'mock' else ''}>Mock PM app</option>
 <option value="http" {'selected' if link.get('kind') == 'http' else ''}>PM app API</option></select></label>
 <label>PM company id <input name="pm_company_id" value="{_e(c['pmCompanyId'])}"></label>
-<label>API address <input name="base_url" value="{_e(link.get('baseUrl'))}"></label>
-<label>API key (leave empty to keep) <input name="api_key" type="password"></label>
-<label>Webhook secret (leave empty to keep) <input name="webhook_secret" type="password"></label>
-<p class="muted">Webhooks go to {_e(config.PUBLIC_URL)}/webhooks/pm/{_e(company_id)}</p>
-<button>Save and sync</button></form>
-<form method="post" action="/platform/companies/{_e(company_id)}/sync"><button class="quiet">Sync now</button></form>
+<label>Webhook URL (answers go here) <input name="webhook_url" value="{_e(link.get('webhookUrl'))}"></label>
+<p class="muted">The PM app calls {_e(config.PUBLIC_URL)}/api/v1 with this company's API key (docs/CARDS_API.md).
+{'A key is set.' if link.get('apiKeyHash') else 'No key yet.'}</p>
+<button>Save</button></form>
+<form method="post" action="/platform/companies/{_e(company_id)}/pm-key"><button class="quiet">Make a new API key and webhook secret</button></form>
 <h2>Setup</h2><form method="post" action="/platform/companies/{_e(company_id)}/setup">
 <textarea name="setup" rows="18" style="width:100%;font-family:monospace">{_e(json.dumps(c['setup'], indent=2, ensure_ascii=False))}</textarea>
 <button>Save setup</button></form>{mock_section}""")
@@ -221,7 +217,7 @@ def _mock_section(company_id: str) -> str:
     try:
         projects = db.rows("SELECT * FROM pm_mock_projects ORDER BY name")
         tasks = db.rows("SELECT * FROM pm_mock_tasks WHERE deleted_at IS NULL ORDER BY project_id, planned_start, name")
-        down = bool(db.value("SELECT (options->>'down')::boolean FROM pm_links WHERE company_id = %(c)s", c=company_id))
+        down = mock.is_down()
     finally:
         t.set_company(previous)
     names = {p["id"]: p["name"] for p in projects}
@@ -242,9 +238,10 @@ def _mock_section(company_id: str) -> str:
 <form class="inline" method="post" action="/platform/companies/{_e(company_id)}/mock/projects/{_e(p['id'])}">
 <input type="hidden" name="status" value="{'closed' if p['status'] == 'active' else 'active'}">
 <button class="quiet">{'Close' if p['status'] == 'active' else 'Reopen'}</button></form></li>""" for p in projects)
-    return f"""<h2>Mock PM app</h2><p class="muted">Stands in for this company's PM app. Changes here reach Siteline as webhooks.</p>
+    return f"""<h2>Mock PM app</h2><p class="muted">Stands in for this company's PM app. Changes here reach Siteline through the Cards API.</p>
 <form method="post" action="/platform/companies/{_e(company_id)}/mock/down"><input type="hidden" name="down" value="{'0' if down else '1'}">
 <button class="quiet">{'Bring the mock PM app back' if down else 'Make the mock PM app stop answering'}</button></form>
+<form method="post" action="/platform/companies/{_e(company_id)}/mock/publish"><button class="quiet">Send projects and members to Siteline</button></form>
 <ul>{project_rows}</ul>
 <table><tr><th>Project</th><th>Task</th><th>Start</th><th>Finish</th><th>Owner (email/phone)</th><th>Status</th><th>%</th><th></th><th></th></tr>
 {rows}<tr><form method="post" action="/platform/companies/{_e(company_id)}/mock/tasks"><input type="hidden" name="id" value="">
@@ -283,19 +280,24 @@ def save_setup(company_id: str, setup: str = Form(...), siteline_platform: str |
 
 
 @router.post("/companies/{company_id}/pm-link")
-def save_pm_link(company_id: str, kind: str = Form(...), base_url: str = Form(""), api_key: str = Form(""),
-                 webhook_secret: str = Form(""), pm_company_id: str = Form(""), siteline_platform: str | None = Cookie(None)):
-    companies.update_pm_link(company_id, kind=kind, base_url=base_url or None, api_key=api_key or None,
-                             webhook_secret=webhook_secret or None, pm_company_id=pm_company_id or None,
+def save_pm_link(company_id: str, kind: str = Form(...), webhook_url: str = Form(""), pm_company_id: str = Form(""),
+                 siteline_platform: str | None = Cookie(None)):
+    companies.update_pm_link(company_id, kind=kind, webhook_url=webhook_url or None, pm_company_id=pm_company_id or None,
                              actor=_require(siteline_platform))
-    return _back(company_id, "PM link saved; a sync is queued.")
+    return _back(company_id, "PM link saved.")
 
 
-@router.post("/companies/{company_id}/sync")
-def sync_now(company_id: str, siteline_platform: str | None = Cookie(None)):
-    _require(siteline_platform)
-    enqueue("pm_sync", {}, company_id=company_id)
-    return _back(company_id, "Sync queued.")
+@router.post("/companies/{company_id}/pm-key", response_class=HTMLResponse)
+def new_pm_key(company_id: str, siteline_platform: str | None = Cookie(None)):
+    """Shown once: the PM team copies them now. The old key keeps working for 24 hours."""
+    admin = _require(siteline_platform)
+    if not db.value("SELECT 1 FROM integrations WHERE company_id = %(c)s", c=company_id):
+        return _back(company_id, "Save a PM link first.")
+    creds = integrations.new_credentials(company_id)
+    accounts.audit(company_id, admin, "pm_key.created", company_id)
+    return _page("API key", f"""<h1>New API key</h1><p>Copy both now; they aren't shown again. The previous key works
+for 24 more hours.</p><p>API key <code>{_e(creds['apiKey'])}</code></p><p>Webhook secret <code>{_e(creds['webhookSecret'])}</code></p>
+<p><a href="/platform/companies/{_e(company_id)}">Back</a></p>""")
 
 
 def _as_company(company_id: str):
@@ -339,6 +341,14 @@ def mock_down(company_id: str, down: str = Form(...), siteline_platform: str | N
     _as_company(company_id)
     mock.set_down(down == "1")
     return _back(company_id, "The mock PM app is down." if down == "1" else "The mock PM app is answering again.")
+
+
+@router.post("/companies/{company_id}/mock/publish")
+def mock_publish(company_id: str, siteline_platform: str | None = Cookie(None)):
+    _require(siteline_platform)
+    _as_company(company_id)
+    mock_bot.publish_projects()
+    return _back(company_id, "Projects sent to Siteline.")
 
 
 @router.get("/audit", response_class=HTMLResponse)

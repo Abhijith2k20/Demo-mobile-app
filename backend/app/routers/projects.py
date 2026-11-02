@@ -1,5 +1,5 @@
-"""Project spaces (spec §5.6, §5.13): their members, recent updates, files, and the PM app's tasks (read-only).
-Projects linked to the PM app get their name, archive state and members from it (pm/sync.py); here a
+"""Project spaces (spec §5.6, §5.13): their members, recent updates, files, and tasks named in its recent cards.
+Projects from the PM app get their name, archive state and members from it (PUT /api/v1/projects); here a
 Manager only changes who is in which channel and adds or removes guests."""
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ from ..rules import can, company_permissions, is_company_admin, is_guest, job_ti
 from ..schemas import MemberAdd, MemberPatch, ProjectCreate, ProjectPatch
 from ..access import can_see_channel, assert_project_active, can_see_project, project_audience, visible_project
 from ..store import BOT_ID, MESSAGE_COLUMNS, first_name, person, project_channel, project_channels, project_member, project_role, setup
-from ..pm import connector as pm
+from ..services import cards
 from ..services import projects as spaces
-from ..views import message_view, pm_task_view, project_view, with_links
+from ..views import message_view, project_view, with_links
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["projects"])
@@ -50,7 +50,7 @@ def create_project(body: ProjectCreate, user: dict = Depends(current_user)):
         raise forbidden("Only the owner or an admin can create projects.")
     if existing := db.row("SELECT * FROM projects WHERE id = %(id)s", id=body.id):
         return project_view(existing, user)  # a retry (Owner/Admin see every project anyway)
-    if pm.link():
+    if db.value("SELECT 1 FROM integrations WHERE company_id = current_company()"):
         raise ApiError("PROJECT_LINKED", "Projects come from the PM app. Create it there.")
     return project_view(spaces.create_space(id=body.id, name=body.name, client=body.client, address=body.address), user)
 
@@ -163,21 +163,17 @@ def remove_member(project_id: str, user_id: str, user: dict = Depends(current_us
 
 @router.get("/projects/{project_id}/tasks")
 def project_tasks(project_id: str, user: dict = Depends(current_user)):
-    """The project's open tasks as the PM app has them, read-only (for "Related task" in Report issue)."""
+    """Tasks the PM app asked about in this project lately (for "Related task" in Report issue)."""
     project = visible_project(user, project_id)
-    if not project["pmProjectId"]:
-        return {"tasks": []}
-    tasks = db.rows("""SELECT pm_task_id FROM pm_tasks WHERE pm_project_id = %(p)s AND removed_at IS NULL
-                       AND status <> 'done' ORDER BY planned_start, name""", p=project["pmProjectId"])
-    return {"tasks": [pm_task_view(pm.saved_task(t["pmTaskId"])) for t in tasks]}
+    return {"tasks": cards.recent_tasks(project["id"])}
 
 
 @router.get("/projects/{project_id}/updates")
 def project_updates(project_id: str, user: dict = Depends(current_user)):
-    """The last few status cards (check-in results, escalations) across the project's channels."""
+    """The last few cards the PM app posted (status updates, escalations) across the project's channels."""
     project = visible_project(user, project_id)
     channels = {c["id"]: c for c in project_channels(project["id"])}
-    cards = db.rows(f"""SELECT {MESSAGE_COLUMNS} FROM messages m WHERE channel_id = ANY(%(ids)s) AND type = 'status_card'
+    cards = db.rows(f"""SELECT {MESSAGE_COLUMNS} FROM messages m WHERE channel_id = ANY(%(ids)s) AND type = 'card'
                         AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 5""", ids=list(channels))
     return {"messages": [message_view(m, user, channels[m["channelId"]]) for m in cards]}
 

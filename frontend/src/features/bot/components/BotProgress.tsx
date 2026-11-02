@@ -1,16 +1,16 @@
-// Slim bar under the bot's header: how many check-ins are still waiting.
+// Slim bar under the bot's header: how many cards are still waiting for an answer.
 import { Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { T } from '@/components/T';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import { useCheckinQueue } from '../queue';
+import { useCardQueue } from '../queue';
 
 export function BotProgress() {
   const { c } = useTheme();
   const { t } = useTranslation();
-  const q = useCheckinQueue();
+  const q = useCardQueue();
   if (!q || q.total === 0) return null;
   const left = q.pending.length;
   const done = left === 0;
@@ -22,8 +22,8 @@ export function BotProgress() {
           {done
             ? t('bot.allDone', 'All caught up. Thanks!')
             : left === 1
-              ? t('bot.oneLeft', '1 task needs an update')
-              : t('bot.left', '{{count}} tasks need an update', { count: left })}
+              ? t('bot.oneLeft', '1 card needs an answer')
+              : t('bot.left', '{{count}} cards need an answer', { count: left })}
         </T>
         <T variant="meta" color="textMuted">
           {t('bot.progress', '{{done}} of {{total}} done', { done: q.answered, total: q.total })}

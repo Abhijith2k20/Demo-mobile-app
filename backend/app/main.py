@@ -18,7 +18,7 @@ from .core import ApiError, ERROR_STATUS, uuid7
 from .deps import user_for_token
 from .events import cancel_all, hub, listen
 from .logs import request_id, setup_logging
-from .routers import auth, channels, internal, me, messages, people, platform, projects, uploads, webhooks
+from .routers import auth, cards, channels, integration_api, internal, me, messages, people, platform, projects, uploads
 
 log = logging.getLogger("siteline")
 
@@ -127,7 +127,7 @@ async def simulate_network(request: Request, call_next):
     if not config.DEV_TOOLS:
         return await call_next(request)
     path = request.url.path
-    is_write = request.method != "GET" and not path.startswith(("/auth", "/internal", "/platform", "/webhooks")) \
+    is_write = request.method != "GET" and not path.startswith(("/auth", "/internal", "/platform", "/api/v1")) \
         and not path.endswith("/read")
     await netsim.delay(path.startswith("/uploads"))
     if not is_write:
@@ -152,7 +152,7 @@ async def simulate_network(request: Request, call_next):
     return response
 
 
-for r in (auth, me, people, projects, channels, messages, uploads, webhooks, platform):
+for r in (auth, me, people, projects, channels, messages, cards, uploads, integration_api, platform):
     app.include_router(r.router)
 if config.DEV_TOOLS:
     app.include_router(internal.router)

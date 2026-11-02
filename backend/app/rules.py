@@ -1,8 +1,6 @@
 """Business rules. The server is the only place they live: the app just shows the results."""
 from __future__ import annotations
 
-from datetime import date
-
 # ---- Permissions (spec §9) ----
 
 PROJECT_PERMISSIONS: dict[str, list[str]] = {
@@ -19,7 +17,6 @@ ALL_PROJECT_ACTIONS = sorted({a for acts in PROJECT_PERMISSIONS.values() for a i
 
 EDIT_WINDOW_MS = 15 * 60 * 1000
 DELETE_WINDOW_MS = 60 * 60 * 1000
-PERCENT_STEPS = [25, 50, 75, 90, 100]  # the check-in scale
 HOME_CHANNEL = "general"
 ROLES_IN_EVERY_CHANNEL = ["manager"]  # §9.3: managers are in every channel of their project
 
@@ -135,38 +132,3 @@ def channel_rank(setup: dict, channel: dict) -> tuple:
     """The company's standard project channels first, in setup order, then the rest by name."""
     names = [c["name"] for c in setup["projectChannels"]]
     return (names.index(channel["name"]) if channel["name"] in names else len(names), channel["name"])
-
-
-# ---- Dates ----
-
-def today_iso() -> str:
-    return date.today().isoformat()
-
-
-# ---- PM tasks and check-ins (spec §8) ----
-# Tasks belong to the PM app; these rules only decide what the bot asks and what an answer means.
-
-OPEN_TASK_STATUSES = ("not_started", "in_progress", "blocked")
-
-
-def task_is_overdue(task: dict, today: str | None = None) -> bool:
-    return task["status"] in OPEN_TASK_STATUSES and task["plannedFinish"] < (today or today_iso())
-
-
-def task_needs_update(task: dict, today: str | None = None) -> bool:
-    """Active (started, not past its finish) or overdue, and not done: the bot asks about these."""
-    today = today or today_iso()
-    return task["status"] in OPEN_TASK_STATUSES and task["plannedStart"] <= today
-
-
-def pm_change_for(answer: dict) -> dict | None:
-    """What a check-in answer tells the PM app. "Not started" tells it nothing."""
-    kind = answer["kind"]
-    if kind == "progress":
-        percent = answer.get("percent")
-        return {"status": "done"} if percent == 100 else {"status": "in_progress", "percent": percent}
-    return {
-        "started": {"status": "in_progress"},
-        "problem": {"status": "blocked", "problem": answer.get("reason")},
-        "done": {"status": "done"},
-    }.get(kind)

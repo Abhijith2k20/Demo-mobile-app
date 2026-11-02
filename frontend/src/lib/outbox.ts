@@ -1,5 +1,5 @@
-// Send queue for the things people do in the field with bad signal: messages (with photos) and check-in
-// answers. Each change is saved on the phone first and sent in the background,
+// Send queue for the things people do in the field with bad signal: messages (with photos) and answers to
+// cards. Each change is saved on the phone first and sent in the background,
 // oldest first, until the server accepts or refuses it. The server still decides everything:
 // the app only shows "sending" until it answers. Everything else in the app is online-only.
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,7 +12,7 @@ import { keys, refresh } from '@/lib/queries';
 import { dropPhoto, keepPhoto, photoExists } from '@/lib/queuedFiles';
 import { useSession } from '@/stores/session';
 import { toast } from '@/stores/ui';
-import type { Attachment, CheckinAnswer, ID, MessageType } from '@/types/models';
+import type { Attachment, CardAnswer, ID, MessageType } from '@/types/models';
 
 export interface QueuedPhoto {
   attachmentId: ID;
@@ -57,7 +57,15 @@ export type OutboxItem = Base &
         photos: QueuedPhoto[];
         file?: QueuedFile;
       }
-    | { kind: 'checkin'; checkinId: ID; taskId: ID; taskName: string; answer: CheckinAnswer }
+    | {
+        kind: 'card';
+        cardId: ID;
+        title: string;
+        /** The answer without its files; upload ids are added as they upload. */
+        answer: CardAnswer;
+        photos: QueuedPhoto[];
+        voice?: QueuedFile;
+      }
   );
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -102,8 +110,8 @@ export async function loadOutbox(userId: ID, companyId: ID): Promise<void> {
   } catch (e) {
     console.warn('[outbox] could not load', e);
   }
-  // Task updates were queued by older versions of the app; tasks now belong to the PM app.
-  items = items.filter((i) => i.kind === 'message' || i.kind === 'checkin');
+  // Older versions queued task updates and check-in answers; their routes are gone, so they can't be sent.
+  items = items.filter((i) => i.kind === 'message' || i.kind === 'card');
   useOutbox.getState().set(items.map((i) => (i.state === 'sending' ? { ...i, state: 'waiting' } : i)));
   void runOutbox();
 }
@@ -123,6 +131,10 @@ export function enqueue(input: NewItem): ID {
   if (rest.kind === 'message') {
     rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
     if (rest.file) rest.file = { ...rest.file, uri: keepPhoto(rest.file.uri, `${id ?? uuidv7()}-file`) };
+  }
+  if (rest.kind === 'card') {
+    rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
+    if (rest.voice) rest.voice = { ...rest.voice, uri: keepPhoto(rest.voice.uri, `${rest.cardId}-voice`) };
   }
   const item = { ...rest, id: id ?? uuidv7(), userId, createdAt: new Date().toISOString(), state: 'waiting', attempts: 0, nextAt: 0, error: null } as OutboxItem;
   save([...items, item]);
@@ -145,9 +157,10 @@ export function retryItem(id: ID): void {
 
 export function discardItem(id: ID): void {
   const item = useOutbox.getState().items.find((i) => i.id === id);
-  if (item?.kind === 'message') {
+  if (item?.kind === 'message' || item?.kind === 'card') {
     item.photos.forEach((p) => dropPhoto(p.uri));
-    if (item.file) dropPhoto(item.file.uri);
+    const file = item.kind === 'message' ? item.file : item.voice;
+    if (file) dropPhoto(file.uri);
   }
   save(useOutbox.getState().items.filter((i) => i.id !== id));
 }
@@ -163,24 +176,33 @@ export function sendNow(): void {
 /** A queued photo is gone from the phone: the message can't be sent as written. */
 class MissingPhoto extends Error {}
 
+/** Uploads the item's photos not uploaded yet; each upload is remembered even if the item itself fails next. */
+async function uploadPhotos(item: OutboxItem & { photos: QueuedPhoto[] }): Promise<QueuedPhoto[]> {
+  const photos = [...item.photos];
+  for (let n = 0; n < photos.length; n++) {
+    if (photos[n].uploadId) continue;
+    if (!photoExists(photos[n].uri)) throw new MissingPhoto();
+    const res = await api<{ uploadId: ID; url: string }>('POST', '/uploads', undefined, photoForm(photos[n].uri));
+    photos[n] = { ...photos[n], uploadId: res.uploadId, url: res.url };
+    update(item.id, { photos });
+  }
+  return photos;
+}
+
+async function uploadFile(id: ID, file: QueuedFile | undefined, field: 'file' | 'voice'): Promise<QueuedFile | undefined> {
+  if (!file || file.uploadId) return file;
+  if (!photoExists(file.uri)) throw new MissingPhoto();
+  const res = await api<{ uploadId: ID }>('POST', '/uploads', undefined, uploadForm(file.uri, file.kind, file.name, file.mime));
+  const done = { ...file, uploadId: res.uploadId };
+  update(id, { [field]: done });
+  return done;
+}
+
 async function send(item: OutboxItem): Promise<void> {
   switch (item.kind) {
     case 'message': {
-      const photos = [...item.photos];
-      for (let n = 0; n < photos.length; n++) {
-        if (photos[n].uploadId) continue;
-        if (!photoExists(photos[n].uri)) throw new MissingPhoto();
-        const res = await api<{ uploadId: ID; url: string }>('POST', '/uploads', undefined, photoForm(photos[n].uri));
-        photos[n] = { ...photos[n], uploadId: res.uploadId, url: res.url };
-        update(item.id, { photos }); // remembered even if the message itself fails next
-      }
-      let file = item.file;
-      if (file && !file.uploadId) {
-        if (!photoExists(file.uri)) throw new MissingPhoto();
-        const res = await api<{ uploadId: ID }>('POST', '/uploads', undefined, uploadForm(file.uri, file.kind, file.name, file.mime));
-        file = { ...file, uploadId: res.uploadId };
-        update(item.id, { file });
-      }
+      const photos = await uploadPhotos(item);
+      const file = await uploadFile(item.id, item.file, 'file');
       const attachments: Attachment[] = photos.map((p) => ({ id: p.attachmentId, kind: 'image', uri: p.url ?? null, uploadId: p.uploadId ?? null }));
       let data = attachments.length ? { ...(item.data ?? {}), attachments } : item.data;
       if (file?.uploadId) data = { ...(data ?? {}), uploadId: file.uploadId, name: file.name };
@@ -193,9 +215,17 @@ async function send(item: OutboxItem): Promise<void> {
       });
       return void refresh(keys.messages(item.channelId), keys.channels, keys.channel(item.channelId), ...(item.threadParentId ? [keys.thread(item.threadParentId)] : []));
     }
-    case 'checkin':
-      await api('POST', `/checkins/${item.checkinId}/answer`, item.answer);
-      return void refresh(keys.checkins, ['tasks']);
+    case 'card': {
+      const photos = await uploadPhotos(item);
+      const voice = await uploadFile(item.id, item.voice, 'voice');
+      await api('POST', `/cards/${item.cardId}/answer`, {
+        ...item.answer,
+        answeredAt: item.createdAt,
+        photoUploadIds: photos.map((p) => p.uploadId),
+        voiceUploadId: voice?.uploadId,
+      });
+      return void refresh(keys.cards, ['tasks']);
+    }
   }
 }
 

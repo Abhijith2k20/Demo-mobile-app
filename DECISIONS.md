@@ -111,7 +111,7 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
 - Company renamed to **Paliath Interiors**; projects renamed to **Villa 99** (was Sharma Residence),
   **RV University** (was Mehta Villa) and **OITH** (was Café Brew Fit-out). Clients and addresses
   are placeholders.
-- **Opening the Siteline Bot conversation asks about every open task the user owns**
+- *(Replaced by the Cards API, 2026-11-02: the PM app decides what to ask.)* **Opening the Siteline Bot conversation asks about every open task the user owns**
   (`POST /bot/checkins`, a demo endpoint). Tasks asked about in the last 12 hours are skipped, and
   these cards carry no reminder/escalation timer. The owner and the admin were given tasks of their
   own in the seed so this works for every sign-in.
@@ -564,9 +564,9 @@ the accounts listed in the README. Where it differs from the spec:
   hour so the image cache works); for R2 the file route redirects to a 5-minute R2 link. The company is part of
   the signed link. Uploads are checked by their first bytes, not the name.
 - **The mock PM app** lives in `pm_mock_*` tables per company and is edited on the platform panel; its edits
-  run the same code as real webhooks (`pm/sync.apply_event`). `pm/http.py` is the client for the real API.
+  run the same code as real webhooks. *(Since the Cards API: it calls the Cards API functions; see below.)*
 - **Notifications**: three levels (all, important, off) and quiet hours on/off (21:00–07:00), saved on the
-  server; check-in pushes wait for quiet hours to end.
+  server; card pushes wait for quiet hours to end.
 - **Expo Go** still opens the app for quick checks: the push module is loaded only in real builds.
 - **Not verified on a real device**: push (needs an EAS project id and a development build), real voice
   recording and file picking (checked by type and lint, the emulator flow covered sign-in and check-ins),
@@ -595,7 +595,7 @@ Business API: the business system decides, WhatsApp delivers.
   queue). Changing how cards look still needs a Siteline release.
 - Spec 2.0's bot (planner, PM sync, re-check, PM writes, saved copy of tasks, check-in times in the setup)
   becomes the **mock PM app** (`mockpm/`), which uses the Cards API like the real PM app will, then the old code
-  is removed. Plan: `docs/PLAN_CARDS_API.md`. Not built yet.
+  is removed. Plan: `docs/PLAN_CARDS_API.md`. Built 2026-11-02 (see below).
 - "Related task" in Report issue lists the tasks named in the project's cards from the last 30 days, since
   Siteline no longer has the PM app's task list.
 
@@ -609,3 +609,21 @@ The owner removed Kannada and Hindi for now.
   translation file, a picker, and (for job titles and problem types) labels in the setup again.
 - The Cards API takes plain strings (no per-language text).
 
+
+## The Cards API, as built (2026-11-02)
+
+- **Webhooks are jobs**, not a separate `webhook_deliveries` table: kind `webhook` in the jobs table, retried
+  1, 5 and 15 minutes then hourly for 24 hours, queued in the same transaction as the answer. The card's
+  `delivery` (pending, delivered, refused, failed) is what the person sees.
+- **The mock PM app runs in the same process**: its "webhook endpoint" is a function (`mockpm.receive`), reached
+  through the same delivery job as a real PM app. Its timers are jobs too (`mock_plan_day`, `mock_checkins`,
+  `mock_remind`, `mock_escalate`, `mock_summary`). Making it "stop answering" makes deliveries retry.
+- **Rate limit is per API process** (120 calls a minute per company, counted in memory). With more than one API
+  process it must move to Postgres.
+- **Channel cards push only when the PM app gives `notify.push`**; without it the Managers get an Activity item
+  only (status updates would otherwise push on every answer). The mock pushes for problems and escalations.
+- **Check-in cards ask once per task per day** (card id `checkin-<task>-<date>`). Opening the bot conversation
+  no longer asks about every open task (`POST /bot/checkins` is gone): what to ask and when is the PM app's call.
+- **Answers carry their files**: voice notes (now recorded for real) and photos upload through the send queue
+  first; the webhook gives the PM app 7-day links and the upload ids.
+- **Old queued check-in answers are dropped** when the app loads its send queue: their route is gone.

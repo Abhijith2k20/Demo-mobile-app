@@ -42,19 +42,16 @@ def run_due(limit: int = 20) -> int:
 
 
 def ensure_schedules() -> None:
-    """Every active company has its daily plan and nightly sync queued, and cleanup runs hourly."""
+    """Companies on the mock PM app have its daily plan queued, and cleanup runs hourly."""
     with db.transaction():
         companies = [r["id"] for r in db.rows("SELECT id FROM companies WHERE status = 'active'")]
         queue.enqueue("cleanup", {}, company_id=None, dedupe_key=f"cleanup:{time.strftime('%Y-%m-%dT%H', time.gmtime())}")
     for cid in companies:
         with db.transaction(cid):
-            pending = db.value("""SELECT count(*) FROM jobs WHERE company_id = %(c)s AND kind = 'plan_day'
-                                  AND status IN ('pending', 'running')""", c=cid)
-            if not pending:
-                queue.enqueue("plan_day", {}, company_id=cid)
-            if not db.value("""SELECT count(*) FROM jobs WHERE company_id = %(c)s AND kind = 'pm_sync'
-                               AND status IN ('pending', 'running')""", c=cid):
-                queue.enqueue("pm_sync", {}, company_id=cid)
+            mock = db.value("SELECT 1 FROM integrations WHERE kind = 'mock'")
+            if mock and not db.value("""SELECT count(*) FROM jobs WHERE company_id = %(c)s AND kind = 'mock_plan_day'
+                                        AND status IN ('pending', 'running')""", c=cid):
+                queue.enqueue("mock_plan_day", {}, company_id=cid)
 
 
 def loop(stop: threading.Event | None = None) -> None:

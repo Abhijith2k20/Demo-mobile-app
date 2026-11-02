@@ -5,7 +5,7 @@ from .. import db
 from ..core import now_iso, uuid7
 from ..events import publish
 from ..access import channel_audience, project_audience
-from ..rules import ROLES_IN_EVERY_CHANNEL, default_channel_names, is_company_admin
+from ..rules import ROLES_IN_EVERY_CHANNEL, default_channel_names, is_company_admin, job_title_error, joins_projects
 from ..store import admins, add_channel_member, person, project, project_channels, setup
 
 
@@ -72,3 +72,61 @@ def remove_member(project_id: str, user_id: str) -> None:
     db.delete("project_members", {"projectId": project_id, "userId": user_id})
     set_member_channels(project_id, user_id, [])  # access ends; their messages stay
     publish({"type": "project.updated", "project": project(project_id)}, [user_id])
+
+
+# ---- Projects the PM app sends (PUT /api/v1/projects/{ref}) ----
+
+def _job_title(role: str, role_name: str | None) -> str:
+    """The PM role name when it's one of the company's job titles (and allowed for the role), else the default."""
+    st = setup()
+    if role_name and not job_title_error(st, role, role_name):
+        return role_name
+    if role == "manager":
+        return next((jt["name"] for jt in st["jobTitles"] if jt.get("managersOnly")), st["defaultJobTitle"])
+    return st["defaultJobTitle"]
+
+
+def apply_pm_project(ref: str, p: dict) -> tuple[dict | None, list[str]]:
+    """Creates or updates the project space for a PM project (renamed, archived when closed) and makes its PM
+    members exactly `p["members"]`; guests and manual members added in Siteline stay. Returns the space and
+    the refs the PM app named who aren't in this company on Siteline."""
+    from .cards import person_for_ref
+    from ..core import ApiError
+
+    space = db.row("SELECT * FROM projects WHERE pm_project_id = %(p)s", p=ref)
+    closed = p.get("status") == "closed"
+    if not space:
+        if closed:
+            return None, []
+        space = create_space(name=p["name"], client=p.get("client") or "", address=p.get("address") or "",
+                             pm_project_id=ref, pm_url=p.get("url"))
+    else:
+        changes = {k: v for k, v in (("name", p["name"]), ("client", p.get("client") or ""),
+                                     ("address", p.get("address") or ""), ("pmUrl", p.get("url"))) if space.get(k) != v}
+        if closed != bool(space["archivedAt"]):
+            changes["archivedAt"] = now_iso() if closed else None
+        if changes:
+            db.update("projects", {"id": space["id"]}, changes)
+            space = project_updated(space)
+    if p.get("members") is None:  # closing a project keeps its members
+        return space, []
+    unmatched: list[str] = []
+    wanted: dict[str, dict] = {}
+    for m in p["members"]:
+        try:
+            uid = person_for_ref(m["ref"])["id"]
+        except ApiError:
+            unmatched.append(m["ref"])
+            continue
+        if joins_projects(person(uid)):
+            wanted[uid] = m
+    for row in db.rows("SELECT user_id FROM project_members WHERE project_id = %(p)s AND source = 'pm'", p=space["id"]):
+        if row["userId"] not in wanted:
+            remove_member(space["id"], row["userId"])
+    for uid, m in wanted.items():
+        current = db.row("SELECT * FROM project_members WHERE project_id = %(p)s AND user_id = %(u)s", p=space["id"], u=uid)
+        title = _job_title(m["role"], m.get("roleName"))
+        if not current or current["source"] == "pm" and (current["role"], current["jobTitle"]) != (m["role"], title):
+            save_member(space["id"], uid, m["role"], title, "pm")
+    return space, sorted(set(unmatched))
+

@@ -4,7 +4,7 @@ A work chat for field teams, with a bot that asks task owners for status, for ma
 Spec: `SITELINE_SPEC.md` (2.0, the MVP). Changes from it: `DECISIONS.md`. Project rules: `CLAUDE.md`.
 
 - **App** (`frontend/`): Expo SDK 57, built with EAS (development, preview, production). A thin client:
-  it shows what the server says. Messages, photos, voice notes, files and check-in answers wait in a send
+  it shows what the server says. Messages, photos, voice notes, files and card answers wait in a send
   queue when offline; the last loaded screens are kept on the phone, per person and company.
 - **Backend** (`backend/`): FastAPI on Postgres with row-level security per company, a worker for the
   bot's timed jobs, and a mock PM app that stands in for each company's PM app until its API exists.

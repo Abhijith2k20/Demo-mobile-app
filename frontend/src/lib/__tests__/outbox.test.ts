@@ -147,3 +147,15 @@ it('a photo that disappeared from the phone fails its message instead of blockin
   expect(items()).toEqual([expect.objectContaining({ id, state: 'failed', error: 'DEPENDENCY_FAILED' })]);
   expect(api).toHaveBeenCalledWith('POST', '/channels/ch1/messages', expect.objectContaining({ body: 'next' }));
 });
+
+it('a card answer uploads its photo once, then sends the answer with the upload id', async () => {
+  api.mockResolvedValueOnce({ uploadId: 'up1', url: 'https://x' }).mockRejectedValueOnce(offline()).mockResolvedValue({});
+  enqueue({ kind: 'card', cardId: 'card1', title: 'Ceiling', answer: { scale: '75' }, photos: [{ attachmentId: 'a1', uri: 'file://p.jpg' }] });
+  await flush();
+  jest.advanceTimersByTime(2000);
+  await flush();
+  const paths = api.mock.calls.map((c) => c[1]);
+  expect(paths).toEqual(['/uploads', '/cards/card1/answer', '/cards/card1/answer']); // the retry doesn't upload again
+  expect(api.mock.calls[2][2]).toEqual(expect.objectContaining({ scale: '75', photoUploadIds: ['up1'] }));
+  expect(items()).toHaveLength(0);
+});

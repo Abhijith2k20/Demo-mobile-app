@@ -1,4 +1,4 @@
-"""Activity items (mentions, thread replies, check-in results, escalations) and push notifications."""
+"""Activity items (mentions, thread replies, notices from the PM app) and push notifications."""
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta
@@ -12,8 +12,8 @@ from .store import BOT_ID
 
 # Which pushes each notification level sends (You → Notifications, spec §5.9).
 LEVELS = {
-    "all": {"dm", "mention", "thread", "checkin", "escalation", "issue"},
-    "important": {"dm", "mention", "checkin", "escalation", "issue"},
+    "all": {"dm", "mention", "thread", "card", "notice", "issue"},
+    "important": {"dm", "mention", "card", "notice", "issue"},
     "off": set(),
 }
 
@@ -30,7 +30,7 @@ def add_activity(**a) -> None:
 
 
 def _quiet_until(prefs: dict, tz: ZoneInfo) -> datetime | None:
-    """End of the person's quiet hours if it's quiet now (check-ins wait for it; §5.9)."""
+    """End of the person's quiet hours if it's quiet now (cards wait for it; §5.9)."""
     start, end = prefs.get("quietFrom"), prefs.get("quietTo")
     if not start or not end:
         return None
@@ -45,7 +45,7 @@ def _quiet_until(prefs: dict, tz: ZoneInfo) -> datetime | None:
 
 
 def push(user_ids: list[str], title: str, body: str, data: dict, *, kind: str) -> None:
-    """Queues a push to each person who wants this kind; check-ins wait until their quiet hours end."""
+    """Queues a push to each person who wants this kind; cards wait until their quiet hours end."""
     ids = [u for u in dict.fromkeys(user_ids) if u != BOT_ID]
     if not ids:
         return
@@ -54,5 +54,5 @@ def push(user_ids: list[str], title: str, body: str, data: dict, *, kind: str) -
         prefs = r["notify"] or {}
         if kind not in LEVELS.get(prefs.get("level", "all"), LEVELS["all"]):
             continue
-        run_at = _quiet_until(prefs, tz) if kind == "checkin" else None
+        run_at = _quiet_until(prefs, tz) if kind == "card" else None
         enqueue("send_push", {"userId": r["id"], "title": title, "body": body[:180], "data": data}, run_at=run_at)

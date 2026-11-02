@@ -21,7 +21,7 @@ export function IssueSheet({ visible, onClose: onCloseProp, projectId, channelId
   const { t } = useTranslation();
   const { c } = useTheme();
   const problems = useProblemTypes();
-  // The project's open tasks, from the PM app.
+  // Tasks the PM app asked about in this project lately.
   const tasks = useProjectTasks(projectId);
   const open = tasks.slice(0, 12);
   const [photos, setPhotos] = useState<string[]>([]);

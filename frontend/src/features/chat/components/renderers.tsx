@@ -10,10 +10,8 @@ import { PhotoGrid } from '@/components/PhotoGrid';
 import { T } from '@/components/T';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { Attachment, CheckinAnswer, ID, Message, MessageType } from '@/types/models';
-import { CheckinCard } from '../../bot/components/CheckinCard';
-import { VoiceChip } from '../../bot/components/NoteField';
-import { MorningSummary } from '../../bot/components/MorningSummary';
+import type { Attachment, ChannelCard, ID, Message, MessageType, Tone } from '@/types/models';
+import { CardView } from '../../bot/components/CardView';
 import { firstName, useProblemTypes } from '../../shared';
 import { useChat } from '../context';
 
@@ -52,8 +50,6 @@ function Edited({ message }: Props) {
 }
 
 function TextMessage({ message }: Props) {
-  const kind = message.data?.kind;
-  if (kind === 'morning_summary' || kind === 'no_open_tasks' || kind === 'checkin_intro') return <MorningSummary message={message} />;
   return (
     <View>
       <RichText text={message.body ?? ''} />
@@ -260,56 +256,25 @@ function DailyReportCard({ message }: Props) {
   );
 }
 
-export function answerSummary(
-  a: CheckinAnswer | undefined,
-  t: (k: string, d: string, o?: Record<string, unknown>) => string,
-  problemLabel: (key: string) => string,
-): string {
-  if (!a) return '';
-  if (a.kind === 'progress') return `${a.percent}%`;
-  if (a.kind === 'problem') return `${t('checkin.problem', 'Problem')}${a.reason ? ` · ${problemLabel(a.reason)}` : ''}`;
-  if (a.kind === 'done') return t('checkin.done', 'Done');
-  if (a.kind === 'not_started') return t('checkin.notStarted', 'Not started');
-  return t('checkin.started', 'Started');
-}
-
-function StatusCard({ message }: Props) {
+/** A card from the PM app: answerable in the person's bot conversation, or a status card in a project channel. */
+function CardMessage({ message }: Props) {
   const { c } = useTheme();
-  const { t } = useTranslation();
-  const problems = useProblemTypes();
-  const { users } = useChat();
-  const d = message.data ?? {};
-  const user = users.get(d.userId as ID);
-  const escalation = d.kind === 'escalation';
-  const answer = d.answer as CheckinAnswer | undefined;
-  const tone = escalation ? c.warning : c.accent;
+  if (message.data?.cardId) return <CardView message={message} />;
+  const card = (message.data?.content ?? { title: '' }) as ChannelCard;
+  const tone = ({ info: c.info, success: c.success, warning: c.warning, danger: c.danger } as Record<Tone, string>)[card.tone ?? 'info'];
+  const photos: Attachment[] = ((message.data?.photoUrls as string[] | undefined) ?? []).map((uri, i) => ({ id: `${message.id}-${i}`, kind: 'image', uri, uploadId: null }));
   return (
     <View style={{ maxWidth: 340, marginTop: 2 }}>
       <Card accent={tone}>
-        <CardTitle
-          icon={escalation ? 'bell' : 'activity'}
-          label={escalation ? t('status.noUpdate', 'No update yet') : t('status.update', 'Check-in update')}
-          color={tone}
-        />
-        {escalation ? (
-          <T variant="body">
-            {t('status.escalation', "{{name}} hasn't updated {{task}}.", { name: firstName(user?.name), task: String(d.taskName ?? '') })}
+        <T variant="bodyStrong">{card.title}</T>
+        {(card.lines ?? []).map((line, i) => (
+          <T key={i} variant="body" color="textMuted" style={{ marginTop: 4 }}>
+            {line}
           </T>
-        ) : (
-          <T variant="body">
-            <T variant="bodyStrong">{firstName(user?.name)}</T> · {String(d.taskName ?? '')} →{' '}
-            <T variant="bodyStrong">{answerSummary(d.answer as CheckinAnswer | undefined, t as never, problems.label)}</T>
-            {d.hasPhoto ? ` · ${t('checkin.withPhoto', 'photo attached')}` : ''}
-          </T>
-        )}
-        {!escalation && answer?.note ? (
-          <T variant="body" color="textMuted" style={{ marginTop: 4 }}>
-            “{answer.note}”
-          </T>
-        ) : null}
-        {!escalation && answer?.voiceSec ? (
+        ))}
+        {photos.length ? (
           <View style={{ marginTop: space.sm }}>
-            <VoiceChip seconds={answer.voiceSec} />
+            <PhotoGrid photos={photos} />
           </View>
         ) : null}
       </Card>
@@ -339,10 +304,9 @@ export const renderers: Record<MessageType, ComponentType<{ message: Message }>>
   image: ImageMessage,
   voice: VoiceMessage,
   file: FileMessage,
-  checkin: CheckinCard,
+  card: CardMessage,
   issue_card: IssueCard,
   daily_report: DailyReportCard,
-  status_card: StatusCard,
   system: SystemNotice,
 };
 

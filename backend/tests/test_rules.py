@@ -7,49 +7,12 @@ from app.rules import (
     can_post,
     default_channel_names,
     job_title_error,
-    pm_change_for,
     simple_mode,
-    task_is_overdue,
-    task_needs_update,
 )
 from app.schemas import normalize_channel_name
 
-TODAY = "2026-10-09"
 OWNER, ADMIN, MEMBER = {"companyRole": "owner"}, {"companyRole": "admin"}, {"companyRole": "member"}
 
-
-def task(**over):
-    base = {"status": "in_progress", "percent": 50, "plannedStart": "2026-10-05", "plannedFinish": "2026-10-12"}
-    return base | over
-
-
-# ---- What the bot asks about, and what an answer tells the PM app ----
-
-def test_bot_asks_about_active_and_overdue_tasks_only():
-    assert task_needs_update(task(), TODAY)  # active
-    assert task_needs_update(task(status="not_started"), TODAY)  # should have started
-    assert task_needs_update(task(plannedFinish="2026-10-01"), TODAY)  # overdue
-    assert task_needs_update(task(status="blocked"), TODAY)
-    assert not task_needs_update(task(plannedStart="2026-10-10"), TODAY)  # starts later
-    assert not task_needs_update(task(status="done"), TODAY)
-
-
-def test_overdue_means_open_and_past_its_finish():
-    assert task_is_overdue(task(plannedFinish="2026-10-08"), TODAY)
-    assert not task_is_overdue(task(plannedFinish=TODAY), TODAY)
-    assert not task_is_overdue(task(plannedFinish="2026-10-08", status="done"), TODAY)
-
-
-def test_answers_become_pm_status_changes():
-    assert pm_change_for({"kind": "progress", "percent": 75}) == {"status": "in_progress", "percent": 75}
-    assert pm_change_for({"kind": "progress", "percent": 100}) == {"status": "done"}
-    assert pm_change_for({"kind": "done"}) == {"status": "done"}
-    assert pm_change_for({"kind": "started"}) == {"status": "in_progress"}
-    assert pm_change_for({"kind": "problem", "reason": "Labour short"}) == {"status": "blocked", "problem": "Labour short"}
-    assert pm_change_for({"kind": "not_started"}) is None
-
-
-# ---- Permissions ----
 
 def test_owner_and_admin_can_do_every_project_action():
     for action in PROJECT_PERMISSIONS["manager"]:

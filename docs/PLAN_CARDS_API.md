@@ -1,6 +1,6 @@
 # Plan — the Cards API (spec 2.1, build step 8)
 
-> **Status: not started.** The PM app takes over the bot's decisions; Siteline becomes the channel. The API the
+> **Status: built 2026-11-02** (steps 1–5 in one go; the emulator check in step 4 is still to do). The PM app takes over the bot's decisions; Siteline becomes the channel. The API the
 > PM team builds against is `docs/CARDS_API.md`. Each step below ends with all checks passing and one commit,
 > and the app keeps working after every step: the mock PM app takes over today's bot before the old code goes.
 
