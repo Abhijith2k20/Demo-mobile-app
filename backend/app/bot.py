@@ -62,14 +62,14 @@ def open_tasks_for(user_id: str) -> list[dict]:
 def _recheck(task: dict, user_id: str) -> dict | None:
     """Right before asking, the task as the PM app has it now (§8.1). None when there's nothing to ask any
     more; the saved copy when the PM app doesn't answer in time."""
-    from .pm.sync import save_task
+    from .pm.sync import remove_task, save_task
 
     try:
         fresh = pm.get_task(task["id"])
     except pm.Unavailable:
         return task
     if not fresh:
-        db.run("UPDATE pm_tasks SET removed_at = now() WHERE pm_task_id = %(id)s", id=task["id"])
+        remove_task(task["id"])
         return None
     save_task(fresh)
     fresh = pm.saved_task(task["id"])

@@ -196,3 +196,22 @@ def test_people_the_pm_app_names_but_siteline_lacks_are_listed(login):
     status = arjun.get("/integration").json()
     assert status["connected"] and "newhire@paliath.in" in status["unmatched"]
     assert login("ravi@paliath.in").get("/integration").status_code == 403
+
+
+def test_open_checkin_cards_refresh_when_the_pm_app_changes_the_task(login):
+    from conftest import events_for
+
+    ravi = login("ravi@paliath.in")
+    c = first_open(ravi)
+    with in_company("Paliath Interiors"):
+        task = mock.get_task(c["taskId"])
+        mock.save_task({**task, "plannedFinish": "2031-02-02"})  # webhook: task.updated
+    pushed = [e["checkin"] for e in events_for(ravi.user["id"], "checkin.updated") if e["checkin"]["id"] == c["id"]]
+    assert pushed and pushed[-1]["task"]["plannedFinish"] == "2031-02-02"
+    before = len(events_for(ravi.user["id"], "checkin.updated"))
+    with in_company("Paliath Interiors"):
+        mock.save_task({**mock.get_task(c["taskId"])})  # nothing the card shows changed: no event
+        assert len(events_for(ravi.user["id"], "checkin.updated")) == before
+        mock.delete_task(c["taskId"])  # webhook: task.deleted
+    closed = [e["checkin"] for e in events_for(ravi.user["id"], "checkin.updated") if e["checkin"]["id"] == c["id"]]
+    assert closed[-1]["closed"] is True and closed[-1]["task"] is None

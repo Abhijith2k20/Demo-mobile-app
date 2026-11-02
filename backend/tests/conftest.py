@@ -20,7 +20,8 @@ _snapshot: dict[str, bytes] = {}
 
 
 def _tables(conn) -> list[str]:
-    return db.PER_COMPANY_TABLES + db.GLOBAL_TABLES
+    # Live events are short-lived and their ids come from a counter that TRUNCATE restarts: not copied.
+    return [t for t in db.PER_COMPANY_TABLES + db.GLOBAL_TABLES if t != "events"]
 
 
 def restore_seed() -> None:
@@ -46,7 +47,7 @@ def restore_seed() -> None:
             with conn.transaction():
                 for t in db.PER_COMPANY_TABLES:
                     conn.execute(f"ALTER TABLE {t} NO FORCE ROW LEVEL SECURITY")
-                conn.execute("TRUNCATE " + ", ".join(_tables(conn)) + " RESTART IDENTITY CASCADE")
+                conn.execute("TRUNCATE " + ", ".join(_tables(conn) + ["events"]) + " RESTART IDENTITY CASCADE")
                 for t in reversed(_tables(conn)):
                     with conn.cursor().copy(f"COPY {t} FROM STDIN") as cp:
                         cp.write(_snapshot[t])

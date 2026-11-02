@@ -20,8 +20,9 @@ def full_sync() -> None:
         for t in pm.list_tasks():
             save_task(t)
             seen.append(t["id"])
-        db.run("""UPDATE pm_tasks SET removed_at = now() WHERE removed_at IS NULL AND NOT (pm_task_id = ANY(%(ids)s))""",
-               ids=seen)
+        gone = db.rows("""UPDATE pm_tasks SET removed_at = now() WHERE removed_at IS NULL AND NOT (pm_task_id = ANY(%(ids)s))
+                          RETURNING pm_task_id""", ids=seen)
+        tell_open_checkins([r["pmTaskId"] for r in gone])
         db.run("""UPDATE pm_links SET last_sync_at = now(), last_error = NULL,
                   options = jsonb_set(options, '{unmatched}', %(u)s) WHERE company_id = current_company()""",
                u=db.Json(sorted(unmatched)))
@@ -36,7 +37,7 @@ def apply_event(event: dict) -> bool:
         return False
     kind, data = event["type"], event.get("data") or {}
     if kind == "task.deleted":
-        db.run("UPDATE pm_tasks SET removed_at = now() WHERE pm_task_id = %(id)s", id=data["id"])
+        remove_task(data["id"])
     elif kind.startswith("task."):
         save_task(data)
     elif kind.startswith(("project.", "member.")):
@@ -48,6 +49,8 @@ def apply_event(event: dict) -> bool:
 
 
 def save_task(t: dict) -> None:
+    """Writes the PM app's version of a task to the saved copy; open check-ins for it refresh if it changed."""
+    before = _shown(pm.saved_task(t["id"]))
     db.run("""INSERT INTO pm_tasks (company_id, pm_task_id, pm_project_id, name, planned_start, planned_finish, owner_ref,
                                     owner_user_id, status, percent, pm_updated_at, removed_at)
               VALUES (current_company(), %(id)s, %(p)s, %(n)s, %(s)s, %(f)s, %(o)s, %(u)s, %(st)s, %(pc)s, %(at)s, NULL)
@@ -57,6 +60,32 @@ def save_task(t: dict) -> None:
                 pm_updated_at = excluded.pm_updated_at, removed_at = NULL""",
            id=t["id"], p=t["projectId"], n=t["name"], s=t["plannedStart"], f=t["plannedFinish"], o=t.get("ownerRef"),
            u=pm.match_person(t.get("ownerRef")), st=t["status"], pc=t.get("percent") or 0, at=t.get("updatedAt"))
+    if _shown(pm.saved_task(t["id"])) != before:
+        tell_open_checkins([t["id"]])
+
+
+def remove_task(task_id: str) -> None:
+    """The PM app no longer has the task; its open check-ins close ("Changed in the PM app")."""
+    if db.run("UPDATE pm_tasks SET removed_at = now() WHERE pm_task_id = %(id)s AND removed_at IS NULL", id=task_id):
+        tell_open_checkins([task_id])
+
+
+def _shown(task: dict | None) -> tuple | None:
+    """What a check-in card shows of a task (other changes don't need a refresh)."""
+    if not task:
+        return None
+    return tuple(task[k] for k in ("name", "plannedStart", "plannedFinish", "ownerUserId", "status", "percent"))
+
+
+def tell_open_checkins(task_ids: list[str]) -> None:
+    """Phones showing an unanswered check-in for these tasks refresh it at once (due date, %, or closed)."""
+    if not task_ids:
+        return
+    from ..events import publish
+    from ..views import checkin_view
+
+    for c in db.rows("SELECT * FROM checkins WHERE task_id = ANY(%(ids)s) AND answer IS NULL", ids=task_ids):
+        publish({"type": "checkin.updated", "checkin": checkin_view(c)}, [c["userId"]])
 
 
 def _job_title(role: str, role_name: str | None) -> str:
