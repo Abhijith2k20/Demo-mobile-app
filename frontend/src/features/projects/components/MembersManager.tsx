@@ -22,6 +22,14 @@ interface Draft {
 function MemberEditor({ draft, channels, onChange }: { draft: Draft; channels: Channel[]; onChange: (d: Draft) => void }) {
   const { c } = useTheme();
   const { t } = useTranslation();
+  const guest = draft.user.companyRole === 'guest';
+  // Someone new (not a guest) joins every public channel on the server; here they only pick private ones.
+  const choosable = draft.isNew && !guest ? channels.filter((ch) => ch.isPrivate) : channels;
+  const hint = guest
+    ? t('members.guestHint', 'Guests see only the channels ticked.')
+    : draft.isNew
+      ? t('members.newHint', 'They join every public channel. Tick any private channels they should be in too.')
+      : t('members.editHint', 'Untick a channel to take them out of it.');
   return (
     <View style={{ gap: space.lg }}>
       <View style={{ gap: 2 }}>
@@ -29,9 +37,9 @@ function MemberEditor({ draft, channels, onChange }: { draft: Draft; channels: C
           {t('members.channels', 'Channels')}
         </T>
         <T variant="meta" color="textMuted">
-          {t('members.channelsHint', 'Nobody is added to a channel automatically. Tick the ones they should be in.')}
+          {hint}
         </T>
-        {channels.map((ch) => {
+        {choosable.map((ch) => {
           const on = draft.channelIds.includes(ch.id);
           return (
             <Pressable

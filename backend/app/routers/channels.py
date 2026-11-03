@@ -125,7 +125,9 @@ def create_channel(project_id: str, body: ChannelCreate, user: dict = Depends(cu
     ch = db.insert("channels", {"id": body.id, "companyId": db.company_id(), "projectId": project["id"], "name": body.name,
                                 "kind": "project", "isPrivate": body.isPrivate, "postingPolicy": "everyone",
                                 "updatedAt": now_iso()})
-    for uid in _people([user["id"], *body.memberIds]):
+    # A public channel starts with everyone on the project; a private one with only the people picked.
+    everyone = [] if body.isPrivate else spaces.project_people(project["id"])
+    for uid in _people([user["id"], *everyone, *body.memberIds]):
         spaces.add_to_channel(ch, uid)
     post_message(ch, BOT_ID, type="system", body=f"{first_name(user['id'])} created #{ch['name']}")
     return {"channel": channel_view(ch, user)}

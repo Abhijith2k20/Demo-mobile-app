@@ -660,3 +660,10 @@ one person's bot conversation, never a channel).
   app keeps its own copy of the seeded projects and its own "Problem" list; neither reaches Siteline.
   Migration `006_chat_only.sql` drops the setup, the PM project link, project roles, job titles and the mock's
   members table.
+
+## Project members join the public channels (2026-11-03)
+
+The owner changed the joining rule: adding someone to a project puts them in all its public channels, and a new
+public channel gets everyone on the project. Private channels have only the people picked. The Owner and Admins
+still add or remove people per channel. Guests get only the channels they're given. Making an existing channel
+public later adds no one (people join it from Browse channels, or are added by hand).

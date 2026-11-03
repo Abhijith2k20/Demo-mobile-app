@@ -58,15 +58,17 @@ Everything below exists in the demo and is **deleted** in the MVP (build step 2,
 | Where | Removed |
 |---|---|
 | Company setup | Industry templates (`interiors`, `events`, `general`), the company `setup`: job titles, standard project channels, the work channel, problem types; `GET /meta`'s setup fields |
-| Projects | Projects from the PM app (`PUT/DELETE /api/v1/projects`), the PM project link (`pm_project_id`, "Open in <PM app>"), "N people in <PM app> aren't on Siteline yet", Recent updates on the project page, project roles (Manager / Member) and job titles, default channels and automatic channel joining |
+| Projects | Projects from the PM app (`PUT/DELETE /api/v1/projects`), the PM project link (`pm_project_id`, "Open in <PM app>"), "N people in <PM app> aren't on Siteline yet", Recent updates on the project page, project roles (Manager / Member) and job titles, and default channels per job title |
 | Chat | **Report issue** and **Daily report** forms and cards, "Related task", status cards in channels (`POST /api/v1/messages`, `notify`), the PM app's Activity notices |
 | People | Simple mode (it came from job titles) |
 | Cards | A card's link to a project (its text can still name one) |
 | Dev | Scripted teammates |
 
 **Projects and channels are only conversation:** the Owner and Admins create a project (it starts with
-`#general` holding only its creator), create channels, and add people. Nobody is added to anything
-automatically.
+`#general` holding only its creator) and add people to it. **Someone added to a project joins all its public
+channels; a new public channel gets everyone on the project. Private channels have only the people picked.**
+The Owner and Admins can still add anyone to, or remove anyone from, any channel. Guests are the exception: they
+get only the channels they're given.
 
 **Expected load at launch** (design for it, prove 10× in a load test): up to 50 companies, 2,000 people, 300
 online at once, 50,000 messages and 5,000 cards a day.
@@ -323,10 +325,12 @@ Read-only status: connected or not, when the PM app last called, the last answer
 ### 5.13 Project settings (Owner/Admin)
 
 - **Project:** name, client, address.
-- **People:** add or remove people on the project. Being on a project lets a person see it and browse and join
-  its public channels; it adds them to no channel.
-- **Channels:** list, add, edit name / private / who is in it, delete (not `#general`). Adding someone to a
-  channel also puts them on the project.
+- **People:** add or remove people on the project. Adding someone puts them in every public channel of the
+  project (and any private ones ticked); removing them takes them out of all of them. Guests join only the
+  channels ticked.
+- **Channels:** list, add, edit name / private / who is in it, delete (not `#general`). A new public channel
+  starts with everyone on the project; a new private one with only the people ticked. Adding someone to any
+  channel also puts them on the project. Removing someone from one channel leaves the rest as they are.
 - **Archive** and **Delete** (type the name).
 
 ### 5.14 Unsent, 5.15 DMs tab
@@ -894,7 +898,7 @@ Each step ends with tests passing and the app working against it.
    PM writes, saved copy of tasks) moves out of Siteline into `mockpm/`, which uses the Cards API like the real
    PM app will. Step by step in `docs/PLAN_CARDS_API.md`.
 9. **Chat only (version 2.2):** remove company templates and setups, job titles, project roles, simple mode,
-   automatic channel joining, Report issue and Daily report, Recent updates, scripted teammates; the Cards API
+   default channels per job title, Report issue and Daily report, Recent updates, scripted teammates; the Cards API
    loses projects and channel messages; projects are made only in Siteline by the Owner and Admins (§0.2).
 10. **Launch:**
    - staging and production on Render, backups and a restore test;

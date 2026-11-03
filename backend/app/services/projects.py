@@ -1,12 +1,13 @@
 """Projects and their people (spec §5.13). A project is a group of channels for conversation: the Owner and
-Admins make it, and add people to it and to its channels. Nobody is added to anything automatically."""
+Admins make it and add people. Someone added to a project joins all its public channels; private channels have
+only the people picked; guests get only the channels they're given."""
 from __future__ import annotations
 
 from .. import db
 from ..access import channel_audience, project_audience
 from ..core import now_iso, uuid7
 from ..events import publish
-from ..rules import HOME_CHANNEL, joins_projects
+from ..rules import HOME_CHANNEL, is_guest, joins_projects
 from ..store import add_channel_member, admins, person, project, project_channels
 
 
@@ -28,15 +29,32 @@ def project_updated(p: dict) -> dict:
 
 
 def add_member(project_id: str, user_id: str) -> None:
-    """Puts the person on the project (they can see it and browse its channels). The Owner and Admins see every
-    project already, so they aren't listed."""
-    if joins_projects(person(user_id)):
-        db.insert("project_members", {"companyId": db.company_id(), "projectId": project_id, "userId": user_id,
-                                      "joinedAt": now_iso()}, on_conflict_nothing=True)
+    """Puts the person on the project and in all its public channels (guests: none; they get only the channels
+    they're given). The Owner and Admins see every project already, so they aren't listed."""
+    u = person(user_id)
+    if not joins_projects(u):
+        return
+    added = db.insert("project_members", {"companyId": db.company_id(), "projectId": project_id, "userId": user_id,
+                                          "joinedAt": now_iso()}, on_conflict_nothing=True)
+    if added and not is_guest(u):
+        for ch in project_channels(project_id):
+            if not ch["isPrivate"]:
+                _join(ch, user_id)
+
+
+def project_people(project_id: str) -> list[str]:
+    """Who joins a new public channel: everyone on the project except guests."""
+    return [m["userId"] for m in db.rows("SELECT user_id FROM project_members WHERE project_id = %(p)s", p=project_id)
+            if not is_guest(person(m["userId"]))]
+
+
+def _join(ch: dict, user_id: str) -> None:
+    if add_channel_member(ch["id"], user_id):
+        publish({"type": "channel.member_added", "channelId": ch["id"], "userId": user_id}, [*channel_audience(ch), user_id])
 
 
 def add_to_channel(ch: dict, user_id: str) -> None:
-    """Adding someone to a project channel also puts them on its project."""
+    """Adding someone to a project channel also puts them on its project (and so in its public channels)."""
     if ch["projectId"]:
         add_member(ch["projectId"], user_id)
     if add_channel_member(ch["id"], user_id):

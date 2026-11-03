@@ -102,9 +102,10 @@ def add_member(project_id: str, body: MemberAdd, user: dict = Depends(current_us
         raise not_found("Person")
     if not joins_projects(target):
         raise invalid({"userId": "The owner and admins already see every project"})
-    spaces.add_member(project["id"], target["id"])
-    if body.channelIds:
-        _set_channels(project["id"], target["id"], body.channelIds)
+    spaces.add_member(project["id"], target["id"])  # joins every public channel
+    for ch in project_channels(project["id"]):
+        if ch["id"] in body.channelIds:  # plus any private ones picked
+            spaces.add_to_channel(ch, target["id"])
     spaces.project_updated(project)
     return {"projectId": project["id"], "userId": target["id"]}
 

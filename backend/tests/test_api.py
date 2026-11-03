@@ -176,8 +176,9 @@ def test_project_files(login):
 # ---- Projects ----
 
 
-def test_owner_and_admins_make_projects_and_add_people_by_hand(login):
-    meera, ravi, amit = login("meera@paliath.in"), login("ravi@paliath.in"), login("amit@paliath.in")
+def test_people_on_a_project_join_its_public_channels(login):
+    meera, ravi, amit, kavya = (login(f"{n}@paliath.in") for n in ("meera", "ravi", "amit", "kavya"))
+    mine = lambda api: {c["name"] for c in api.get("/channels").json()["channels"] if c["projectId"] == pid}  # noqa: E731
     pid = uuid7()
     p = meera.post("/projects", {"id": pid, "name": "Lake House"}).json()
     assert p["members"] == []
@@ -185,19 +186,29 @@ def test_owner_and_admins_make_projects_and_add_people_by_hand(login):
     assert [c["name"] for c in chans] == ["general"] and chans[0]["memberIds"] == []  # admins aren't listed
     assert not any(x["name"] == "Lake House" for x in ravi.get("/projects").json()["projects"])  # nobody else, yet
     assert amit.post("/projects", {"id": uuid7(), "name": "Mine"}).status_code == 403  # members can't create projects
-    # A new channel with Ravi in it puts him on the project too.
-    ch = meera.post(f"/projects/{pid}/channels", {"id": uuid7(), "name": "Tiling", "memberIds": [ravi.user["id"]]}).json()
-    assert ch["channel"]["name"] == "tiling"
-    assert any(x["name"] == "Lake House" for x in ravi.get("/projects").json()["projects"])
-    names = {c["name"] for c in ravi.get("/channels").json()["channels"] if c["projectId"] == pid}
-    assert names == {"tiling"}  # not #general: nobody is added anywhere automatically
-    # Adding someone to the project alone gives them no channel.
-    meera.post(f"/projects/{pid}/members", {"userId": amit.user["id"]})
-    assert not any(c["projectId"] == pid for c in amit.get("/channels").json()["channels"])
+    # Added to the project: in every public channel.
+    meera.post(f"/projects/{pid}/members", {"userId": ravi.user["id"]})
+    assert mine(ravi) == {"general"}
+    # A new public channel gets everyone on the project; a private one only the people picked.
+    meera.post(f"/projects/{pid}/channels", {"id": uuid7(), "name": "Tiling"})
+    meera.post(f"/projects/{pid}/channels", {"id": uuid7(), "name": "Money", "isPrivate": True, "memberIds": [kavya.user["id"]]})
+    assert mine(ravi) == {"general", "tiling"}
+    assert mine(kavya) == {"general", "tiling", "money"}  # added to a channel = on the project = in its public ones
+    # Someone added later joins the public channels, plus private ones picked.
+    money = next(c for c in meera.get(f"/projects/{pid}/channels").json()["channels"] if c["name"] == "money")
+    meera.post(f"/projects/{pid}/members", {"userId": amit.user["id"], "channelIds": [money["id"]]})
+    assert mine(amit) == {"general", "tiling", "money"}
+    # The Owner and Admins can still take someone out of one channel; the rest stay.
+    tiling = next(c for c in meera.get(f"/projects/{pid}/channels").json()["channels"] if c["name"] == "tiling")
+    meera.patch(f"/projects/{pid}/members/{ravi.user['id']}", {"channelIds": []})
+    assert mine(ravi) == set()
+    meera.patch(f"/channels/{tiling['id']}", {"memberIds": [ravi.user["id"]]})
+    assert mine(ravi) == {"tiling"} and "tiling" not in mine(amit)
     assert amit.post(f"/projects/{pid}/channels", {"id": uuid7(), "name": "extra"}).status_code == 403
     assert meera.patch(f"/projects/{pid}", {"name": "Lake House 2"}).json()["name"] == "Lake House 2"
     meera.delete(f"/projects/{pid}/members/{ravi.user['id']}")
-    assert not any(c["projectId"] == pid for c in ravi.get("/channels").json()["channels"])
+    assert mine(ravi) == set()
+
 
 def test_owner_and_admins_are_never_added_to_a_project(login):
     kavya = login("kavya@paliath.in")
