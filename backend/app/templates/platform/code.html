@@ -1,0 +1,11 @@
+{% extends "platform/_base.html" %}
+{% block auth %}
+<h1>Check your email</h1>
+<p class="sub" style="margin-bottom:24px">If <b>{{ email }}</b> is a platform admin, a 6-digit code is on its way. It works for 10 minutes.</p>
+<form method="post" action="/platform/verify">
+  <input type="hidden" name="email" value="{{ email }}">
+  <label class="f">Code<input class="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus></label>
+  <div class="actions"><button class="btn full">Sign in</button></div>
+</form>
+<p class="small" style="text-align:center;margin:20px 0 0"><a href="/platform">Use a different email</a></p>
+{% endblock %}

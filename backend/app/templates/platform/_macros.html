@@ -1,0 +1,28 @@
+{# Small pieces the platform pages share. #}
+
+{% macro pill(status, text=none) -%}
+<span class="pill {{ TONES.get(status, '') }}">{{ text or (status | label) }}</span>
+{%- endmacro %}
+
+{% macro flash(text, tone="ok") -%}
+{% if text %}<div class="flash {{ tone }}" role="status">{{ text }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro empty(text, cols) -%}
+<tr><td colspan="{{ cols }}" class="empty">{{ text }}</td></tr>
+{%- endmacro %}
+
+{# Destructive actions ask first. Single-quoted attribute: tojson escapes quotes inside. #}
+{% macro confirm(message) -%}
+onsubmit='return confirm({{ message | tojson }})'
+{%- endmacro %}
+
+{% macro card(title, hint="", right="") -%}
+<section class="card">
+  <header>
+    <div><h2>{{ title }}</h2>{% if hint %}<p>{{ hint }}</p>{% endif %}</div>
+    {{ right }}
+  </header>
+  {{ caller() }}
+</section>
+{%- endmacro %}

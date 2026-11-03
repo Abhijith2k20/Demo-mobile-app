@@ -1,0 +1,11 @@
+{% extends "platform/_base.html" %}
+{% import "platform/_macros.html" as ui %}
+{% block auth %}
+<h1>Sign in to Siteline Platform</h1>
+<p class="sub" style="margin-bottom:24px">For the Siteline team. We'll email you a 6-digit code.</p>
+{{ ui.flash(error, "bad") }}
+<form method="post" action="/platform/login">
+  <label class="f">Work email<input name="email" type="email" autocomplete="email" placeholder="name@company.com" required autofocus></label>
+  <div class="actions"><button class="btn full">Send code</button></div>
+</form>
+{% endblock %}

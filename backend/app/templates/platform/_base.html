@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title }} · Siteline Platform</title>
+<style>{% include "platform/_style.css" %}</style>
+</head>
+<body>
+{% if admin %}
+<header class="top"><div class="wrap">
+  <a class="brand" href="/platform"><span class="logo">S</span>Siteline <small>Platform</small></a>
+  <nav>
+    <a href="/platform" class="{{ 'on' if nav == 'companies' }}">Companies</a>
+    <a href="/platform/audit" class="{{ 'on' if nav == 'audit' }}">Audit log</a>
+  </nav>
+  <span class="who">{{ admin }}</span>
+</div></header>
+<main><div class="wrap">{% block content %}{% endblock %}</div></main>
+{% else %}
+{# Sign-in pages: one centred card, no navigation. #}
+<main class="auth"><div class="card"><div class="body">
+  <div class="logo">S</div>
+  {% block auth %}{% endblock %}
+</div></div></main>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,49 @@
+{% extends "platform/_base.html" %}
+{% import "platform/_macros.html" as ui %}
+{% block content %}
+<div class="head"><div>
+  <h1>Companies</h1>
+  <p class="sub">{{ rows | length }} companies · {{ active }} active · {{ people }} people</p>
+</div></div>
+{{ ui.flash(error, "bad") }}
+
+<section class="card"><div class="scroll"><table>
+  <thead><tr><th>Company</th><th>Status</th><th class="num">People</th><th>PM link</th><th>Last API call</th><th>Last error</th></tr></thead>
+  <tbody>
+  {% for c in rows %}
+    <tr>
+      <td><a class="strong" href="/platform/companies/{{ c.id }}">{{ c.name }}</a><div class="muted small">{{ c.slug }}</div></td>
+      <td>{{ ui.pill(c.status) }}</td>
+      <td class="num">{{ c.people }}</td>
+      <td>{{ PM_KINDS.get(c.pmKind, c.pmKind) or "—" }}</td>
+      <td class="muted">{{ c.lastCallAt | when("Never") }}</td>
+      <td><div class="trunc small" style="color:var(--danger)" title="{{ c.lastError or '' }}">{{ c.lastError or "" }}</div></td>
+    </tr>
+  {% else %}
+    {{ ui.empty("No companies yet. Create the first one below.", 6) }}
+  {% endfor %}
+  </tbody>
+</table></div></section>
+
+<details class="card" {{ "open" if error or not rows }}>
+  <summary>New company</summary>
+  <form class="body" method="post" action="/platform/companies/new">
+    <div class="fields">
+      <label class="f">Company name<input name="name" placeholder="Paliath Interiors" required></label>
+      <label class="f">Time zone<input name="time_zone" value="Asia/Kolkata" list="zones" required>
+        <datalist id="zones">{% for z in ["Asia/Kolkata", "Asia/Dubai", "Europe/London", "America/New_York", "UTC"] %}<option value="{{ z }}"></option>{% endfor %}</datalist>
+      </label>
+      <label class="f">Owner's name<input name="owner_name" autocomplete="off" required></label>
+      <label class="f">Owner's work email<input name="owner_identifier" type="email" placeholder="name@company.com" required></label>
+      <label class="f">PM link<select name="pm_kind">
+        <option value="mock">Mock PM app</option><option value="http">PM app API</option><option value="none">None (projects made in Siteline)</option>
+      </select></label>
+      <label class="f">PM company id <span>Optional. The company's id in the PM app.</span><input name="pm_company_id"></label>
+      <label class="f wide">PM webhook URL <span>Optional. Where Siteline sends card answers.</span>
+        <input name="pm_webhook_url" type="url" placeholder="https://pm.example.com/siteline/webhook"></label>
+    </div>
+    <div class="actions"><button class="btn">Create company and invite owner</button>
+      <span class="muted small">The owner gets an email invite right away.</span></div>
+  </form>
+</details>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "platform/_base.html" %}
+{% import "platform/_macros.html" as ui %}
+{% block content %}
+{% set base = "/platform/companies/" ~ c.id %}
+<div class="crumbs"><a href="/platform">Companies</a> / {{ c.name }}</div>
+<div class="head">
+  <div>
+    <h1>{{ c.name }} {{ ui.pill(c.status) }}</h1>
+    <p class="sub">{{ c.timeZone }} · {{ active_count }} active people · PM company {{ c.pmCompanyId or "—" }}</p>
+  </div>
+  {% if c.status == "active" %}
+  <form class="inline" method="post" action="{{ base }}/status" {{ ui.confirm("Suspend " ~ c.name ~ "? Nobody in it can use Siteline until you make it active again.") }}>
+    <input type="hidden" name="status" value="suspended"><button class="btn danger">Suspend company</button>
+  </form>
+  {% else %}
+  <form class="inline" method="post" action="{{ base }}/status">
+    <input type="hidden" name="status" value="active"><button class="btn">Make active again</button>
+  </form>
+  {% endif %}
+</div>
+{{ ui.flash(note) }}
+
+{% call ui.card("People") %}
+<div class="scroll"><table>
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for m in members %}
+    <tr><td class="strong">{{ m.name }}</td><td class="muted">{{ m.email or "—" }}</td><td>{{ m.role | label }}</td><td>{{ ui.pill(m.status) }}</td></tr>
+  {% else %}
+    {{ ui.empty("No one yet.", 4) }}
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endcall %}
+
+{% call ui.card("Pending invites") %}
+<div class="scroll"><table>
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Expires</th></tr></thead>
+  <tbody>
+  {% for i in invites %}
+    <tr><td class="strong">{{ i.name }}</td><td class="muted">{{ i.identifier }}</td><td>{{ i.role | label }}</td><td class="muted">{{ i.expiresAt | when }}</td></tr>
+  {% else %}
+    {{ ui.empty("No pending invites.", 4) }}
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endcall %}
+
+{% call ui.card("Ownership", "Invite someone new as owner, or hand ownership to someone already here.") %}
+<div class="body grid2">
+  <form method="post" action="{{ base }}/owner-invite">
+    <div class="fields">
+      <label class="f">New owner's name<input name="name" required></label>
+      <label class="f">Work email<input name="identifier" type="email" placeholder="name@company.com" required></label>
+    </div>
+    <div class="actions"><button class="btn secondary">Send owner invite</button></div>
+  </form>
+  {% if transferable %}
+  <form method="post" action="{{ base }}/transfer" {{ ui.confirm("Transfer ownership? The current owner becomes an admin.") }}>
+    <label class="f">Transfer to someone already in the company<select name="user_id">
+      {% for m in transferable %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+    </select></label>
+    <div class="actions"><button class="btn secondary">Transfer ownership</button></div>
+  </form>
+  {% else %}
+  <p class="muted">Transfer needs another active person in the company.</p>
+  {% endif %}
+</div>
+{% endcall %}
+
+{% set kind = link.kind %}
+{% call ui.card("PM link", "How this company's PM app sends cards and gets the answers.", ui.pill(kind, PM_KINDS.get(kind)) if kind else "") %}
+<form class="body" method="post" action="{{ base }}/pm-link">
+  <div class="fields">
+    <label class="f">Kind<select name="kind">
+      <option value="mock" {{ "selected" if kind == "mock" }}>Mock PM app</option>
+      <option value="http" {{ "selected" if kind == "http" }}>PM app API</option>
+    </select></label>
+    <label class="f">PM company id<input name="pm_company_id" value="{{ c.pmCompanyId or '' }}"></label>
+    <label class="f wide">Webhook URL <span>Card answers go here.</span>
+      <input name="webhook_url" type="url" value="{{ link.webhookUrl or '' }}" placeholder="https://pm.example.com/siteline/webhook"></label>
+    <label class="check wide"><input type="checkbox" name="card_seen" value="1" {{ "checked" if link.sendCardSeen }}>
+      Also send <span class="mono">card.seen</span> when a person first opens a card</label>
+  </div>
+  <div class="actions"><button class="btn">Save PM link</button></div>
+</form>
+<div class="body" style="border-top:1px solid var(--border)">
+  <dl class="kv">
+    <dt>API endpoint</dt><dd class="mono">{{ public_url }}/api/v1</dd>
+    <dt>API key</dt><dd>{{ ui.pill("active", "Key set") if link.apiKeyHash else ui.pill("pending", "No key yet") }}</dd>
+    <dt>Last API call</dt><dd>{{ link.lastCallAt | when("Never") }}</dd>
+    <dt>Last error</dt><dd style="color:var(--danger)">{{ link.lastError or "" }}{% if not link.lastError %}<span class="muted">None</span>{% endif %}</dd>
+  </dl>
+  <form method="post" action="{{ base }}/pm-key" class="actions" {{ ui.confirm("Make a new API key and webhook secret? The old key keeps working for 24 hours.") }}>
+    <button class="btn secondary">Make a new API key and webhook secret</button>
+    <span class="muted small">Shown once. The PM app uses it with docs/CARDS_API.md.</span>
+  </form>
+</div>
+{% endcall %}
+
+{% if mock %}
+{% macro status_select(form, current="not_started") -%}
+<select class="sm" name="status" form="{{ form }}" style="min-width:115px">
+  {% for s in TASK_STATUSES %}<option value="{{ s }}" {{ "selected" if s == current }}>{{ s | label }}</option>{% endfor %}
+</select>
+{%- endmacro %}
+{% set down_button %}
+<form method="post" action="{{ base }}/mock/down"><input type="hidden" name="down" value="{{ '0' if mock.down else '1' }}">
+  <button class="btn small {{ '' if mock.down else 'secondary' }}">{{ "Bring it back" if mock.down else "Make it stop answering" }}</button></form>
+{% endset %}
+{% call ui.card("Mock PM app", "Stands in for this company's PM app: its projects and tasks live here, and it only sends cards to people.", down_button) %}
+{% if mock.down %}<div class="flash warn" style="margin:16px 20px 0">The mock PM app isn't answering. Siteline keeps retrying card answers.</div>{% endif %}
+{% if mock.projects %}
+<div class="chips">
+  {% for p in mock.projects %}
+  <span class="chip">{{ p.name }} {{ ui.pill(p.status) }}
+    <form class="inline" method="post" action="{{ base }}/mock/projects/{{ p.id }}">
+      <input type="hidden" name="status" value="{{ 'closed' if p.status == 'active' else 'active' }}">
+      <button class="btn link small">{{ "Close" if p.status == "active" else "Reopen" }}</button></form>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="scroll"><table class="dense">
+  <thead><tr><th>Task</th><th>Start</th><th>Finish</th><th>Owner (email)</th><th>Status</th><th>%</th><th></th></tr></thead>
+  <tbody>
+  {% for t in mock.tasks %}
+    {% if loop.first or loop.previtem.projectId != t.projectId %}
+    <tr><td colspan="7" class="strong" style="background:var(--alt)">{{ mock.names.get(t.projectId, "") }}</td></tr>
+    {% endif %}
+    {# Inputs point at their row's form with form="…": a <form> can't sit inside a <tr>. #}
+    {% set f = "t" ~ loop.index0 %}
+    <tr>
+      <td><form id="{{ f }}" method="post" action="{{ base }}/mock/tasks"><input type="hidden" name="id" value="{{ t.id }}"><input type="hidden" name="project_id" value="{{ t.projectId }}"></form>
+        <input class="sm" form="{{ f }}" name="name" value="{{ t.name }}" style="min-width:180px" required></td>
+      <td><input class="sm" form="{{ f }}" name="planned_start" type="date" value="{{ t.plannedStart }}"></td>
+      <td><input class="sm" form="{{ f }}" name="planned_finish" type="date" value="{{ t.plannedFinish }}"></td>
+      <td><input class="sm" form="{{ f }}" name="owner_ref" type="email" value="{{ t.ownerRef or '' }}" placeholder="No owner" style="min-width:150px"></td>
+      <td>{{ status_select(f, t.status) }}</td>
+      <td><input class="sm" form="{{ f }}" name="percent" type="number" min="0" max="100" value="{{ t.percent }}" style="width:58px"></td>
+      <td style="white-space:nowrap"><button class="btn small secondary" form="{{ f }}">Save</button>
+        <form class="inline" method="post" action="{{ base }}/mock/tasks/{{ t.id }}/delete" {{ ui.confirm("Remove " ~ t.name ~ "?") }}>
+          <button class="btn link danger small">Remove</button></form></td>
+    </tr>
+  {% else %}
+    {{ ui.empty("No tasks yet.", 7) }}
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if mock.projects %}
+<form method="post" action="{{ base }}/mock/tasks" class="body" style="border-top:1px solid var(--border)">
+  <input type="hidden" name="id" value=""><input type="hidden" name="status" value="not_started"><input type="hidden" name="percent" value="0">
+  <div class="fields" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    <label class="f">Project<select name="project_id">{% for p in mock.projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>
+    <label class="f">New task<input name="name" placeholder="Task name" required></label>
+    <label class="f">Start<input name="planned_start" type="date" value="{{ today() }}"></label>
+    <label class="f">Finish<input name="planned_finish" type="date" value="{{ today() }}"></label>
+    <label class="f">Owner (email)<input name="owner_ref" type="email" placeholder="name@company.com"></label>
+  </div>
+  <div class="actions"><button class="btn">Add task</button></div>
+</form>
+{% endif %}
+{% endcall %}
+{% endif %}
+{% endblock %}

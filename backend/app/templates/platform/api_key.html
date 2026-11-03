@@ -1,0 +1,18 @@
+{% extends "platform/_base.html" %}
+{% import "platform/_macros.html" as ui %}
+{% macro secret(text, value, n) -%}
+<label class="f">{{ text }}<div class="secret">
+  <input id="s{{ n }}" readonly value="{{ value }}" onclick="this.select()">
+  <button type="button" class="btn secondary" onclick="navigator.clipboard.writeText(document.getElementById('s{{ n }}').value);this.textContent='Copied'">Copy</button>
+</div></label>
+{%- endmacro %}
+{% block content %}
+<div class="crumbs"><a href="/platform">Companies</a> / <a href="/platform/companies/{{ company_id }}">Back to company</a></div>
+<div class="head"><div><h1>New API key</h1></div></div>
+{{ ui.flash("Copy both now. They aren't shown again. The previous key keeps working for 24 more hours.", "warn") }}
+<section class="card"><div class="body" style="display:grid;gap:20px">
+  {{ secret("API key", creds.apiKey, 1) }}
+  {{ secret("Webhook secret", creds.webhookSecret, 2) }}
+  <div><a class="btn secondary" href="/platform/companies/{{ company_id }}">Done</a></div>
+</div></section>
+{% endblock %}

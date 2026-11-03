@@ -1,0 +1,24 @@
+{% extends "platform/_base.html" %}
+{% import "platform/_macros.html" as ui %}
+{% block content %}
+<div class="head"><div>
+  <h1>Audit log</h1>
+  <p class="sub">Every platform and admin action, newest first. Latest 300.</p>
+</div></div>
+<section class="card"><div class="scroll"><table>
+  <thead><tr><th>When</th><th>Company</th><th>Who</th><th>What</th><th>Target</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="muted" style="white-space:nowrap">{{ r.at | when }}</td>
+      <td class="strong" style="white-space:nowrap">{{ r.company or "—" }}</td>
+      <td style="white-space:nowrap" title="{{ r.actor }}">{{ r.actorName or r.actor }}</td>
+      <td><span class="mono">{{ r.action }}</span></td>
+      <td><div class="trunc mono muted" title="{{ r.target or '' }}">{{ r.target or "" }}</div></td>
+    </tr>
+  {% else %}
+    {{ ui.empty("Nothing yet.", 5) }}
+  {% endfor %}
+  </tbody>
+</table></div></section>
+{% endblock %}
