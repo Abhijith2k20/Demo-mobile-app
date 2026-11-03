@@ -462,7 +462,7 @@ def build() -> Data:
 
 def build_brightline(paliath: Data) -> Data:
     """A second, smaller company in another industry. Suresh (from Paliath) works here too, and Babu signs in
-    with a phone number."""
+    with babu@brightline.events."""
     now = int(time.time() * 1000)
     epoch = now - 30 * 86_400_000
 
@@ -479,16 +479,16 @@ def build_brightline(paliath: Data) -> Data:
     s.users[suresh["id"]] = suresh
     s.roles[suresh["id"]] = "member"
 
-    def add_user(key: str, name: str, email: str | None, role: str, phone: str | None = None) -> None:
+    def add_user(key: str, name: str, email: str, role: str) -> None:
         uid = uuid_at(epoch)
         U[key] = uid
-        s.users[uid] = {"id": uid, "name": name, "email": email, "phone": phone, "avatarColor": avatar_tone(uid)}
+        s.users[uid] = {"id": uid, "name": name, "email": email, "avatarColor": avatar_tone(uid)}
         s.roles[uid] = role
 
     add_user("nisha", "Nisha Rao", "nisha@brightline.events", "owner")
     add_user("farhan", "Farhan Ali", "farhan@brightline.events", "member")
     add_user("anu", "Anu Thomas", "anu@brightline.events", "member")
-    add_user("babu", "Babu M", None, "member", phone="+919800000005")
+    add_user("babu", "Babu M", "babu@brightline.events", "member")
     people = list(U)
 
     def add_channel(name: str, kind: str, project_id: str | None, members: list[str], **opts) -> str:
@@ -532,7 +532,7 @@ def build_brightline(paliath: Data) -> Data:
 
     def task(p: dict, name: str, start: int, finish: int, status: str, percent: int, owner: str | None) -> None:
         tid = uuid_at(epoch)
-        ref = (s.users[U[owner]]["email"] or s.users[U[owner]]["phone"]) if owner else None
+        ref = s.users[U[owner]]["email"] if owner else None
         s.pm["tasks"][tid] = {"id": tid, "projectId": p["pmId"], "name": name, "plannedStart": day(start),
                               "plannedFinish": day(finish), "ownerRef": ref, "status": status, "percent": percent,
                               "updatedAt": iso(epoch)}
@@ -566,7 +566,7 @@ def load(companies: list[Data]) -> None:
     with db.transaction():
         db.insert("users", {"id": BOT_ID, "name": "Siteline Bot", "email": BOT_EMAIL, "avatarColor": "#5C6F80", "isBot": True})
         users = {u["id"]: u for d in companies for u in d.users.values()}
-        db.insert_many("users", [{"id": u["id"], "name": u["name"], "email": u.get("email"), "phone": u.get("phone"),
+        db.insert_many("users", [{"id": u["id"], "name": u["name"], "email": u.get("email"),
                                   "avatarColor": u["avatarColor"]} for u in users.values()])
         db.insert("platform_admins", {"email": PLATFORM_ADMIN})
         for d in companies:

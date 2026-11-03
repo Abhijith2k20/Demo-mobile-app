@@ -9,8 +9,7 @@ from zoneinfo import ZoneInfo
 from .. import db
 from ..mockpm import bot as mock
 from ..services import integrations
-from ..senders import email, push, sms
-from ..services.accounts import is_phone
+from ..senders import email, push
 from .queue import enqueue
 
 log = logging.getLogger("siteline.jobs")
@@ -21,21 +20,15 @@ class Retry(Exception):
 
 
 def send_code(p: dict) -> None:
-    if is_phone(p["identifier"]):
-        sms.send(p["identifier"], "code", {"code": p["code"]})
-    else:
-        email.send(p["identifier"], f"{p['code']} is your Siteline code",
-                   f"Your Siteline sign-in code is {p['code']}. It works for 10 minutes.\n\n"
-                   "If you didn't ask for it, you can ignore this email.")
+    email.send(p["identifier"], f"{p['code']} is your Siteline code",
+               f"Your Siteline sign-in code is {p['code']}. It works for 10 minutes.\n\n"
+               "If you didn't ask for it, you can ignore this email.")
 
 
 def send_invite(p: dict) -> None:
-    if is_phone(p["identifier"]):
-        sms.send(p["identifier"], "invite", {"inviter": p["inviter"], "company": p["company"], "link": p["link"]})
-    else:
-        email.send(p["identifier"], f"{p['inviter']} invited you to {p['company']} on Siteline",
-                   f"{p['inviter']} invited you to {p['company']} on Siteline.\n\nGet the app: {p['link']}\n\n"
-                   f"Sign in with this email address ({p['identifier']}) to join.")
+    email.send(p["identifier"], f"{p['inviter']} invited you to {p['company']} on Siteline",
+               f"{p['inviter']} invited you to {p['company']} on Siteline.\n\nGet the app: {p['link']}\n\n"
+               f"Sign in with this email address ({p['identifier']}) to join.")
 
 
 def send_push(p: dict) -> None:

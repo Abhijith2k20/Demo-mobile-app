@@ -71,7 +71,7 @@ function YouScreen() {
           <View style={{ flex: 1, gap: 2 }}>
             <T variant="title">{me.name}</T>
             <T variant="meta" color="textMuted">
-              {me.email ?? me.phone}
+              {me.email}
             </T>
             <Pill label={`${company?.name ?? ''} · ${roleLabel}`} bg={c.surfaceAlt} fg={c.textMuted} />
           </View>
@@ -242,7 +242,7 @@ function YouScreen() {
 
       <Sheet visible={confirmDelete} onClose={() => setConfirmDelete(false)} title={t('you.deleteTitle', 'Delete your account?')}>
         <T variant="body" color="textMuted" style={{ marginBottom: space.lg }}>
-          {t('you.deleteBody', 'Your name, email and phone are removed from every company. Your messages stay, shown as "Former member". This cannot be undone.')}
+          {t('you.deleteBody', 'Your name and email are removed from every company. Your messages stay, shown as "Former member". This cannot be undone.')}
         </T>
         <Button
           kind="danger"

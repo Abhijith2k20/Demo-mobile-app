@@ -71,8 +71,7 @@ def send_event(event: str, body: dict, event_id: str) -> None:
 
 
 def _person_ref(user_id: str) -> str:
-    who = db.row("SELECT email, phone FROM users WHERE id = %(u)s", u=user_id)
-    return who["email"] or who["phone"]
+    return db.value("SELECT email FROM users WHERE id = %(u)s", u=user_id)
 
 
 def send_card_seen(card: dict) -> None:

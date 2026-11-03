@@ -681,3 +681,10 @@ public later adds no one (people join it from Browse channels, or are added by h
 - The worker takes one job at a time, sign-in codes, invites and pushes first.
 - A card is saved before its bot message, so the same card id sent twice at once returns the card.
 - Removed `GET /meta` and `GET /company` (the app used neither); the production event log in memory is dev-only.
+
+## Email only: no phone sign-in (2026-11-03)
+
+The owner removed phone numbers. People sign in, are invited and are named by the PM app only by their work
+email. Gone: phone sign-in and invites, SMS (MSG91 and its settings), the `users.phone` column (migration
+`007_email_only.sql`), the +91 handling, and Babu's phone-only seed account (Babu now has an email). Someone
+without a work email can't use Siteline; the company gives them one, or an address they check.

@@ -18,13 +18,11 @@ const BOX_HEIGHT = 60;
 
 interface Props {
   identifier: string;
-  /** Where the code went. */
-  channel: 'email' | 'sms';
   /** Dev sign-in sheet: open this company straight away when the person has several. */
   company?: string;
 }
 
-function OtpScreen({ identifier, channel, company }: Props) {
+function OtpScreen({ identifier, company }: Props) {
   const { c } = useTheme();
   const { t } = useTranslation();
   const [code, setCode] = useState('');
@@ -62,7 +60,7 @@ function OtpScreen({ identifier, channel, company }: Props) {
     }
   };
 
-  // One hidden input holds the whole code (so fast typing and SMS autofill never drop digits);
+  // One hidden input holds the whole code (so fast typing and pasting never drop digits);
   // the six boxes only display it.
   const onChange = (value: string) => {
     const clean = value.replace(/\D/g, '').slice(0, LENGTH);
@@ -113,7 +111,7 @@ function OtpScreen({ identifier, channel, company }: Props) {
       title={t('auth.enterCode', 'Enter the code')}
       subtitle={
         <>
-          {channel === 'sms' ? t('auth.codeSentBySms', 'Sent by SMS to') : t('auth.codeSentTo', 'Sent by email to')}{' '}
+          {t('auth.codeSentTo', 'Sent by email to')}{' '}
           <T variant="bodyStrong">{identifier}</T>
           {'  '}
           <T variant="bodyStrong" color="accent" onPress={() => (router.canGoBack() ? router.back() : router.replace('/login'))} accessibilityRole="link">
@@ -145,7 +143,7 @@ function OtpScreen({ identifier, channel, company }: Props) {
           autoFocus
           keyboardType="number-pad"
           textContentType="oneTimeCode"
-          autoComplete="sms-otp"
+          autoComplete="one-time-code"
           maxLength={LENGTH}
           editable={!busy}
           caretHidden

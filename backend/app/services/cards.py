@@ -16,15 +16,10 @@ CONTENT_KEYS = ("title", "subtitle", "badge", "fields", *ANSWER_PARTS, "push")
 
 
 def person_for_ref(ref: str) -> dict:
-    """The active member of this company the PM app means (by email or phone); refused otherwise."""
-    from .accounts import normalize_identifier
-
-    try:
-        ident = normalize_identifier(ref)
-    except ApiError:
-        ident = (ref or "").strip().lower()
+    """The active member of this company the PM app means (by work email, any case); refused otherwise."""
+    ident = (ref or "").strip().lower()
     uid = db.value("""SELECT u.id FROM users u JOIN memberships m ON m.user_id = u.id AND m.company_id = current_company()
-                      WHERE m.status = 'active' AND u.deleted_at IS NULL AND (u.email = %(r)s OR u.phone = %(r)s)""", r=ident)
+                      WHERE m.status = 'active' AND u.deleted_at IS NULL AND u.email = %(r)s""", r=ident)
     if not uid:
         raise ApiError("NOT_A_MEMBER", f"{ref} isn't in this company on Siteline.", {"fields": {"to": "Not in this company"}})
     return {"id": uid, "ref": ident}

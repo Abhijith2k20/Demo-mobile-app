@@ -5,9 +5,8 @@ export type CompanyRole = 'owner' | 'admin' | 'member' | 'guest';
 export interface User {
   id: ID;
   name: string;
-  /** Work email and/or phone (E.164); at least one. */
+  /** Work email: how the person signs in and is invited (null once the account is deleted). */
   email: string | null;
-  phone?: string | null;
   companyRole: CompanyRole;
   avatarColor: string;
   isActive: boolean;

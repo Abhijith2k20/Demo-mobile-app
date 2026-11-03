@@ -1,4 +1,4 @@
-"""Sign-in (spec §5.1, §9.4): a one-time code to a work email or phone, then a session for one company."""
+"""Sign-in (spec §5.1, §9.4): a one-time code to a work email, then a session for one company."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
@@ -30,7 +30,7 @@ def otp_request(body: CodeRequest, request: Request):
     identifier = accounts.normalize_identifier(body.identifier)
     accounts.request_code(identifier, request.client.host if request.client else "?")
     # Same answer for known and unknown addresses, so nobody can test who has an account.
-    return {"sent": True, "resendInSeconds": 30, "channel": "sms" if accounts.is_phone(identifier) else "email"}
+    return {"sent": True, "resendInSeconds": 30, "channel": "email"}
 
 
 @router.post("/otp/verify")
@@ -99,9 +99,9 @@ def demo_accounts():
     picked = []
     for c in db.rows("SELECT id, name FROM companies WHERE status = 'active' ORDER BY created_at"):
         db.current().set_company(c["id"])
-        for u in db.rows("""SELECT u.name, u.email, u.phone, m.role FROM memberships m JOIN users u ON u.id = m.user_id
+        for u in db.rows("""SELECT u.name, u.email, m.role FROM memberships m JOIN users u ON u.id = m.user_id
                             WHERE m.company_id = %(c)s AND m.status = 'active' ORDER BY m.joined_at, u.id""", c=c["id"]):
-            picked.append({"identifier": u["email"] or u["phone"], "email": u["email"], "name": u["name"],
+            picked.append({"identifier": u["email"], "email": u["email"], "name": u["name"],
                            "companyRole": u["role"], "company": c["name"]})
     db.current().set_company(None)
     return {"accounts": picked}

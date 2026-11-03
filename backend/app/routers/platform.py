@@ -93,7 +93,7 @@ def panel(siteline_platform: str | None = Cookie(None), error: str = ""):
 <label>Name <input name="name" required></label>
 <label>Time zone <input name="time_zone" value="Asia/Kolkata" required></label>
 <label>Owner's name <input name="owner_name" required></label>
-<label>Owner's email or phone <input name="owner_identifier" required></label>
+<label>Owner's work email <input name="owner_identifier" type="email" required></label>
 <label>PM company id <input name="pm_company_id"></label>
 <label>PM link <select name="pm_kind"><option value="mock">Mock PM app</option><option value="http">PM app API</option>
 <option value="none">None (projects made in Siteline)</option></select></label>
@@ -170,11 +170,11 @@ def company_page(company_id: str, siteline_platform: str | None = Cookie(None), 
     if not c:
         return RedirectResponse("/platform?error=No+such+company", status_code=303)
     link = db.row("SELECT * FROM integrations WHERE company_id = %(c)s", c=company_id) or {}
-    members = db.rows("""SELECT u.id, u.name, u.email, u.phone, m.role, m.status FROM memberships m JOIN users u ON u.id = m.user_id
+    members = db.rows("""SELECT u.id, u.name, u.email, m.role, m.status FROM memberships m JOIN users u ON u.id = m.user_id
                          WHERE m.company_id = %(c)s ORDER BY m.role, u.name""", c=company_id)
     invites = db.rows("""SELECT identifier, name, role, expires_at FROM invites WHERE company_id = %(c)s AND status = 'pending'
                          ORDER BY created_at DESC""", c=company_id)
-    people = "".join(f"<tr><td>{_e(m['name'])}</td><td>{_e(m['email'] or m['phone'])}</td><td>{_e(m['role'])}</td>"
+    people = "".join(f"<tr><td>{_e(m['name'])}</td><td>{_e(m['email'])}</td><td>{_e(m['role'])}</td>"
                      f"<td>{_e(m['status'])}</td></tr>" for m in members)
     pending = "".join(f"<tr><td>{_e(i['name'])}</td><td>{_e(i['identifier'])}</td><td>{_e(i['role'])}</td>"
                       f"<td>{_e(i['expiresAt'])}</td></tr>" for i in invites)
@@ -186,10 +186,10 @@ def company_page(company_id: str, siteline_platform: str | None = Cookie(None), 
 PM company {_e(c['pmCompanyId'])}</p><p>{_e(note)}</p>
 <form class="inline" method="post" action="/platform/companies/{_e(company_id)}/status"><input type="hidden" name="status" value="{flip}">
 <button class="quiet">{'Suspend' if flip == 'suspended' else 'Make active again'}</button></form>
-<h2>People</h2><table><tr><th>Name</th><th>Email or phone</th><th>Role</th><th>Status</th></tr>{people}</table>
-<h2>Pending invites</h2><table><tr><th>Name</th><th>Email or phone</th><th>Role</th><th>Expires</th></tr>{pending}</table>
+<h2>People</h2><table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr>{people}</table>
+<h2>Pending invites</h2><table><tr><th>Name</th><th>Email</th><th>Role</th><th>Expires</th></tr>{pending}</table>
 <form method="post" action="/platform/companies/{_e(company_id)}/owner-invite"><label>Invite a new owner: name
-<input name="name" required> email or phone <input name="identifier" required></label><button class="quiet">Send owner invite</button></form>
+<input name="name" required> work email <input name="identifier" type="email" required></label><button class="quiet">Send owner invite</button></form>
 <form method="post" action="/platform/companies/{_e(company_id)}/transfer"><label>Transfer ownership to
 <select name="user_id">{options}</select></label><button class="quiet">Transfer</button></form>
 <h2>PM link</h2><p class="muted">Last API call {_e(link.get('lastCallAt'))} <span class="err">{_e(link.get('lastError'))}</span></p>
@@ -238,7 +238,7 @@ def _mock_section(company_id: str) -> str:
 <form method="post" action="/platform/companies/{_e(company_id)}/mock/down"><input type="hidden" name="down" value="{'0' if down else '1'}">
 <button class="quiet">{'Bring the mock PM app back' if down else 'Make the mock PM app stop answering'}</button></form>
 <ul>{project_rows}</ul>
-<table><tr><th>Project</th><th>Task</th><th>Start</th><th>Finish</th><th>Owner (email/phone)</th><th>Status</th><th>%</th><th></th><th></th></tr>
+<table><tr><th>Project</th><th>Task</th><th>Start</th><th>Finish</th><th>Owner (email)</th><th>Status</th><th>%</th><th></th><th></th></tr>
 {rows}<tr><form method="post" action="/platform/companies/{_e(company_id)}/mock/tasks"><input type="hidden" name="id" value="">
 <td><select name="project_id">{project_opts}</select></td><td><input name="name" placeholder="New task" size="22" required></td>
 <td><input name="planned_start" type="date" value="{date.today()}"></td><td><input name="planned_finish" type="date" value="{date.today()}"></td>

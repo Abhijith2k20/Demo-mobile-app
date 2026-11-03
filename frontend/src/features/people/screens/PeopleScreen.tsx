@@ -17,8 +17,8 @@ import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { CompanyRole, User, UserView } from '@/types/models';
 
-/** A person's email or phone, whichever they have. */
-const address = (u: Pick<User, 'email' | 'phone'>) => u.email ?? u.phone ?? '';
+/** A person's email. */
+const address = (u: Pick<User, 'email'>) => u.email ?? '';
 
 /** Everyone in the company. Owner and Admins can also invite and deactivate people here. */
 function PeopleScreen() {
@@ -97,8 +97,8 @@ function PeopleScreen() {
           <Input
             value={query}
             onChangeText={setQuery}
-            placeholder={t('people.search', 'Search by name, email or phone')}
-            accessibilityLabel={t('people.search', 'Search by name, email or phone')}
+            placeholder={t('people.search', 'Search by name or email')}
+            accessibilityLabel={t('people.search', 'Search by name or email')}
             autoCapitalize="none"
             autoCorrect={false}
           />

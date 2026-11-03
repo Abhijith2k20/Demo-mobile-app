@@ -56,7 +56,7 @@ def test_dev_routes_need_a_sign_in_and_the_test_code_is_only_for_test_accounts(c
     from app import config
 
     assert config.fixed_code_for("ravi@paliath.in") == "123456"
-    assert config.fixed_code_for("+919800000005") == "123456"
+    assert config.fixed_code_for("babu@brightline.events") == "123456"
     assert config.fixed_code_for("someone@realcompany.com") is None
 
 

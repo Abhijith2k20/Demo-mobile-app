@@ -22,12 +22,12 @@ def bearer(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_sign_in_by_email_any_case_and_by_phone(client):
+def test_sign_in_by_email_in_any_case_and_never_by_phone(client):
     r = code(client, "  Ravi@Paliath.IN ").json()
     assert r["session"]["user"]["name"] == "Ravi Kumar" and r["session"]["company"]["name"] == "Paliath Interiors"
-    babu = code(client, "98000 00005").json()  # ten digits are an Indian number
-    assert babu["session"]["user"]["phone"] == "+919800000005" and babu["session"]["company"]["name"] == "Brightline Events"
-    assert client.post("/auth/otp/request", json={"identifier": "not an address"}).status_code == 422
+    assert "phone" not in r["session"]["user"]
+    for not_email in ("not an address", "9800000005", "+919800000005"):
+        assert client.post("/auth/otp/request", json={"identifier": not_email}).status_code == 422
 
 
 def test_unknown_addresses_get_the_same_reply_and_no_code(client):
@@ -101,15 +101,17 @@ def test_two_companies_pick_and_switch(client):
                        headers=bearer(other["accessToken"])).json()["error"]["code"] == "NOT_A_MEMBER"
 
 
-def test_invite_by_phone_then_join(login, client):
+def test_invite_by_email_then_join(login, client):
     nisha = login("nisha@brightline.events")
-    inv = nisha.post("/invites", {"id": uuid7(), "identifier": "+91 98000 00077", "name": "Ganesh K", "role": "member"}).json()
-    assert inv["invite"]["identifier"] == "+919800000077"
+    assert nisha.post("/invites", {"id": uuid7(), "identifier": "+91 98000 00077", "name": "Ganesh K",
+                                   "role": "member"}).status_code == 422  # no phone invites
+    inv = nisha.post("/invites", {"id": uuid7(), "identifier": "Ganesh@Crew.Example", "name": "Ganesh K", "role": "member"}).json()
+    assert inv["invite"]["identifier"] == "ganesh@crew.example"
     assert [i["name"] for i in nisha.get("/invites").json()["invites"]] == ["Ganesh K"]
     with db.transaction():
         sent = db.rows("SELECT payload FROM jobs WHERE kind = 'send_invite'")
-    assert sent[-1]["payload"]["identifier"] == "+919800000077" and "link" in sent[-1]["payload"]
-    r = code(client, "9800000077").json()
+    assert sent[-1]["payload"]["identifier"] == "ganesh@crew.example" and "link" in sent[-1]["payload"]
+    r = code(client, "ganesh@crew.example").json()
     assert r["companies"] == [] and r["invites"][0]["companyName"] == "Brightline Events" and "session" not in r
     h = bearer(r["accessToken"])
     client.post(f"/auth/invites/{r['invites'][0]['id']}/accept", headers=h)

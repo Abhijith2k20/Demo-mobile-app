@@ -48,7 +48,7 @@ def create(*, name: str, time_zone: str, owner_name: str, owner_identifier: str,
 
 
 def invite_owner(company_id: str, name: str, identifier: str, actor: str) -> dict:
-    """(Re)sends the owner's invite; signing in with that email or phone makes them the Owner."""
+    """(Re)sends the owner's invite; signing in with that email makes them the Owner."""
     db.run("UPDATE invites SET status = 'cancelled' WHERE company_id = %(c)s AND role = 'owner' AND status = 'pending'",
            c=company_id)
     invite = db.insert("invites", {"id": uuid7(), "companyId": company_id, "identifier": identifier, "name": name,

@@ -1,4 +1,4 @@
-// Invite someone by work email or phone (spec §5.11). Guests get only the channels picked here.
+// Invite someone by work email (spec §5.11). Guests get only the channels picked here.
 import { Feather } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -78,12 +78,12 @@ export function InviteSheet({ visible, onClose, initial }: { visible: boolean; o
       visible={visible}
       onClose={close}
       title={t('invite.title', 'Invite person')}
-      subtitle={t('invite.hint', 'They get an email or SMS, and join by signing in with that address.')}
+      subtitle={t('invite.hint', 'They get an email, and join by signing in with that address.')}
       full>
       <Field label={t('invite.name', 'Name')} error={errors.name}>
         <SheetInput value={name} onChangeText={(v) => { setName(v); setErrors((e) => ({ ...e, name: '' })); }} placeholder="Deepa Nair" autoCapitalize="words" />
       </Field>
-      <Field label={t('invite.identifier', 'Work email or phone number')} error={errors.identifier}>
+      <Field label={t('invite.identifier', 'Work email')} error={errors.identifier}>
         <SheetInput
           value={identifier}
           onChangeText={(v) => {

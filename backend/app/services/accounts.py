@@ -1,5 +1,5 @@
 """Accounts and sessions (spec §9.4–9.6): sign-in codes, sessions per company, invites, joining a company,
-deactivation. A person has one account (email and/or phone) and a membership in each company."""
+deactivation. A person has one account (their work email) and a membership in each company."""
 from __future__ import annotations
 
 import hashlib
@@ -19,34 +19,20 @@ PER_IDENTIFIER_PER_HOUR = 5
 PER_IP_PER_HOUR = 20
 
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-E164 = re.compile(r"^\+[1-9]\d{7,14}$")
 
 
 # ---- Identifiers ----
 
 def normalize_identifier(raw: str) -> str:
-    """A work email (lower case) or a phone number in E.164; 10 digits are taken as an Indian number."""
-    value = (raw or "").strip()
-    if "@" in value:
-        value = value.lower()
-        if not EMAIL.match(value):
-            raise invalid({"identifier": "Enter a valid email or phone number"})
-        return value
-    digits = re.sub(r"[\s\-()]", "", value)
-    if re.fullmatch(r"\d{10}", digits):
-        digits = "+91" + digits
-    if not E164.match(digits):
-        raise invalid({"identifier": "Enter a valid email or phone number"})
-    return digits
-
-
-def is_phone(identifier: str) -> bool:
-    return identifier.startswith("+")
+    """A work email, in lower case. People are known only by their email (no phone sign-in)."""
+    value = (raw or "").strip().lower()
+    if not EMAIL.match(value):
+        raise invalid({"identifier": "Enter a valid work email"})
+    return value
 
 
 def user_by_identifier(identifier: str) -> dict | None:
-    col = "phone" if is_phone(identifier) else "email"
-    return db.row(f"SELECT * FROM users WHERE {col} = %(v)s AND deleted_at IS NULL AND NOT is_bot", v=identifier)
+    return db.row("SELECT * FROM users WHERE email = %(v)s AND deleted_at IS NULL AND NOT is_bot", v=identifier)
 
 
 def _hash(value: str) -> str:
@@ -105,9 +91,7 @@ def account_for(identifier: str) -> dict:
         return user
     invite = pending_invites(identifier)[0]
     uid = uuid7()
-    return db.insert("users", {"id": uid, "name": invite["name"], "avatarColor": avatar_tone(uid),
-                               "email": None if is_phone(identifier) else identifier,
-                               "phone": identifier if is_phone(identifier) else None})
+    return db.insert("users", {"id": uid, "name": invite["name"], "avatarColor": avatar_tone(uid), "email": identifier})
 
 
 # ---- Sessions ----
@@ -172,7 +156,7 @@ def companies_for(user_id: str) -> list[dict]:
 
 
 def identifiers_of(user: dict) -> list[str]:
-    return [v for v in (user.get("email"), user.get("phone")) if v]
+    return [user["email"]] if user.get("email") else []
 
 
 def invites_for(user: dict) -> list[dict]:
@@ -232,9 +216,9 @@ def _tell_pm_app(event: str, user_id: str) -> None:
     """person.joined / person.left, so the PM app knows who it can send cards to (in the current company)."""
     from .integrations import send_event
 
-    u = db.row("SELECT name, email, phone FROM users WHERE id = %(u)s", u=user_id)
-    if u and (u["email"] or u["phone"]):
-        send_event(event, {"person": u["email"] or u["phone"], "name": u["name"]}, f"evt_{uuid7()}")
+    u = db.row("SELECT name, email FROM users WHERE id = %(u)s", u=user_id)
+    if u and u["email"]:
+        send_event(event, {"person": u["email"], "name": u["name"]}, f"evt_{uuid7()}")
 
 
 def accept_invite(user: dict, invite_id: str) -> dict:
@@ -269,7 +253,7 @@ def delete_account(user_id: str) -> None:
         t.set_company(m["companyId"])
         _tell_pm_app("person.left", user_id)
     t.set_company(previous)
-    db.run("""UPDATE users SET name = 'Former member', email = NULL, phone = NULL, deleted_at = now(), updated_at = now()
+    db.run("""UPDATE users SET name = 'Former member', email = NULL, deleted_at = now(), updated_at = now()
               WHERE id = %(u)s""", u=user_id)
     db.run("UPDATE memberships SET status = 'deactivated', updated_at = now() WHERE user_id = %(u)s", u=user_id)
     db.run("UPDATE sessions SET revoked_at = now() WHERE user_id = %(u)s AND revoked_at IS NULL", u=user_id)

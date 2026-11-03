@@ -21,7 +21,7 @@ from .store import MESSAGE_COLUMNS, company, project_members
 
 
 def public_user(u: dict, viewer: dict | None = None) -> dict:
-    out = {k: u.get(k) for k in ("id", "name", "email", "phone", "companyRole", "avatarColor", "isActive", "online")}
+    out = {k: u.get(k) for k in ("id", "name", "email", "companyRole", "avatarColor", "isActive", "online")}
     if viewer is not None:
         out["canDeactivate"] = bool(u["isActive"]) and can_deactivate(viewer, u)
         out["canChangeRole"] = bool(u["isActive"]) and any(can_change_role(viewer, u, r) for r in ("admin", "member", "guest"))

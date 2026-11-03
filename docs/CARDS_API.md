@@ -26,8 +26,8 @@
 - Every call: `Authorization: Bearer <api key>`, JSON in and out, the standard Siteline error format:
   `{"error": {"code": "NOT_A_MEMBER", "message": "...", "details": {}, "request_id": "req_..."}}`.
 - **Limits:** 120 calls a minute per company (`429 RATE_LIMITED` with `Retry-After`).
-- **People** are named by **ref**: their work email or phone (E.164, `+919800000005`), the same one they sign in
-  to Siteline with. A ref Siteline doesn't know in this company is refused with `NOT_A_MEMBER`, so a card never
+- **People** are named by **ref**: their work email, the same one they sign in to Siteline with (any case;
+  Siteline compares it in lower case). A ref Siteline doesn't know in this company is refused with `NOT_A_MEMBER`, so a card never
   reaches the wrong person.
 
 ## 2. Cards

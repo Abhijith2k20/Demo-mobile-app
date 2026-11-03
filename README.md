@@ -42,6 +42,6 @@ CI runs the same on every push (`.github/workflows/checks.yml`).
 ## Deploy
 
 `render.yaml` describes the API, the worker and Postgres (Singapore). Before going live you need:
-Render, Cloudflare R2, Resend (email), MSG91 with DLT-registered templates (SMS), Sentry, an Expo/EAS
+Render, Cloudflare R2, Resend (email), Sentry, an Expo/EAS
 project (its id in `app.json` → `extra.eas.projectId`, for push), and store developer accounts.
 Set the secrets listed in `render.yaml` in Render, and the API address in `frontend/eas.json`.

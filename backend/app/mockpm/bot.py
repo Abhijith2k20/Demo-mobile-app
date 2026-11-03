@@ -70,9 +70,8 @@ def owners() -> list[str]:
 
 
 def ref_of(user_id: str) -> str | None:
-    """The dev panel names a Siteline person; the mock knows people by email or phone."""
-    u = db.row("SELECT email, phone FROM users WHERE id = %(u)s", u=user_id)
-    return (u["email"] or u["phone"]) if u else None
+    """The dev panel names a Siteline person; the mock knows people by email."""
+    return db.value("SELECT email FROM users WHERE id = %(u)s", u=user_id)
 
 
 # ---- Card content ----

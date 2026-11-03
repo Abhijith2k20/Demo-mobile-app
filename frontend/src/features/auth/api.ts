@@ -4,10 +4,9 @@ import type { CompanyChoice, PendingInvite } from '@/types/models';
 
 export interface CodeSent {
   resendInSeconds: number;
-  channel: 'email' | 'sms';
 }
 
-/** Sends a sign-in code to a work email or phone. The reply is the same whether or not the address is known. */
+/** Sends a sign-in code to a work email. The reply is the same whether or not the address is known. */
 export function requestCode(identifier: string): Promise<CodeSent> {
   return api<CodeSent>('POST', '/auth/otp/request', { identifier: identifier.trim() });
 }
@@ -36,8 +35,7 @@ export const acceptInvite = (id: string): Promise<Choices> => api<Choices>('POST
 export const declineInvite = (id: string): Promise<Choices> => api<Choices>('POST', `/auth/invites/${id}/decline`);
 export const openCompany = (id: string): Promise<void> => pickCompany(id);
 
-/** A rough check before asking the server (which decides): an email, or a phone number with at least 10 digits. */
+/** A rough check before asking the server (which decides): does it look like an email? */
 export function looksLikeIdentifier(value: string): boolean {
-  const v = value.trim();
-  return v.includes('@') ? /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) : v.replace(/\D/g, '').length >= 10;
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim());
 }

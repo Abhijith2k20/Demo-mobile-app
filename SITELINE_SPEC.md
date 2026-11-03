@@ -7,7 +7,7 @@
 > private bot conversation, never to a channel. The PM app decides what to ask, whom, and when; Siteline shows the card, keeps
 > answers made without signal, and sends every answer back by webhook. **The PM app has nothing to do with
 > projects, channels or messages in Siteline.** Every company gets the same app; the only per-company part is its
-> PM link. Companies are created by the Siteline team. Sign-in is a one-time code by email or SMS. The app ships
+> PM link. Companies are created by the Siteline team. Sign-in is a one-time code by email (no phone numbers, no SMS). The app ships
 > as real builds (EAS). The API for the PM team is `docs/CARDS_API.md`.
 >
 > Version 2.0 had Siteline's own bot reading the PM app's tasks; 2.1 moved those decisions to the PM app; 2.2
@@ -115,7 +115,7 @@ online at once, 50,000 messages and 5,000 cards a day.
 | Background work | a `jobs` table in Postgres and one worker process (§10.6) |
 | Live events | WebSocket on the API; Postgres `LISTEN/NOTIFY` carries events from the worker to the API (§10.7) |
 | Files | Cloudflare R2 (S3 API), private bucket, short-lived signed links |
-| Email / SMS codes | Resend (email), MSG91 (SMS, DLT-registered template), behind one `senders/` interface |
+| Email codes | Resend, behind one `senders/` interface |
 | Errors | Sentry (app and backend) |
 | Hosting | Render, Singapore region: API service, worker service, managed Postgres with daily backups and point-in-time recovery |
 | CI | GitHub Actions: lint, typecheck, jest, pytest (against Postgres) on every push; deploy staging on merge to `main`; production by hand |
@@ -204,7 +204,7 @@ Defined in `src/theme/colors.ts` with light and dark values. Never hard-code col
 app/                          ROUTES ONLY: read URL params, render a screen from src/features/<area>/screens/
   _layout.tsx                 providers, theme, fonts, auth gate, push setup
   (auth)/
-    login.tsx                 → auth/LoginScreen (email or phone)
+    login.tsx                 → auth/LoginScreen (work email)
     otp.tsx                   → auth/OtpScreen
     companies.tsx             → auth/CompanyPickerScreen (invites to accept, companies to open)
   (app)/
@@ -240,10 +240,9 @@ it first if the person is a member, otherwise shows "You don't have access to th
 
 One layout (`AuthShell`): dark header with the Siteline mark, a rounded card holding the form.
 
-- **Login:** one field, **"Work email or phone number"**. Starts with a digit or `+` → phone (default country
-  `+91`, shown as a prefix; stored as E.164); otherwise email. **Continue** sends a code (§9.6). Help line:
+- **Login:** one field, **"Work email"** (stored in lower case). **Continue** sends a code by email (§9.4). Help line:
   "Can't sign in? Ask your company admin to invite you."
-- **Code:** six boxes fed by one hidden input (paste and SMS autofill work), the address with **Change**,
+- **Code:** six boxes fed by one hidden input (paste works), the address with **Change**,
   "Resend in 0:30" then **Resend code**. Signs in on the sixth digit. Errors from `OTP_INVALID`, `OTP_EXPIRED`,
   `OTP_TOO_MANY_ATTEMPTS`, `RATE_LIMITED`.
 - **After the code:**
@@ -251,7 +250,7 @@ One layout (`AuthShell`): dark header with the Siteline mark, a rounded card hol
   - exactly one company → open it;
   - several → **company picker** (name, tile, unread count); the last used one is remembered;
   - none and no invites → "You're not in a company on Siteline yet. Ask your admin to invite
-    *ravi@example.com*." with **Use a different email or phone**.
+    *ravi@example.com*." with **Use a different email**.
 - **Join** on an invite creates the membership; first sign-in asks for **your name** (pre-filled from the
   invite).
 
@@ -299,7 +298,7 @@ Mentions and thread replies, newest first; unread items have an accent rule.
 
 ### 5.9 You
 
-- Avatar, name (editable), email, phone, theme.
+- Avatar, name (editable), email, theme.
 - **Company:** current company with **Switch company** (when more than one); **People**; for Owner/Admin
   **Invites** and **PM link** (status, §9.3).
 - **Notifications:** All · Important (DMs, mentions, cards) · Off.
@@ -307,13 +306,13 @@ Mentions and thread replies, newest first; unread items have an accent rule.
 
 ### 5.10 People (`people.tsx`)
 
-Directory of the current company (guests don't see it). Search by name, email or phone. Tap a person: role,
+Directory of the current company (guests don't see it). Search by name or email. Tap a person: role,
 projects you share, **Message**; Owner/Admin get **Change role** and **Deactivate**. Deactivated people are
 listed separately.
 
 ### 5.11 Invites (`invites.tsx`, Owner/Admin)
 
-- **Invite person:** name, email or phone, role (Admin — Owner only; Member; Guest), and for guests the
+- **Invite person:** name, work email, role (Admin — Owner only; Member; Guest), and for guests the
   channels they get. Sends the invite (§9.5). An address already in the company: "Already in Paliath Interiors."
 - **Pending invites:** address, role, invited by, expires in N days; **Resend** and **Cancel**.
 
@@ -357,7 +356,7 @@ IDs are UUIDv7. Times are `timestamptz`.
 | Table | Key columns | Notes |
 |---|---|---|
 | **Global** | | |
-| `users` | id, name, email (unique, lower case, nullable), phone (unique, E.164, nullable), avatar_color, notify (level), deleted_at | A person. At least one of email/phone. No company here. |
+| `users` | id, name, email (unique, lower case, nullable), avatar_color, notify (level), deleted_at | A person, known by their email. No company here. |
 | `companies` | id, name, slug, time_zone, pm_company_id, status (active / suspended / deleted), created_at | Created only by the platform (§9.2) |
 | `integrations` | company_id, kind (mock / http), api_key_hash (the key the PM app calls with), webhook_url, webhook_secret (encrypted), last_call_at, last_error, options | One per company (§9.3) |
 | `otp_codes` | id, identifier, code_hash, expires_at, attempts, created_at | Codes stored hashed |
@@ -402,7 +401,7 @@ card comes from the PM app through the Cards API (`docs/CARDS_API.md`), which al
 
 ### 8.1 Where cards come from
 
-- `POST /api/v1/cards` from the PM app: to one person (by email or phone), with a title, subtitle, a badge (for example red "Overdue"), fields, and answer parts: a one-tap **scale**, up to 3
+- `POST /api/v1/cards` from the PM app: to one person (by email), with a title, subtitle, a badge (for example red "Overdue"), fields, and answer parts: a one-tap **scale**, up to 3
   **buttons** (a button can open a list of **choices**), and whether a **note** (text, voice note, photo) may be
   added.
 - The PM app's own id makes sending safe to repeat. `PATCH` changes or closes an open card ("Changed in the PM
@@ -481,7 +480,7 @@ COMPANY_PERMISSIONS = {
 No public sign-up. From the **platform panel** (§10.8) the super-admin enters:
 - company name and time zone;
 - the PM link: PM company id and the PM app's webhook URL, or the **mock PM app** (§10.8), or none;
-- the owner's name and email or phone.
+- the owner's name and work email.
 
 The server, in one transaction:
 1. creates the company;
@@ -532,8 +531,8 @@ key stops working (`COMPANY_SUSPENDED`). **Delete:** suspended first, data remov
 
 ### 9.5 Invites
 
-- Owner/Admin invite by **email or phone** with a role (and channels for guests).
-- The invite is sent as an email or SMS: "Arjun invited you to Paliath Interiors on Siteline. Get the app:
+- Owner/Admin invite by **work email** with a role (and channels for guests).
+- The invite is sent as an email: "Arjun invited you to Paliath Interiors on Siteline. Get the app:
   <link>". The link only opens the store or the app. **Signing in with that email or phone is what accepts the
   invite** (§5.1), so there is no secret in the link.
 - Invites expire after 14 days. Resend restarts the timer; Cancel stops it.
@@ -563,7 +562,7 @@ key stops working (`COMPANY_SUSPENDED`). **Delete:** suspended first, data remov
 ### 9.8 Account deletion
 
 **Delete my account** (You):
-- removes the person's email, phone, name and push tokens, and deactivates all their memberships;
+- removes the person's email, name and push tokens, and deactivates all their memberships;
 - their messages stay as "Former member";
 - it is required by the app stores.
 
@@ -600,7 +599,7 @@ backend/
                       integration_api (the Cards API, /api/v1), internal (development only)
     services/         business actions: messaging, accounts, companies, projects, cards, webhooks, files, secrets
     jobs/             queue.py (enqueue, claim, retry), handlers.py
-    senders/          email.py, sms.py, push.py
+    senders/          email.py, push.py
     mockpm/           the stand-in PM app: decides what to ask and when, calls the Cards API, takes the webhooks
     events.py         WebSocket hub + LISTEN/NOTIFY
     seed.py, actors.py, netsim.py   development and staging only
@@ -616,7 +615,7 @@ in `access.py`; only `main.py` imports routers (checked by a test).
 | | Development | Staging | Production |
 |---|---|---|---|
 | Database | local Postgres (Docker) | Render Postgres | Render Postgres, backups + point-in-time recovery |
-| Codes | fixed code for seeded accounts | fixed code for seeded accounts | real email/SMS only |
+| Codes | fixed code for seeded accounts | fixed code for seeded accounts | real email codes only |
 | PM link | mock PM app | mock PM app | mock PM app until the real one uses the Cards API |
 | `dev/` (seed, teammates, /internal, dev panel) | on | on | off |
 | App build | development | preview | production |
@@ -830,9 +829,9 @@ production.
 
 ## 14. Acceptance criteria (each must work on staging, on a real Android phone)
 
-1. **New company:** a super-admin creates "Brightline Events" with an owner phone number → the owner gets an
-   SMS, signs in with the code, sees the company, `#announcements`, `#general` and the bot.
-2. **Invite and projects:** the owner invites a worker by phone and a designer by email → each signs in, sees
+1. **New company:** a super-admin creates "Brightline Events" with an owner email → the owner gets an
+   email, signs in with the code, sees the company, `#announcements`, `#general` and the bot.
+2. **Invite and projects:** the owner invites a worker and a designer by email → each signs in, sees
    "invited you", joins, and sees only the company channels; the owner creates a project, adds them to it and
    to a channel, and only then do they see it.
 3. **Separation:** a Paliath member can't see, search, fetch by id, or receive events or files from Brightline
@@ -880,7 +879,7 @@ Each step ends with tests passing and the app working against it.
 3. **Database:** Postgres, models, Alembic, row-level security, the store replaced by queries; the existing
    chat and bot tests pass on Postgres; tenant separation tests.
 4. **Accounts:**
-   - users, memberships, invites, code sign-in by email and SMS, sessions per company, switch;
+   - users, memberships, invites, code sign-in by email, sessions per company, switch;
    - platform panel: create company, suspend, audit log;
    - app: login, code, picker and switcher, invites screen.
 5. **PM sync (2.0, replaced by step 8):** the mock PM moves to Postgres with its platform panel; sync, webhooks, project spaces from PM
@@ -939,7 +938,7 @@ Before calling any step done: `npm run typecheck`, `npm run lint`, `npm test` in
 
 1. Can the PM app call the Cards API (`docs/CARDS_API.md`) and take its webhooks? Who builds its scheduler
    (what to ask, when, reminders)?
-2. How are people identified in the PM app: email, phone, or both? They must match how they sign in to Siteline.
+2. Does the PM app have every person's work email? Siteline knows people only by the email they sign in with.
 3. Files in answers: are 7-day links enough, or should the PM app copy the files when the webhook arrives?
 
 ---

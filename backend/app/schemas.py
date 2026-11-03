@@ -57,7 +57,7 @@ def _channel_name(v: str) -> str:
 # ---- Auth ----
 
 class CodeRequest(Body):
-    identifier: str = Field(min_length=3, max_length=120)  # work email or phone; normalised by services/accounts
+    identifier: str = Field(min_length=3, max_length=120)  # work email; normalised by services/accounts
 
 
 class CodeVerify(Body):

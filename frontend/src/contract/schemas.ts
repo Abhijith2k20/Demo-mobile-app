@@ -40,13 +40,13 @@ export const projectCreateSchema = z.object({
   client: z.string().trim().max(80),
   address: z.string().trim().max(160),
 });
-/** Instant feedback only: the server normalises the email or phone and checks it again. */
+/** Instant feedback only: the server normalises the email and checks it again. */
 export const inviteSchema = z.object({
   name: z.string().trim().min(2, 'Enter their name').max(60),
   identifier: z
     .string()
     .trim()
-    .refine((v) => (v.includes('@') ? /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) : v.replace(/\D/g, '').length >= 10), 'Enter a work email or a phone number'),
+    .refine((v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'Enter a work email'),
   role: z.enum(['admin', 'member', 'guest']),
   channelIds: z.array(z.string()),
 });

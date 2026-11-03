@@ -120,7 +120,7 @@ function DemoPanel() {
         <Section title="1 · Who am I" hint="Switching signs in again; nothing from the previous person is kept.">
           <Card style={{ padding: 0 }}>
             {demoUsers.map((u, i) => {
-              const current = (user?.email === u.identifier || user?.phone === u.identifier) && company?.name === u.company;
+              const current = user?.email === u.identifier && company?.name === u.company;
               const key = `${u.company}:${u.identifier}`;
               return (
                 <View

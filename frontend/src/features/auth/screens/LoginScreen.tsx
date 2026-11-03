@@ -30,14 +30,14 @@ function LoginScreen() {
 
   const submit = async (value = address, company?: string) => {
     if (!looksLikeIdentifier(value)) {
-      setError(t('auth.identifierInvalid', 'Enter your work email or a phone number with 10 digits.'));
+      setError(t('auth.identifierInvalid', 'Enter your work email, like name@company.com.'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const sent = await requestCode(value);
-      router.push({ pathname: '/otp', params: { identifier: value, channel: sent.channel, ...(company ? { company } : {}) } });
+      await requestCode(value);
+      router.push({ pathname: '/otp', params: { identifier: value, ...(company ? { company } : {}) } });
     } catch (e) {
       setError(isAppError(e) ? errorText(e) : errorText('UNKNOWN'));
     } finally {
@@ -48,7 +48,7 @@ function LoginScreen() {
   return (
     <AuthShell
       title={t('auth.signIn', 'Sign in')}
-      subtitle={t('auth.signInHint', 'Enter your work email or phone number to get a 6-digit code.')}
+      subtitle={t('auth.signInHint', 'Enter your work email to get a 6-digit code.')}
       footer={
         <View style={{ alignItems: 'center', gap: space.md }}>
           <Pressable
@@ -67,7 +67,7 @@ function LoginScreen() {
         </View>
       }>
       <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>
-        {t('auth.identifier', 'Work email or phone number')}
+        {t('auth.identifier', 'Work email')}
       </T>
       <View
         style={{
@@ -95,7 +95,7 @@ function LoginScreen() {
           returnKeyType="go"
           placeholder={t('auth.identifierPlaceholder', 'name@company.com or 98765 43210')}
           placeholderTextColor={c.textFaint}
-          accessibilityLabel={t('auth.identifier', 'Work email or phone number')}
+          accessibilityLabel={t('auth.identifier', 'Work email')}
           style={{ flex: 1, color: c.text, fontFamily: fonts.semibold, fontSize: 17, paddingHorizontal: space.lg, paddingVertical: 0 }}
           onSubmitEditing={() => void submit()}
         />

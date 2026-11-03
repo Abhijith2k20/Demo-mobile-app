@@ -34,12 +34,6 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
-      - key: MSG91_AUTH_KEY
-        sync: false
-      - key: MSG91_TEMPLATE_CODE
-        sync: false
-      - key: MSG91_TEMPLATE_INVITE
-        sync: false
       - key: SITELINE_PUSH
         value: expo
       - key: EXPO_ACCESS_TOKEN

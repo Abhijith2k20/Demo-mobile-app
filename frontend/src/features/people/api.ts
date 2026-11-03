@@ -6,7 +6,7 @@ import type { CompanyRole, SentInvite, User, UserView } from '@/types/models';
 import type { InviteInput } from '@/contract/schemas';
 
 /**
- * Invites a person by work email or phone. They join by signing in with it (spec §9.5).
+ * Invites a person by work email. They join by signing in with it (spec §9.5).
  * The server checks the role and whether they're already in the company; errors come back for the form.
  */
 export function invitePerson(input: InviteInput) {

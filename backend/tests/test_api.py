@@ -233,7 +233,7 @@ def test_the_same_app_for_every_company(client, login):
     accounts = client.get("/auth/demo-accounts").json()["accounts"]
     assert {"identifier": "ravi@paliath.in", "email": "ravi@paliath.in", "name": "Ravi Kumar", "companyRole": "member",
             "company": "Paliath Interiors"} in accounts
-    assert any(a["identifier"] == "+919800000005" for a in accounts)  # a phone-only person in Brightline
+    assert all("@" in a["identifier"] for a in accounts)  # everyone signs in by email
     amit = login("amit@paliath.in")
     assert amit.get("/me").json()["company"]["name"] == "Paliath Interiors"
     assert "simpleMode" not in amit.get("/me").json()

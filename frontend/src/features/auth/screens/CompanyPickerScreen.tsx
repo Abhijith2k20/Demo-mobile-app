@@ -86,7 +86,7 @@ function CompanyPickerScreen() {
       footer={
         <Pressable accessibilityRole="button" onPress={startOver} style={{ alignItems: 'center', paddingVertical: space.sm }}>
           <T variant="metaStrong" color="accent">
-            {t('picker.different', 'Use a different email or phone')}
+            {t('picker.different', 'Use a different email')}
           </T>
         </Pressable>
       }>
