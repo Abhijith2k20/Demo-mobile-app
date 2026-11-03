@@ -1,22 +1,24 @@
 {
-  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development",
-      "env": { "EXPO_PUBLIC_ENV": "development" }
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview",
-      "env": { "EXPO_PUBLIC_ENV": "staging", "EXPO_PUBLIC_API_URL": "https://staging-api.siteline.app" }
+      "channel": "preview"
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_ENV": "production", "EXPO_PUBLIC_API_URL": "https://api.siteline.app" }
+      "autoIncrement": true
     }
   },
-  "submit": { "production": {} }
+  "submit": {
+    "production": {}
+  }
 }

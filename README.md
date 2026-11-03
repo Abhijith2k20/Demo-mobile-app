@@ -46,4 +46,6 @@ CI runs the same on every push (`.github/workflows/checks.yml`).
 `render.yaml` describes the API, the worker and Postgres (Singapore). Before going live you need:
 Render, Cloudflare R2, Resend (email), Sentry, an Expo/EAS
 project (its id in `app.json` → `extra.eas.projectId`, for push), and store developer accounts.
-Set the secrets listed in `render.yaml` in Render, and the API address in `frontend/eas.json`.
+Set the secrets listed in `render.yaml` (and `backend/.env.example`) in Render. Set `EXPO_PUBLIC_API_URL` in the Expo
+dashboard (Environment variables, plain text) for the `preview` and `production` environments; publish updates with
+`eas update --environment production` so they get it too.
