@@ -1,35 +1,36 @@
 # Siteline — MVP Spec
 
-> **Version 2.1 — the PM app owns the bot (2026-11-02).** Siteline is a multi-company **work chat** that also
-> **delivers cards for the company's project-management (PM) app**, the way WhatsApp delivers messages for a
-> business: the PM app decides what to ask, whom, and when; Siteline shows the card, keeps answers made without
-> signal, and sends every answer back by webhook. Projects and tasks live only in the PM app. Companies are
-> created by the Siteline team. Sign-in is a one-time code by email or SMS. The app ships as real builds (EAS).
-> The API for the PM team is `docs/CARDS_API.md`.
+> **Version 2.2 — a chat app with a bot API (2026-11-03).** Siteline replaces WhatsApp for a company's teams: a
+> multi-company **Slack-style chat** (projects and channels are just group conversations, made in Siteline) plus
+> one extra: the company's project-management (PM) app can talk to **one person at a time through the Siteline
+> Bot** (the **Cards API**). The PM app decides what to ask, whom, and when; Siteline shows the card, keeps
+> answers made without signal, and sends every answer back by webhook. **The PM app has nothing to do with
+> projects, channels or messages in Siteline.** Every company gets the same app; the only per-company part is its
+> PM link. Companies are created by the Siteline team. Sign-in is a one-time code by email or SMS. The app ships
+> as real builds (EAS). The API for the PM team is `docs/CARDS_API.md`.
 >
-> Version 2.0 had Siteline's own bot reading the PM app's tasks and deciding when to ask; 2.1 moves those
-> decisions to the PM app (`DECISIONS.md`, "The PM app owns the bot").
+> Version 2.0 had Siteline's own bot reading the PM app's tasks; 2.1 moved those decisions to the PM app; 2.2
+> removes the rest of the PM link to projects and channels, company templates, and the site forms (§0.2).
 >
-> **Status:** steps 1–7 of §15 are built as 2.0; step 8 (the Cards API, this version) is built; step 9 (launch)
-> needs the accounts listed in the README. `DECISIONS.md` says where the build differs.
+> **Status:** steps 1–8 of §15 are built; step 9 (chat only, this version) is next; step 10 (launch) needs the
+> accounts listed in the README. `DECISIONS.md` says where the build differs.
 
 ---
 
 ## 0. What the MVP must deliver
 
-1. **Work chat for field teams:** a Slack-style workspace per company: project channels, company channels, DMs,
-   threads, photos, voice notes, files, simple enough for site workers. English only for now (§2).
-2. **Cards from the PM app:** the PM app sends a person a **card** (for example "How far is False ceiling?"
-   with a one-tap scale), reminds, and posts status cards in project channels, all through the
-   **Cards API**. Siteline delivers them in the person's Siteline Bot conversation, with push, and sends each
-   answer back to the PM app. The PM app owns every rule about what to ask and when.
+1. **Work chat for field teams:** a Slack-style workspace per company: projects (a group of channels) made by
+   the Owner and Admins, company channels, DMs, threads, photos, voice notes, files. English only for now (§2).
+2. **A bot for the PM app:** the PM app sends a person a **card** (for example "How far is False ceiling?"
+   with a one-tap scale) and reminders, through the **Cards API**. Siteline delivers them in the person's
+   Siteline Bot conversation, with push, and sends each answer back to the PM app. The PM app owns every rule
+   about what to ask and when. Cards go only to people, never to projects or channels.
 3. **Many companies, fully separated:** each company is a tenant. Nothing from one company is ever visible to
    another. One person can belong to several companies and switch between them.
 4. **Ready to run for real customers:** data in Postgres with backups, real sign-in codes, push notifications,
    file storage, error tracking, staging and production, store builds.
-5. **Any industry:** no industry words in code. Each company has a **setup** (job titles, project channels,
-   problem types, the work channel), copied from an industry template when the company is
-   created. Card wording comes from the PM app.
+5. **The same app for every company:** no templates, no per-company setup, no industry words in code. Card
+   wording comes from the PM app.
 
 **Thin client, as before:** every rule, permission and calculation lives on the server. The app shows what the
 server returns (`access.permissions`, `can*` flags, computed fields) and never works results out itself.
@@ -49,9 +50,22 @@ Everything below exists in the demo and is **deleted** in the MVP (build step 2,
 | Server | `routers/tasks.py` and every `/tasks`, `/me/tasks`, `/projects/:id/tasks` (write), `/task-defaults`, `/baseline/*` route; task rules in `rules.py` (filters, defaults, phases, stages, delay, progress); `services/tasks.py`; view fields `delayDays`, `progress`, `nextStage`, `varianceDays`, `isLate`, `isDelayed`; task events `task.created|updated`; the "shift 5 tasks" scripted teammate; their tests |
 | App | the `tasks` feature folder, task filters and their tests, task translations, the stage colours |
 
-**Kept:** the Siteline Bot conversation (now showing the PM app's cards), status cards, issue and daily report
-cards, project spaces with channels and members, files, Activity for mentions, replies and the PM app's
-notifications.
+**Kept (in 2.0):** the Siteline Bot conversation, project spaces with channels and members, files, Activity.
+
+### 0.2 Removed in version 2.2
+
+| Where | Removed |
+|---|---|
+| Company setup | Industry templates (`interiors`, `events`, `general`), the company `setup`: job titles, standard project channels, the work channel, problem types; `GET /meta`'s setup fields |
+| Projects | Projects from the PM app (`PUT/DELETE /api/v1/projects`), the PM project link (`pm_project_id`, "Open in <PM app>"), "N people in <PM app> aren't on Siteline yet", Recent updates on the project page, project roles (Manager / Member) and job titles, default channels and automatic channel joining |
+| Chat | **Report issue** and **Daily report** forms and cards, "Related task", status cards in channels (`POST /api/v1/messages`, `notify`), the PM app's Activity notices |
+| People | Simple mode (it came from job titles) |
+| Cards | A card's link to a project (its text can still name one) |
+| Dev | Scripted teammates |
+
+**Projects and channels are only conversation:** the Owner and Admins create a project (it starts with
+`#general` holding only its creator), create channels, and add people. Nobody is added to anything
+automatically.
 
 **Expected load at launch** (design for it, prove 10× in a load test): up to 50 companies, 2,000 people, 300
 online at once, 50,000 messages and 5,000 cards a day.
@@ -70,8 +84,9 @@ online at once, 50,000 messages and 5,000 cards a day.
 - **Works on a bad connection:** the last loaded screens show offline; site actions (messages, photos, card
   answers) wait in the send queue (§12.4).
 - **No borrowed branding:** Slack-like layout and density, but not Slack's logo, name, purple, icons or copy.
-- **The PM app is the source of truth for projects and tasks, and decides what the bot asks.** Siteline keeps
-  no copy of tasks and has no rules about them; it delivers cards and answers (§8, §9.3).
+- **The PM app only talks to people through the bot.** It decides what the bot asks; Siteline keeps no copy of
+  its tasks or projects, has no rules about them, and gives it no access to projects, channels or messages
+  (§8, §9.3).
 
 ---
 
@@ -161,8 +176,6 @@ Defined in `src/theme/colors.ts` with light and dark values. Never hard-code col
 | `label` | 12 / 16 | 600, uppercase, +0.6 | Section headers, field labels |
 | `button` | 16 / 22 | 600 | Button labels |
 
-**Simple mode** (job titles the company marks `simpleMode`) bumps `body` to 17 and buttons to 18.
-
 ### 3.4 Spacing, shape, elevation, motion, icons
 
 - 4-pt grid: `xs 4, sm 8, md 12, lg 16, xl 24, xxl 32`. Screen side padding 16.
@@ -178,8 +191,7 @@ Defined in `src/theme/colors.ts` with light and dark values. Never hard-code col
   switcher** when the person belongs to more than one company, and a "Jump to…" search field.
 - **Message grouping** (same sender within 5 min), day dividers, an accent **"New"** divider.
 - **Photo grids** like a site log: 1 full-width, 2 side by side, 3–4 in 2 × 2, more shows "+N".
-- **Cards in chat** (issue, daily report, status) are structured blocks with a left accent rule. **Check-in
-  cards** have their own layout (§8).
+- **Bot cards** have their own layout (§8).
 
 ---
 
@@ -245,12 +257,12 @@ One layout (`AuthShell`): dark header with the Siteline mark, a rounded card hol
 1. **Workspace header** (§3.5) with the company switcher.
 2. **Offline banner** when the server can't be reached.
 3. **Sections** (collapsible, remembered per company):
-   - **PROJECTS:** one row per active project space the person can see (bold if unread). Expanded: its channels
-     (standard channels in setup order, then custom ones by name), unread badges, and a **Project info** row.
+   - **PROJECTS:** one row per active project the person can see (bold if unread). Expanded: its channels
+     (`#general` first, then by name), unread badges, and a **Project info** row.
    - **Archived (N)** when there are archived projects.
    - **COMPANY:** `#announcements` (admins post), `#general`.
-4. **New project** button, Owner/Admin only, and only for companies without a PM link (linked companies get
-   their projects from the PM app, §9.3).
+4. **New project** button, Owner/Admin only: name, client and address (optional). The project starts with
+   `#general` and its creator; they add people from Project settings.
 
 Pull-to-refresh refetches. Rows are 44 px.
 
@@ -259,9 +271,9 @@ Pull-to-refresh refetches. Rows are 44 px.
 As in the demo, without the stage banner:
 - Header: back, `# site-work`, "Villa 99 · 6 members", channel details (members, pinned, settings or leave).
 - Message rows, long-press menu: React, Reply in thread, Copy text, Edit (own, ≤15 min), Delete (own ≤1 h;
-  Managers any), Pin (Managers). **"Create task from message" is removed.**
+  Owner/Admin any), Pin (Owner/Admin).
 - Composer with **"+"**: Camera, Gallery, **Voice note** (real recording, up to 2 min), **File** (PDF and
-  images, up to 25 MB), **Report issue**, **Daily report**. Simple mode adds a large camera button.
+  images, up to 25 MB).
 - Read-only channels and archived projects show a muted bar instead of the composer.
 - Messages are marked read only while the channel is on screen and the app is in the foreground.
 - A new DM exists only on the phone until its first message.
@@ -269,10 +281,9 @@ As in the demo, without the stage banner:
 ### 5.6 Project info (`project/[id]`)
 
 Segmented: **Info · Members · Files**.
-- **Info:** name, client and address (from the PM app), **"Open in <PM app name>"** (link from the PM app),
-  "Channels" with **Browse channels**, **Project settings** for Managers, "Recent updates" (last 5 status
-  cards). Archived projects show a read-only banner.
-- **Members:** avatar, name, Manager/Member badge, job title, channels, and a **from PM** or **guest** label.
+- **Info:** name, client and address, "Channels" with **Browse channels**, **Project settings** for Owner/Admin.
+  Archived projects show a read-only banner.
+- **Members:** avatar, name, the channels they're in, and a **guest** label.
 - **Files:** every photo and file from the project's channels the viewer can read, newest first.
 
 ### 5.7 Bot DM
@@ -281,8 +292,7 @@ The PM app's cards (§8).
 
 ### 5.8 Activity
 
-Mentions, thread replies and the PM app's notifications (status cards it flags for someone),
-newest first; unread items have an accent rule.
+Mentions and thread replies, newest first; unread items have an accent rule.
 
 ### 5.9 You
 
@@ -307,17 +317,16 @@ listed separately.
 ### 5.12 PM link (`integration.tsx`, Owner/Admin)
 
 Read-only status: connected or not, when the PM app last called, the last answer that couldn't be delivered
-(in plain words), and **"N people in <PM app> aren't on Siteline yet"** with **Invite** next to each
-(pre-filled). The link itself is set by the Siteline team in the MVP (§9.2).
+(in plain words). The link itself is set by the Siteline team in the MVP (§9.2).
 
-### 5.13 Project settings (Managers, Owner/Admin)
+### 5.13 Project settings (Owner/Admin)
 
-- **Channels:** list, edit name / private / who is in it, add, delete (not `#general`).
-- **People:** linked projects get their members from the PM app; here a Manager only changes **which channels**
-  each member is in and adds or removes **guests**. Unlinked projects: add/remove members and set roles and job
-  titles as in the demo.
-- **Project:** Archive (unlinked projects; linked ones follow the PM app) and **Delete** (Owner/Admin, type the
-  name).
+- **Project:** name, client, address.
+- **People:** add or remove people on the project. Being on a project lets a person see it and browse and join
+  its public channels; it adds them to no channel.
+- **Channels:** list, add, edit name / private / who is in it, delete (not `#general`). Adding someone to a
+  channel also puts them on the project.
+- **Archive** and **Delete** (type the name).
 
 ### 5.14 Unsent, 5.15 DMs tab
 
@@ -328,14 +337,8 @@ Bot first, then people by latest message; **New message** opens the company dire
 
 ## 6. Forms inside chat
 
-react-hook-form + zod; the server validates again.
-
-| Form | Fields | Result |
-|---|---|---|
-| **Report issue** | What's wrong* (company problem types + Other with text), Photos (0–4), Related task (optional; the tasks of cards the PM app sent about this project in the last 30 days), Urgency (Normal / Urgent) | Issue card; Urgent mentions the project Managers and sends them a push |
-| **Daily report** | Work done today*, People on site (stepper), Photos (0–6), Problems, Tomorrow's plan | Daily report card |
-
-**"New task" is removed.** Creating tasks from chat waits until the PM app has an API for it.
+None. Report issue and Daily report are removed in 2.2: problems reach the PM app through its cards, and
+anything else is a normal message with photos.
 
 ---
 
@@ -350,7 +353,7 @@ IDs are UUIDv7. Times are `timestamptz`.
 |---|---|---|
 | **Global** | | |
 | `users` | id, name, email (unique, lower case, nullable), phone (unique, E.164, nullable), avatar_color, notify (level), deleted_at | A person. At least one of email/phone. No company here. |
-| `companies` | id, name, slug, time_zone, setup (jsonb), pm_company_id, status (active / suspended / deleted), created_at | Created only by the platform (§9.2) |
+| `companies` | id, name, slug, time_zone, pm_company_id, status (active / suspended / deleted), created_at | Created only by the platform (§9.2) |
 | `integrations` | company_id, kind (mock / http), api_key_hash (the key the PM app calls with), webhook_url, webhook_secret (encrypted), last_call_at, last_error, options | One per company (§9.3) |
 | `otp_codes` | id, identifier, code_hash, expires_at, attempts, created_at | Codes stored hashed |
 | `sessions` | id, user_id, company_id, refresh_hash, device, created_at, last_used_at, revoked_at | A session is for one company; switching makes a new one |
@@ -360,32 +363,31 @@ IDs are UUIDv7. Times are `timestamptz`.
 | **Per company** | | |
 | `memberships` | company_id, user_id, role (owner / admin / member / guest), status (active / deactivated), joined_at | A person's place in a company |
 | `invites` | id, company_id, identifier, name, role, channel_ids, invited_by, expires_at, status (pending / accepted / cancelled / expired) | §9.5 |
-| `projects` | id, company_id, pm_project_id (nullable, unique per company), name, client, address, pm_url, archived_at | A **project space**: channels and people; no stages, no dates |
-| `project_members` | company_id, project_id, user_id, role (manager / member), job_title, source (pm / manual / guest) | |
+| `projects` | id, company_id, name, client, address, archived_at | A group of channels for conversation; no link to the PM app |
+| `project_members` | company_id, project_id, user_id, joined_at | Who can see the project and browse its channels |
 | `channels`, `channel_members`, `messages` | as in the demo, plus company_id | `kind`: project / company / dm / bot |
-| `cards` | id, company_id, ext_id (the PM app's id, unique per company), user_id, project_id, message_id, content (jsonb), ref (jsonb), state (open / answered / closed / expired), answer (jsonb), answered_at, seen_at, nudged_at, delivery (pending / delivered / refused / failed), delivery_error, expires_at | A card from the PM app and its answer (§8) |
-| `webhook_deliveries` | id, company_id, event, payload, attempts, next_at, status, last_error | Answers and other events on their way to the PM app |
+| `cards` | id, company_id, ext_id (the PM app's id, unique per company), user_id, message_id, content (jsonb), ref (jsonb), state (open / answered / closed / expired), answer (jsonb), answered_at, seen_at, nudged_at, delivery (pending / delivered / refused / failed), delivery_error, expires_at | A card from the PM app and its answer (§8) |
 | `activities` | as in the demo, plus company_id | |
 | `uploads` | id, company_id, user_id, key (R2), content_type, size, created_at | |
 | `jobs` | id, company_id, kind, run_at, payload, dedupe_key (unique), status, attempts, locked_until, last_error | §10.6 |
 
 ### 7.2 Message types and renderer registry
 
-`text | image | voice | file | card | issue_card | daily_report | status_card | system`. `task_card` is removed;
-`checkin` messages from 2.0 are shown as cards.
+`text | image | voice | file | card | system`. `issue_card`, `daily_report` and `status_card` are removed in 2.2
+(old ones show as "Update the app to see this message").
 Unknown type → "Update the app to see this message."
 
 ### 7.3 Fields the server adds for the viewer
 
 | Reply | Extra fields |
 |---|---|
-| `ProjectView` | `members`, `access { role, jobTitle, permissions[] }`, `linked` (from PM) |
+| `ProjectView` | `members`, `access { permissions[] }` |
 | `ChannelView` | `memberIds`, `peerId`, `joined`, `unreadCount`, `lastReadMessageId`, `lastMessage`, `canPost` |
 | `MessageView` | `replyCount`, `lastReplyAt`, `canEdit`, `canDelete`, `canPin` |
-| `CardView` | the card's content, project name, `state`, `answer`, `delivery` (sending to the PM app / saved / not saved + reason), `queuePosition` |
+| `CardView` | the card's content, `state`, `answer`, `delivery` (sending to the PM app / saved / not saved + reason), `queuePosition` |
 | `UserView` | `role`, `canDeactivate`, `canChangeRole` |
-| `GET /me` | user, current company, `companies[]` (with unread counts), `permissions[]`, `simpleMode` |
-| `GET /meta` | the company's setup: job titles, problem types, default channels, percent steps, edit/delete windows |
+| `GET /me` | user, current company, `companies[]` (with unread counts), `permissions[]` |
+| `GET /meta` | edit and delete windows |
 
 ---
 
@@ -396,8 +398,7 @@ card comes from the PM app through the Cards API (`docs/CARDS_API.md`), which al
 
 ### 8.1 Where cards come from
 
-- `POST /api/v1/cards` from the PM app: to one person (by email or phone), optionally about a project, with a
-  title, subtitle, a badge (for example red "Overdue"), fields, and answer parts: a one-tap **scale**, up to 3
+- `POST /api/v1/cards` from the PM app: to one person (by email or phone), with a title, subtitle, a badge (for example red "Overdue"), fields, and answer parts: a one-tap **scale**, up to 3
   **buttons** (a button can open a list of **choices**), and whether a **note** (text, voice note, photo) may be
   added.
 - The PM app's own id makes sending safe to repeat. `PATCH` changes or closes an open card ("Changed in the PM
@@ -424,8 +425,8 @@ As in 2.0, now drawn from the card's content:
 3. The card shows **"Sending to <PM app>…"** until the PM app replies. A refusal ("This task is already closed")
    shows as "Not saved: …"; no reply after 24 hours of retries shows "Couldn't reach <PM app>" and the company's
    admins are told.
-4. What follows is the PM app's choice: a status card in the project's channel and Activity for its Managers
-   (`POST /api/v1/messages` with `notify`), a follow-up card, or nothing.
+4. What follows is the PM app's choice: a follow-up card (to this person or, for example, their manager), or
+   nothing. The PM app never posts in channels.
 
 ### 8.4 What Siteline guarantees
 
@@ -452,21 +453,20 @@ As in 2.0, now drawn from the card's content:
   DMs), manages projects.
 - **Member:** the projects they are on; the directory; DMs with anyone in the company.
 - **Guest** (client, architect, subcontractor): only the channels they were given; can't browse channels, the
-  directory or other projects; DMs only with people who share a channel; can't be a project Manager; gets bot
-  cards from the PM app like anyone else.
+  directory or other projects; DMs only with people who share a channel; gets bot cards from the PM app like
+  anyone else.
 
-**Project** (`project_members.role`): **Manager**, **Member**. Job title sets default channels only.
+**Projects have no roles of their own:** the Owner and Admins create and run them; everyone else is on a project
+or not.
 
 Permissions live only in `backend/app/rules.py`; the server enforces them and tells the app (as in the demo).
 
 ```python
-PROJECT_PERMISSIONS = {
-  "manager": ["project.edit", "project.members", "channel.manage", "message.delete_any", "message.pin"],
-  "member":  [],
-}
 COMPANY_PERMISSIONS = {
-  "owner":  ["company.people", "user.invite", "user.invite_admin", "user.role", "project.create", "project.delete", "pm.status"],
-  "admin":  ["company.people", "user.invite", "project.create", "project.delete", "pm.status"],
+  "owner":  ["company.people", "user.invite", "user.invite_admin", "user.role", "project.create", "project.manage",
+             "project.delete", "channel.manage", "message.delete_any", "message.pin", "pm.status"],
+  "admin":  ["company.people", "user.invite", "user.role", "project.create", "project.manage", "project.delete",
+             "channel.manage", "message.delete_any", "message.pin", "pm.status"],
   "member": ["company.directory"],
   "guest":  [],
 }
@@ -475,12 +475,12 @@ COMPANY_PERMISSIONS = {
 ### 9.2 Creating a company (super-admin only)
 
 No public sign-up. From the **platform panel** (§10.8) the super-admin enters:
-- company name, time zone, industry template (`interiors`, `events`, `general`);
+- company name and time zone;
 - the PM link: PM company id and the PM app's webhook URL, or the **mock PM app** (§10.8), or none;
 - the owner's name and email or phone.
 
 The server, in one transaction:
-1. creates the company with the template copied into `setup`;
+1. creates the company;
 2. creates `#announcements` and `#general`;
 3. creates the owner's invite (role Owner);
 4. writes the audit log;
@@ -502,19 +502,14 @@ key stops working (`COMPANY_SUSPENDED`). **Delete:** suspended first, data remov
 - **Connecting:** the Siteline team links the company on the platform panel. Siteline makes an **API key** for
   the PM app (shown once, stored hashed, rotatable with 24 hours' overlap) and a **webhook secret**, and saves
   the PM app's **webhook URL**. The key decides the company: every call with it acts only in that company.
-- **Projects and people:** `PUT /api/v1/projects/{ref}` with name, client, address, link, status (active /
-  closed) and the full member list (email or phone, Manager or Member, role name). Siteline creates or updates
-  the project space with the setup's standard channels, archives it when closed, adds and removes PM members
-  (role name → job title → default channels; unknown → the setup's default), keeps guests added in Siteline,
-  and answers with the refs it doesn't know yet. Those are listed on the PM link screen with **Invite**.
-- **Cards and channel messages:** §8; `POST /api/v1/cards`, `PATCH /api/v1/cards/{id}`,
-  `POST /api/v1/cards/{id}/nudge`, `POST /api/v1/messages`.
+- **Cards:** §8; `POST /api/v1/cards`, `PATCH /api/v1/cards/{id}`, `POST /api/v1/cards/{id}/nudge`,
+  `GET /api/v1/cards/{id}`. That is the whole API: the PM app can't reach projects, channels or messages.
 - **Webhooks to the PM app:** `card.answered` (and optionally `card.seen`), `person.joined`, `person.left`.
   Signed with HMAC-SHA256 over `"<timestamp>.<body>"` (`X-Siteline-Signature`, `X-Siteline-Timestamp`), with an
   id per event (`X-Siteline-Id`). Retries after 1, 5 and 15 minutes, then hourly for 24 hours.
 - **Limits:** 120 calls a minute per company.
-- **Files in answers:** links valid for 7 days, plus upload ids the PM app can attach to its channel messages.
-- **No PM link** (a company that doesn't use a PM app): no cards; projects are made in Siteline (§5.2).
+- **Files in answers:** links valid for 7 days.
+- **No PM link** (a company that doesn't use a PM app): no cards; everything else is the same.
 
 ### 9.4 Sign-in and sessions
 
@@ -576,7 +571,6 @@ key stops working (`COMPANY_SUSPENDED`). **Delete:** suspended first, data remov
 - Owner/Admin see every project channel, but never other people's DMs.
 
 **Channel rules:**
-- Managers are in every channel of their project.
 - `#general` can't be renamed, made private, deleted or left.
 - Archived projects are read-only.
 - Deleting a channel or project removes its messages for everyone.
@@ -605,7 +599,6 @@ backend/
     senders/          email.py, sms.py, push.py
     mockpm/           the stand-in PM app: decides what to ask and when, calls the Cards API, takes the webhooks
     events.py         WebSocket hub + LISTEN/NOTIFY
-    setups/           industry templates: interiors.py, events.py, general.py
     seed.py, actors.py, netsim.py   development and staging only
   db/migrations/      numbered SQL files
   tests/
@@ -637,14 +630,14 @@ Secrets come only from the environment.
 | `POST /auth/refresh` / `POST /auth/logout` | Rotating refresh; logout revokes the session |
 | `GET /me` / `PATCH /me` `{name?, notify?}` / `DELETE /me` | Profile, companies, permissions |
 | `PUT /me/push-tokens` `{token, platform}` / `DELETE` | |
-| `GET /meta` | Company setup |
+| `GET /meta` | Edit and delete windows |
 | `GET /users` | Company directory (not for guests) |
 | `PATCH /members/:userId` `{role}` / `POST /members/:userId/deactivate` | |
 | `GET /invites` / `POST /invites` `{id, identifier, name, role, channelIds?}` / `POST /invites/:id/resend` / `DELETE /invites/:id` | Owner/Admin |
 | `GET /integration` | PM link status (Owner/Admin) |
-| `GET /projects` / `GET /projects/:id` / `POST /projects` (unlinked companies) / `PATCH` / `DELETE` | |
-| `POST /projects/:id/members` / `PATCH|DELETE /projects/:id/members/:userId` | Guests, channels; full control for unlinked projects |
-| `GET /projects/:id/updates` / `GET /projects/:id/files` | |
+| `GET /projects` / `GET /projects/:id` / `POST /projects` / `PATCH` / `DELETE` | Create, edit, delete: Owner/Admin |
+| `POST /projects/:id/members` / `DELETE /projects/:id/members/:userId` | Owner/Admin |
+| `GET /projects/:id/files` | |
 | `GET /projects/:id/channels` / `POST /projects/:id/channels` | |
 | `GET /channels` / `GET|PATCH|DELETE /channels/:id` / `POST /channels/:id/join|leave` | |
 | `GET /channels/:id/messages?before=&limit=` / `POST /channels/:id/messages` | Create is idempotent by id |
@@ -652,7 +645,6 @@ Secrets come only from the environment.
 | `PATCH|DELETE /messages/:id` / `PUT /messages/:id/reactions/:emoji` / `POST /channels/:id/read` | |
 | `GET /dms/:userId` / `POST /dms` | |
 | `GET /me/cards` / `POST /cards/:id/answer` | The PM app's cards for me; answering is idempotent |
-| `GET /projects/:id/tasks` | Tasks named in this project's cards in the last 30 days, for "Related task" |
 | `GET /activity` / `POST /activity/read` | |
 | `POST /uploads` (multipart) → `{uploadId}` / `GET /files/:id` → 302 to a signed link (5 min) | Images 10 MB, voice 5 MB, files 25 MB |
 | `WS /ws?token=` | Live events |
@@ -682,7 +674,7 @@ baseline, task defaults, stages.
 - **Events after commit**, only to allowed users of the same company:
   `message.*`, `channel.*`, `project.updated|deleted`, `card.new|updated`, `activity.new|read`,
   `user.updated`, `membership.removed`. The app treats every event as "this changed" and refetches.
-- **Push** for DMs, mentions, thread replies to you, cards, the PM app's notifications and urgent issues, following each
+- **Push** for DMs, mentions, thread replies to you and cards, following each
   person's notification setting. Push text names the sender and channel and shows a short
   preview.
 
@@ -708,10 +700,10 @@ baseline, task defaults, stages.
 - Server-rendered pages at `/platform`, for emails listed in `platform_admins`.
 - Sign-in uses a code to that email, with an 8-hour session.
 - Pages:
-  - **Companies:** list, create, suspend, edit setup (JSON with validation), PM link (webhook URL; make or
+  - **Companies:** list, create, suspend, PM link (webhook URL; make or
     rotate the API key and webhook secret, shown once), resend owner invite, transfer ownership.
-  - **Mock PM app** (companies linked to it): projects, members and tasks; edit dates, owners and status to
-    drive its cards.
+  - **Mock PM app** (companies linked to it): its own projects and tasks; edit dates, owners and status to drive
+    its cards. They never appear in Siteline's projects.
   - **Audit log.**
 - **No page shows messages or files.**
 
@@ -719,7 +711,7 @@ baseline, task defaults, stages.
 
 `OTP_INVALID, OTP_EXPIRED, OTP_TOO_MANY_ATTEMPTS, AUTH_EXPIRED, NO_COMPANY, COMPANY_SUSPENDED, NOT_A_MEMBER,
 ALREADY_MEMBER, INVITE_EXPIRED, FORBIDDEN, NOT_FOUND, VALIDATION_FAILED, MESSAGE_EDIT_WINDOW_PASSED,
-CHANNEL_READ_ONLY, CHANNEL_NAME_TAKEN, CHANNEL_PRIVATE, PROJECT_ARCHIVED, PROJECT_LINKED, FILE_TOO_LARGE,
+CHANNEL_READ_ONLY, CHANNEL_NAME_TAKEN, CHANNEL_PRIVATE, PROJECT_ARCHIVED, FILE_TOO_LARGE,
 CARD_CLOSED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE` (plus client-side `OFFLINE`,
 `TIMEOUT`, `UNKNOWN`), each with a plain English message in the app.
 
@@ -743,12 +735,11 @@ CARD_CLOSED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE` (plus client-sid
 
 ## 11. Seed data (development and staging only)
 
-- **Paliath Interiors** (`interiors` template, Asia/Kolkata): the demo's people, linked to the mock PM app with
-  projects Villa 99, RV University and OITH and their tasks.
-- **Brightline Events** (`events` template): 5 people, 2 projects in the mock PM app.
+- **Paliath Interiors** (Asia/Kolkata): the demo's people; projects Villa 99, RV University and OITH with their
+  channels and conversations; linked to the mock PM app, which has its own tasks for these people.
+- **Brightline Events**: 5 people, 2 projects.
 - **Suresh** is in both companies to test the picker and the switcher.
 - Ravi has an open card on first sign-in.
-- Scripted teammates (`dev/actors.py`) post now and then in Paliath and can be paused.
 
 Production starts empty: the first company is created from the platform panel.
 
@@ -826,7 +817,6 @@ The demo's Demo panel, renamed:
 - switch between seeded accounts;
 - network modes and error injection;
 - ask the mock PM app to send a morning summary or a card now;
-- pause teammates;
 - API and event log;
 - reset staging seed.
 
@@ -839,15 +829,16 @@ production.
 
 1. **New company:** a super-admin creates "Brightline Events" with an owner phone number → the owner gets an
    SMS, signs in with the code, sees the company, `#announcements`, `#general` and the bot.
-2. **Invite:** the owner invites a worker by phone and a designer by email → each signs in, sees "invited you",
-   joins, and gets their default channels when the PM app adds them to a project (`PUT /api/v1/projects`).
+2. **Invite and projects:** the owner invites a worker by phone and a designer by email → each signs in, sees
+   "invited you", joins, and sees only the company channels; the owner creates a project, adds them to it and
+   to a channel, and only then do they see it.
 3. **Separation:** a Paliath member can't see, search, fetch by id, or receive events or files from Brightline
    (automated tests over every route, plus a manual check).
 4. **Two companies:** Suresh signs in → picker; opens Paliath; switches to Brightline from the header; unread
    counts, saved screens and the send queue stay per company; a push from the other company opens it.
 5. **A card from the PM app:** the mock PM app sends Ravi a card about an active task at 17:30 company time →
-   Ravi gets a push and the card; taps 75% → the mock PM app receives `card.answered` and shows 75%, then posts
-   a status card in `#site-work` with an Activity item for the Manager.
+   Ravi gets a push and the card; taps 75% → the mock PM app receives `card.answered` and its task shows 75%.
+   Nothing appears in any channel.
 6. **Information cards:** the mock PM app's 08:30 morning summary shows as a card with one row per task.
 7. **Nudge:** the mock PM app nudges an unanswered card once (one reminder line and a push), even if the worker
    restarts.
@@ -856,8 +847,8 @@ production.
 9. **PM app down:** the webhook URL fails → the card shows "Sending to <PM app>…", the answer is delivered when it
    answers again, once. A refusal shows its reason; 24 hours of failures shows "Couldn't reach <PM app>".
 10. **Cards API safety:** a card to someone outside the company is refused; the same card id twice makes one
-    card; a key from one company can't send to another; `PATCH` closes an open card on the phone at once;
-    `PUT /projects` with a closed status archives the space and with a member removed takes them off it.
+    card; a key from one company can't send to another; `PATCH` closes an open card on the phone at once; the
+    key reaches nothing but cards.
 11. **Roles:** a guest sees only their channels, no directory, no Browse channels; a Member can't invite; an
     Admin can't add an Admin; deactivating someone removes access in that company only.
 12. **Sign-in safety:** wrong code 5 times → `OTP_TOO_MANY_ATTEMPTS`; 6th code request in an hour →
@@ -866,7 +857,7 @@ production.
     companies still work.
 14. **Files and voice:** photo, voice note and PDF upload to R2 and open for channel members only; a signed link
     stops working after 5 minutes.
-15. **Push:** DMs, mentions, cards and the PM app's notifications arrive, following each person's level.
+15. **Push:** DMs, mentions and cards arrive, following each person's level.
 16. **Account deletion** removes the person's details; their messages show "Former member".
 17. **Dark mode** looks intentional on every screen.
 18. **Restore:** a backup restores into a fresh database and the app works against it.
@@ -901,7 +892,10 @@ Each step ends with tests passing and the app working against it.
    messages, webhooks with retries); cards in the app drawn from their content; the 2.0 bot (planner, PM sync,
    PM writes, saved copy of tasks) moves out of Siteline into `mockpm/`, which uses the Cards API like the real
    PM app will. Step by step in `docs/PLAN_CARDS_API.md`.
-9. **Launch:**
+9. **Chat only (version 2.2):** remove company templates and setups, job titles, project roles, simple mode,
+   automatic channel joining, Report issue and Daily report, Recent updates, scripted teammates; the Cards API
+   loses projects and channel messages; projects are made only in Siteline by the Owner and Admins (§0.2).
+10. **Launch:**
    - staging and production on Render, backups and a restore test;
    - load test, store listings, privacy policy;
    - one pilot company, with its PM app on the Cards API.

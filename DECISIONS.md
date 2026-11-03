@@ -638,3 +638,18 @@ The owner removed both.
   escalation feature).
 - **Quiet hours:** pushes go out at once, following only the person's level (All, Important, Off). The switch on
   You is gone; migration `005_no_quiet_hours.sql` strips the saved times.
+
+## Version 2.2: a chat app with a bot API (2026-11-03)
+
+The owner's direction: Siteline replaces WhatsApp for the company's teams. Projects and channels are only group
+conversations; the PM app's only part is the bot, which talks to one person at a time.
+- **Projects are made only in Siteline**, by the Owner and Admins. A new project has `#general` with its creator;
+  they add people to the project and to channels by hand. Nothing joins anyone automatically.
+- **No company templates or setup:** job titles, standard channels, the work channel and problem types are
+  gone, and with job titles simple mode and project roles (Manager / Member). Owner and Admins run projects,
+  channels, pins and deleting others' messages.
+- **The Cards API is cards only:** `PUT/DELETE /projects` and `POST /messages` (with `notify`) are removed, and
+  a card has no project link. The PM app can still name a project in a card's text.
+- **Report issue, Daily report, Recent updates and the scripted teammates are removed.**
+- Old `issue_card`, `daily_report` and PM channel cards in existing chats show "Update the app to see this
+  message"; there is no production data yet, so nothing is converted.

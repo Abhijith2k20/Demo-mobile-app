@@ -1,10 +1,14 @@
 # Siteline Cards API — for the PM app
 
-> **Version 1 (draft, 2026-11-02).** How a company's PM app uses Siteline to reach its people, the way a
+> **Version 2 (draft, 2026-11-03).** How a company's PM app uses Siteline to reach its people, the way a
 > business system uses the WhatsApp Business API. **The PM app decides; Siteline delivers.** The PM app owns
-> projects, tasks and every rule about chasing them: what to ask, when, and reminders. Siteline
-> shows the cards in its app, sends pushes, keeps answers made without signal, and sends every answer back to
-> the PM app by webhook. Siteline has no copy of the PM app's tasks.
+> projects, tasks and every rule about chasing them: what to ask, when, and reminders. Siteline shows the
+> cards in the person's Siteline Bot conversation, sends pushes, keeps answers made without signal, and sends
+> every answer back to the PM app by webhook.
+>
+> **The API is a bot that talks to one person at a time.** It has no access to Siteline's projects, channels or
+> messages; those are the company's own conversations. (Version 1 also had `PUT /projects` and `POST /messages`;
+> both are gone.)
 
 ---
 
@@ -24,41 +28,7 @@
   to Siteline with. A ref Siteline doesn't know in this company is refused with `NOT_A_MEMBER`, so a card never
   reaches the wrong person.
 
-## 2. Projects and their people
-
-The PM app tells Siteline which projects exist and who is on them. Siteline keeps a **project space** per
-project: its standard channels (from the company's setup) and its members.
-
-### `PUT /projects/{projectRef}`
-
-Creates or updates the project space. `projectRef` is the PM app's project id. Repeating it is harmless.
-
-```json
-{
-  "name": "Villa 99",
-  "client": "Villa 99 owners",
-  "address": "Bengaluru",
-  "url": "https://pm.example.com/projects/77",
-  "status": "active",
-  "members": [
-    {"ref": "amit@paliath.in", "role": "manager", "roleName": "Project Manager"},
-    {"ref": "ravi@paliath.in", "role": "member", "roleName": "Worker"}
-  ]
-}
-```
-
-- `status`: `active` or `closed` (closed = the space becomes read-only, archived).
-- `members` is the full list: people missing from it leave the project (their messages stay). `role` is
-  `manager` or `member`; `roleName` is matched to the company's job titles in Siteline (unknown → the default
-  job title), which decides their default channels. Guests added in Siteline are kept.
-- Reply `200`: `{"project": {"id": "...", "ref": "77"}, "unmatched": ["newhire@paliath.in"]}`. `unmatched`
-  lists refs that aren't on Siteline yet; the company's admins see them with an **Invite** button.
-
-### `DELETE /projects/{projectRef}`
-
-Same as `status: closed`.
-
-## 3. Cards
+## 2. Cards
 
 A **card** is a message to one person in their Siteline Bot conversation, with buttons to answer.
 
@@ -68,7 +38,6 @@ A **card** is a message to one person in their Siteline Bot conversation, with b
 {
   "id": "checkin-4411-2026-11-02",
   "to": "ravi@paliath.in",
-  "project": "77",
   "title": "False ceiling – living room",
   "subtitle": "Villa 99 · due Wed 4 Nov",
   "badge": {"text": "Overdue", "tone": "danger"},
@@ -104,7 +73,7 @@ A **card** is a message to one person in their Siteline Bot conversation, with b
 - `push`: the notification. Left out = a push with the title.
 - `expiresAt`: after this the card can't be answered and shows "Expired".
 - Reply `201` (or `200` for a repeat): `{"card": {"id": "...", "state": "open"}}`.
-- Refusals: `NOT_A_MEMBER` (unknown or deactivated ref), `NOT_FOUND` (unknown project), `VALIDATION_FAILED`.
+- Refusals: `NOT_A_MEMBER` (unknown or deactivated ref), `VALIDATION_FAILED`.
 
 Only one card is open at a time on the phone: the others wait as one-line rows ("Update") in the order sent.
 
@@ -128,35 +97,7 @@ push. At most one nudge per card per hour (`429`).
 
 `{"card": {"id", "state": "open|answered|closed|expired", "seenAt", "answer"}}`, for the PM app to check.
 
-## 4. Messages in project channels
-
-### `POST /messages`
-
-Posts a card or a line in a project channel, for status updates.
-
-```json
-{
-  "id": "status-4411-2026-11-02",
-  "project": "77",
-  "channel": "site-work",
-  "card": {
-    "title": "Ravi · False ceiling – living room → 75%",
-    "lines": ["“Boards fixed, cove tomorrow”"],
-    "tone": "info",
-    "photos": ["upl_..."]
-  },
-  "notify": {"managers": true, "people": ["amit@paliath.in"], "push": "Ravi hasn't updated False ceiling"}
-}
-```
-
-- `channel`: a channel name in the project; left out = the company's work channel (from its setup).
-- `card.tone`: `info`, `success`, `warning` or `danger` (the colour of the card's edge).
-- `card.photos`: upload ids from answers (see §5), so a status card can show the person's photo.
-- `notify.managers`: an Activity item for the project's Managers; `people`: for these refs. `push`: the push text
-  sent to them too (left out = Activity only).
-- Same `id` again = the same message.
-
-## 5. Webhooks to the PM app
+## 3. Webhooks to the PM app
 
 Siteline sends `POST <webhook URL>` with:
 
@@ -187,7 +128,7 @@ The PM app should check the signature and that the timestamp is within 5 minutes
 
 - `answer` is one of `{"scale": "<stop id>"}`, `{"button": "<id>"}` or `{"button": "<id>", "choice": "<id>"}`.
 - `answeredAt` is when the person tapped (they may have had no signal); `receivedAt` is when it reached Siteline.
-- File `url`s work for 7 days; `upload` ids can be reused in `POST /messages`.
+- File `url`s work for 7 days.
 
 **The reply decides what the person sees:**
 - `2xx` with `{"result": "accepted"}` (or an empty body): the card shows the answer as saved.
@@ -206,14 +147,15 @@ Sent the first time the person opens a card: `{"card", "ref", "person", "seenAt"
 When someone joins or leaves the company on Siteline: `{"person": "ravi@paliath.in", "name": "Ravi Kumar"}`,
 so the PM app knows who it can send cards to.
 
-## 6. What stays with the PM app
+## 4. What stays with the PM app
 
 - Which tasks to ask about, when (working days, time zones, holidays), how often.
 - Reminders (`nudge`).
-- What an answer means for the task (75% → in progress, Problem → blocked), and any status card it wants posted.
+- What an answer means for the task (75% → in progress, Problem → blocked), and any follow-up card (for example
+  to the person's manager).
 - Morning summaries: an information card (no answer parts) with one `fields` row per task.
 
-## 7. What Siteline guarantees
+## 5. What Siteline guarantees
 
 - A card reaches only an active member of that company, in their Siteline Bot conversation.
 - Answers made without signal are kept on the phone and delivered when it's back, in order, once.
