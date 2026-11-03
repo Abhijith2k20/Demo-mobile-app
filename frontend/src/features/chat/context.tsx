@@ -11,6 +11,8 @@ export interface ChatContextValue {
   isBotChat: boolean;
   /** A direct message: two people, so bubbles skip names and avatars. */
   isDm: boolean;
+  /** The search match the chat is showing: its bubble is outlined. */
+  highlightId?: ID | null;
   onLongPress: (m: Message) => void;
   onOpenThread: (m: Message) => void;
 }

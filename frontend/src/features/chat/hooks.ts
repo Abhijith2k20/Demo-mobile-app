@@ -183,6 +183,22 @@ export function useThread(parentId: ID) {
   return { parent: q.data?.parent ?? null, replies, loading: q.isPending };
 }
 
+/** Messages in the channel's whole history matching `q` (the server searches; 2+ characters, waits for typing to pause). */
+export function useMessageSearch(channelId: ID, query: string) {
+  const q = query.trim();
+  const [settled, setSettled] = useState(q);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(q), 300);
+    return () => clearTimeout(timer);
+  }, [q]);
+  const r = useQuery({
+    queryKey: keys.search(channelId, settled),
+    queryFn: get<{ messages: MessageView[] }>(`/channels/${channelId}/messages/search?q=${encodeURIComponent(settled)}`),
+    enabled: settled.length >= 2,
+  });
+  return { messages: r.data?.messages ?? [], searching: q.length >= 2 && (q !== settled || r.isFetching), failed: r.isError, ready: settled.length >= 2 && r.isSuccess && q === settled };
+}
+
 export function usePinned(channelId: ID): MessageView[] {
   const q = useQuery({ queryKey: keys.pins(channelId), queryFn: get<{ messages: MessageView[] }>(`/channels/${channelId}/pins`) });
   return q.data?.messages ?? [];

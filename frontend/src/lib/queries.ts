@@ -18,6 +18,7 @@ export const keys = {
   messages: (channelId: string) => ['messages', channelId] as const,
   thread: (parentId: string) => ['thread', parentId] as const,
   pins: (channelId: string) => ['pins', channelId] as const,
+  search: (channelId: string, q: string) => ['search', channelId, q] as const,
   dm: (userId: string) => ['dm', userId] as const,
   cards: ['cards'] as const,
   activity: ['activity'] as const,

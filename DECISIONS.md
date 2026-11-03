@@ -104,7 +104,7 @@ differs from it, or where the spec left a choice open. Built against **Expo SDK 
   says "His"; the app does not know anyone's gender).
 - The Demo pill sits a little higher than "just above the tab bar" so it does not cover composers
   and the quick-add bar. It can be dragged and hidden (You → "Show the Demo button" brings it back).
-- Channel search (header icon) is a stub, as the spec permits.
+- Channel search (header icon) searches the whole history of that channel or DM on the server (`GET /channels/{id}/messages/search?q=`, 2+ characters, newest 50 matches, thread replies included). WhatsApp-style: the header becomes the search field, arrows step through matches and the chat jumps to each one (outlined). A reply only in a thread jumps to its parent.
 
 ## Changes requested after the first build
 

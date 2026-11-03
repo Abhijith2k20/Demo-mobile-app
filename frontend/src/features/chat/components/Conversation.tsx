@@ -1,13 +1,12 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { router } from 'expo-router';
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, View } from 'react-native';
 import { Avatar, Button, Divider, EmptyState, IconButton, Row, Skeleton } from '@/components/basics';
 import { Header, OfflineBanner, Screen } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { toast } from '@/stores/ui';
 import { space } from '@/theme/spacing';
 import type { ID, Message, MessageView } from '@/types/models';
 import { BotProgress } from '../../bot/components/BotProgress';
@@ -15,9 +14,10 @@ import { CardQueueProvider } from '../../bot/queue';
 import { leaveChannel } from '../../projects/api';
 import { firstName, useMe, useProject, useProjectAccess, useUsers } from '../../shared';
 import { ChatContext, type ChatContextValue } from '../context';
-import { useChannelInfo, useChannelMessages, usePinned, type ListItem } from '../hooks';
+import { useChannelInfo, useChannelMessages, useMessageSearch, usePinned, type ListItem } from '../hooks';
 import { Composer, ReadOnlyBar } from './Composer';
 import { MessageMenu } from './MessageMenu';
+import { SearchBar } from './SearchBar';
 import { DayDivider, MessageRow, NewDivider } from './MessageRow';
 
 function renderItem({ item }: { item: ListItem }) {
@@ -39,7 +39,29 @@ export function Conversation({ channelId }: { channelId: ID }) {
   const [menu, setMenu] = useState<MessageView | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [details, setDetails] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const [hit, setHit] = useState(0);
+  const search = useMessageSearch(channelId, searching ? query : '');
   const listRef = useRef<FlashListRef<ListItem>>(null);
+
+  const match = searching ? search.messages[hit] : undefined;
+  // A thread reply shows in the chat only when it was also sent to the channel; otherwise jump to its parent.
+  const targetId = match ? (match.threadParentId && !match.data?.alsoToChannel ? match.threadParentId : match.id) : null;
+  const targetIndex = targetId ? items.findIndex((i) => i.kind === 'message' && i.message.id === targetId) : -1;
+  useEffect(() => {
+    if (!targetId) return;
+    if (targetIndex >= 0) {
+      // Rows not drawn yet have guessed heights, so the first jump can land off; a second one, once they're measured, corrects it.
+      const to = { index: targetIndex, viewPosition: 0.4 };
+      void listRef.current?.scrollToIndex({ ...to, animated: true }).then(() => listRef.current?.scrollToIndex({ ...to, animated: false }));
+    }
+    else if (!loadingOlder) void loadOlder(); // older than what's loaded: fetch pages until it's there
+  }, [targetId, targetIndex, loadingOlder, loadOlder]);
+  const closeSearch = () => {
+    setSearching(false);
+    setQuery('');
+  };
 
   const onOpenThread = useCallback((m: Message) => router.push(`/thread/${m.id}`), []);
   const ctx = useMemo<ChatContextValue>(
@@ -50,10 +72,11 @@ export function Conversation({ channelId }: { channelId: ID }) {
       inThread: false,
       isBotChat: info.isBot,
       isDm: info.channel?.kind === 'dm',
+      highlightId: targetId,
       onLongPress: setMenu,
       onOpenThread,
     }),
-    [me, users.byId, info.members, info.isBot, info.channel?.kind, onOpenThread],
+    [me, users.byId, info.members, info.isBot, info.channel?.kind, targetId, onOpenThread],
   );
 
   // The bot conversation shows one open card at a time.
@@ -64,17 +87,33 @@ export function Conversation({ channelId }: { channelId: ID }) {
     <ChatContext.Provider value={ctx}>
       <Queue>
       <Screen>
-        <Header
-          title={info.title}
-          subtitle={info.subtitle}
-          onTitlePress={project ? () => router.push(`/project/${project.id}`) : undefined}
-          right={
-            <View style={{ flexDirection: 'row' }}>
-              <IconButton icon="search" label={t('common.search', 'Search')} onPress={() => toast(t('chat.searchStub', 'Search is not part of this demo.'))} />
-              <IconButton icon="info" label={t('channel.details', 'Details')} onPress={() => setDetails(true)} />
-            </View>
-          }
-        />
+        {searching ? (
+          <SearchBar
+            query={query}
+            onChange={(q) => {
+              setQuery(q);
+              setHit(0); // a new search starts at the newest match
+            }}
+            position={hit}
+            total={search.ready ? search.messages.length : null}
+            busy={search.searching || (!!targetId && targetIndex < 0)}
+            onOlder={() => setHit((h) => Math.min(h + 1, Math.max(search.messages.length - 1, 0)))}
+            onNewer={() => setHit((h) => Math.max(h - 1, 0))}
+            onClose={closeSearch}
+          />
+        ) : (
+          <Header
+            title={info.title}
+            subtitle={info.subtitle}
+            onTitlePress={project ? () => router.push(`/project/${project.id}`) : undefined}
+            right={
+              <View style={{ flexDirection: 'row' }}>
+                {info.isBot || !info.channel ? null : <IconButton icon="search" label={t('common.search', 'Search')} onPress={() => setSearching(true)} />}
+                <IconButton icon="info" label={t('channel.details', 'Details')} onPress={() => setDetails(true)} />
+              </View>
+            }
+          />
+        )}
         <OfflineBanner />
         {info.isBot ? <BotProgress /> : null}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">

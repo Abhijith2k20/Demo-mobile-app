@@ -80,6 +80,17 @@ def list_pins(channel_id: str, user: dict = Depends(current_user)):
     return {"messages": [message_view(m, user, ch) for m in pins]}
 
 
+@router.get("/channels/{channel_id}/messages/search")
+def search_messages(channel_id: str, q: str = Query(..., min_length=2, max_length=100), user: dict = Depends(current_user)):
+    """Newest first, the whole history of one channel the person can see, thread replies included."""
+    ch = visible_channel(user, channel_id)
+    pattern = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    # shortcut: ILIKE scans the channel's messages; add a trigram index when channels reach ~100k messages.
+    found = db.rows(f"""SELECT {MESSAGE_COLUMNS} FROM messages m WHERE channel_id = %(c)s AND deleted_at IS NULL
+                        AND body ILIKE %(p)s ORDER BY created_at DESC, id DESC LIMIT 50""", c=ch["id"], p=pattern)
+    return {"messages": [message_view(m, user, ch) for m in found]}
+
+
 @router.get("/messages/{message_id}/thread")
 def get_thread(message_id: str, user: dict = Depends(current_user)):
     parent, ch = _visible_message(user, message_id)

@@ -132,7 +132,6 @@
     "recording": "Recording…",
     "replies": "{{count}} replies",
     "replyInThread": "Reply in thread",
-    "searchStub": "Search is not part of this demo.",
     "send": "Send",
     "sending": "Sending…",
     "sendingHint": "Waiting for a connection to send.",
@@ -291,6 +290,14 @@
     "client": "Client",
     "create": "Create project",
     "name": "Project name"
+  },
+  "search": {
+    "close": "Close search",
+    "newer": "Newer match",
+    "none": "None",
+    "older": "Older match",
+    "placeholder": "Search messages",
+    "position": "{{n}} of {{total}}"
   },
   "tabs": {
     "activity": "Activity",

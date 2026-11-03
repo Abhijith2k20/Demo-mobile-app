@@ -143,6 +143,8 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
               paddingTop: space.sm,
               paddingBottom: 6,
               opacity: pressed ? 0.8 : 1,
+              borderWidth: 2,
+              borderColor: chat.highlightId === m.id ? c.accent : 'transparent',
             })}>
             {others && !grouped ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
