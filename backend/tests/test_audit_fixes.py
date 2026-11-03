@@ -167,3 +167,66 @@ def test_signing_in_after_the_invite_was_cancelled_is_explained(login, client):
 def test_migrations_started_twice_at_once_both_finish():
     with ThreadPoolExecutor(2) as pool:
         assert list(pool.map(lambda _: db.migrate(), range(2))) == [[], []]
+
+
+# ---- Third audit (2026-11-03) ----
+
+def test_cleanup_books_its_next_run(client):
+    from app.worker import ensure_schedules
+    from conftest import run_jobs
+
+    ensure_schedules()
+    run_jobs({"cleanup"})
+    with db.transaction():
+        assert db.value("SELECT count(*) FROM jobs WHERE kind = 'cleanup' AND status = 'pending'") == 1
+
+
+def test_the_mock_stays_quiet_once_the_real_pm_app_is_linked(login):
+    from app.mockpm import bot as mock
+
+    ravi = login("ravi@paliath.in")
+    before = len(ravi.get("/me/cards").json()["cards"])
+    with in_company("Paliath Interiors"):
+        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks'")
+        db.run("DELETE FROM jobs WHERE kind LIKE 'mock_%%'")
+        mock.plan_day({})
+        assert mock.evening_checkins("ravi@paliath.in") == 0
+        assert not db.value("SELECT 1 FROM jobs WHERE kind LIKE 'mock_%%'")  # not even tomorrow's plan
+    assert len(ravi.get("/me/cards").json()["cards"]) == before
+
+
+def test_only_companies_on_the_mock_get_its_daily_plan(client):
+    from app.worker import ensure_schedules
+
+    with in_company("Brightline Events"):
+        db.run("UPDATE integrations SET kind = 'http' WHERE company_id = current_company()")  # a global table
+    with db.transaction():
+        db.run("DELETE FROM jobs WHERE kind = 'mock_plan_day'")
+    ensure_schedules()
+    with db.transaction():
+        planned = {r["name"] for r in db.rows("""SELECT c.name FROM jobs j JOIN companies c ON c.id = j.company_id
+                                                 WHERE j.kind = 'mock_plan_day'""")}
+    assert planned == {"Paliath Interiors"}
+
+
+def test_a_project_without_a_client_can_be_renamed(login):
+    meera = login("meera@paliath.in")
+    pid = uuid7()
+    meera.post("/projects", {"id": pid, "name": "No Client"})
+    r = meera.patch(f"/projects/{pid}", {"name": "Still No Client", "client": "", "address": ""})
+    assert r.status_code == 200 and r.json()["name"] == "Still No Client"
+
+
+def test_answers_still_reach_the_pm_app_while_the_company_is_suspended(login, client):
+    from app.services import companies
+    from conftest import run_jobs
+
+    ravi = login("ravi@paliath.in")
+    c = next(x for x in ravi.get("/me/cards").json()["cards"] if x["state"] == "open" and x["content"].get("scale"))
+    ravi.post(f"/cards/{c['id']}/answer", {"scale": "50"})
+    with db.transaction():
+        cid = db.value("SELECT id FROM companies WHERE name = 'Paliath Interiors'")
+        companies.set_status(cid, "suspended", "test")
+    run_jobs({"webhook"})
+    with in_company("Paliath Interiors"):
+        assert db.value("SELECT delivery FROM cards WHERE id = %(c)s", c=c["id"]) == "delivered"

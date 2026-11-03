@@ -699,3 +699,14 @@ without a work email can't use Siteline; the company gives them one, or an addre
 - Migrations take a database lock, so the API and the worker can start together.
 - Signing in after the invite was cancelled gives `INVITE_EXPIRED`, not a server error.
 - Removed the scripted teammates' timers and `GET /internal/events`.
+
+## Third audit fixes (2026-11-03)
+
+- The hourly clean-up books its next run under the next hour's label (it used to book nothing).
+- The mock PM app's timers stop once the company is linked to its real PM app; switching back books its plan
+  again. The worker's schedule check now filters `integrations` (a global table) by company.
+- Editing a project accepts an empty client, as creating one does.
+- Suspending a company keeps answers on their way to the PM app (`webhook` jobs run while suspended).
+- The worker re-checks schedules hourly, not only at start.
+- The app saves for offline use only Home's data, the bot, Activity and the 20 newest chats (Android allows
+  6 MB by default).

@@ -252,7 +252,7 @@ class ProjectPatch(Body):
     @field_validator("client")
     @classmethod
     def c(cls, v):
-        return None if v is None else _name(1, 80, "Who is the client?")(v)
+        return None if v is None else _name(0, 80, "")(v)  # optional, as when the project was made
 
     @field_validator("address")
     @classmethod

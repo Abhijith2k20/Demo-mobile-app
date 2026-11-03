@@ -42,6 +42,9 @@ def run_due(limit: int = 1) -> int:
     return len(jobs)
 
 
+SCHEDULE_CHECK_SECONDS = 3600
+
+
 def ensure_schedules() -> None:
     """Companies on the mock PM app have its daily plan queued, and cleanup runs hourly."""
     with db.transaction():
@@ -49,16 +52,21 @@ def ensure_schedules() -> None:
         queue.enqueue("cleanup", {}, company_id=None, dedupe_key=f"cleanup:{time.strftime('%Y-%m-%dT%H', time.gmtime())}")
     for cid in companies:
         with db.transaction(cid):
-            mock = db.value("SELECT 1 FROM integrations WHERE kind = 'mock'")
+            # `integrations` is a global table (no row-level security): filter by company by hand.
+            mock = db.value("SELECT 1 FROM integrations WHERE company_id = %(c)s AND kind = 'mock'", c=cid)
             if mock and not db.value("""SELECT count(*) FROM jobs WHERE company_id = %(c)s AND kind = 'mock_plan_day'
                                         AND status IN ('pending', 'running')""", c=cid):
                 queue.enqueue("mock_plan_day", {}, company_id=cid)
 
 
 def loop(stop: threading.Event | None = None) -> None:
-    ensure_schedules()
+    checked = 0.0
     while not (stop and stop.is_set()):
         try:
+            # Hourly, not only at start: a daily plan or clean-up that failed for good is booked again.
+            if time.monotonic() - checked > SCHEDULE_CHECK_SECONDS:
+                ensure_schedules()
+                checked = time.monotonic()
             if run_due() == 0:
                 time.sleep(1)
         except Exception:

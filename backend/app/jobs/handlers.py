@@ -51,8 +51,9 @@ def cleanup(p: dict) -> None:
     db.run("DELETE FROM otp_requests WHERE at < now() - interval '1 hour'")
     db.run("DELETE FROM otp_codes WHERE expires_at < now() - interval '1 day'")
     db.run("UPDATE invites SET status = 'cancelled' WHERE status = 'pending' AND expires_at < now() - interval '30 days'")
-    enqueue("cleanup", {}, run_at=datetime.now(ZoneInfo("UTC")) + timedelta(hours=1), company_id=None,
-            dedupe_key=f"cleanup:{datetime.now(ZoneInfo('UTC')):%Y-%m-%dT%H}")
+    nxt = datetime.now(ZoneInfo("UTC")) + timedelta(hours=1)
+    # Labelled with the next hour: this run's own label (this hour) is still taken by the job that is running.
+    enqueue("cleanup", {}, run_at=nxt, company_id=None, dedupe_key=f"cleanup:{nxt:%Y-%m-%dT%H}")
 
 
 HANDLERS = {
@@ -69,7 +70,8 @@ HANDLERS = {
 }
 
 # Jobs that stop when their company is suspended (sign-in codes and cleanup don't belong to a company).
-COMPANY_JOBS = set(HANDLERS) - {"send_code", "cleanup"}
+# Answers already given (`webhook`) still reach the PM app while the company is suspended.
+COMPANY_JOBS = set(HANDLERS) - {"send_code", "cleanup", "webhook"}
 
 
 def on_gave_up(job: dict) -> None:

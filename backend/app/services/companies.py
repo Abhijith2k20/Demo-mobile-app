@@ -68,7 +68,9 @@ def set_status(company_id: str, status: str, actor: str) -> None:
     db.run("UPDATE companies SET status = %(s)s, updated_at = now() WHERE id = %(c)s", s=status, c=company_id)
     if status == "suspended":
         db.run("UPDATE sessions SET revoked_at = now() WHERE company_id = %(c)s AND revoked_at IS NULL", c=company_id)
-        db.run("UPDATE jobs SET status = 'cancelled' WHERE company_id = %(c)s AND status = 'pending'", c=company_id)
+        # Answers already given still go to the PM app; everything else for this company stops.
+        db.run("""UPDATE jobs SET status = 'cancelled' WHERE company_id = %(c)s AND status = 'pending'
+                  AND kind <> 'webhook'""", c=company_id)
     elif db.value("SELECT 1 FROM integrations WHERE company_id = %(c)s AND kind = 'mock'", c=company_id):
         enqueue("mock_plan_day", {}, company_id=company_id)
     accounts.audit(company_id, actor, f"company.{status}", company_id)
@@ -94,4 +96,6 @@ def update_pm_link(company_id: str, *, kind: str, webhook_url: str | None, pm_co
               ON CONFLICT (company_id) DO UPDATE SET kind = excluded.kind, webhook_url = excluded.webhook_url,
                 send_card_seen = excluded.send_card_seen""", c=company_id, k=kind, u=webhook_url, s=card_seen)
     db.run("UPDATE companies SET pm_company_id = %(p)s WHERE id = %(c)s", p=pm_company_id, c=company_id)
+    if kind == "mock":  # back on the mock: its daily plan starts again (it stops itself while on a real PM app)
+        enqueue("mock_plan_day", {}, company_id=company_id)
     accounts.audit(company_id, actor, "pm_link.changed", company_id, {"kind": kind})

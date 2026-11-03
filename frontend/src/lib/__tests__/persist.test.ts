@@ -61,3 +61,22 @@ it('keeps each company apart for a person in two companies', async () => {
   await restoreCache('suresh', 'paliath');
   expect(queryClient.getQueryData(['projects'])).toEqual(['Villa 99']);
 });
+
+it('saves Home and the newest 20 chats, not everything ever opened', async () => {
+  startSavingCache('ravi', 'paliath');
+  queryClient.setQueryData(['projects'], ['Project A']);
+  queryClient.setQueryData(['files', 'p1'], ['big list']);
+  for (let i = 0; i < 25; i++) {
+    jest.setSystemTime(1_000_000 + i * 1000); // chat 24 is the newest
+    queryClient.setQueryData(['messages', `ch${i}`], [`message ${i}`]);
+  }
+  jest.advanceTimersByTime(3000);
+  await flush();
+  stopSavingCache();
+  queryClient.clear();
+  await restoreCache('ravi', 'paliath');
+  expect(queryClient.getQueryData(['projects'])).toEqual(['Project A']);
+  expect(queryClient.getQueryData(['files', 'p1'])).toBeUndefined();
+  expect(queryClient.getQueryData(['messages', 'ch24'])).toEqual(['message 24']);
+  expect(queryClient.getQueryData(['messages', 'ch4'])).toBeUndefined(); // one of the 5 oldest
+});

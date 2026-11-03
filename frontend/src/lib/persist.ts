@@ -49,6 +49,10 @@ export async function restoreCache(userId: string, companyId: string): Promise<v
   }
 }
 
+/** Saved for offline use: Home, the bot, Activity, and how to open a channel or DM. */
+const SAVED = new Set(['me', 'users', 'projects', 'channels', 'channel', 'dm', 'cards', 'activity']);
+const MAX_SAVED_CHATS = 20;
+
 let stopSaving: (() => void) | null = null;
 
 /** Saves successful replies a few seconds after the cache changes, for this person and company only. */
@@ -57,7 +61,19 @@ export function startSavingCache(userId: string, companyId: string): void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const flush = () => {
     timer = null;
-    const state = dehydrate(queryClient, { shouldDehydrateQuery: (q) => q.state.status === 'success' && q.queryKey[0] !== 'demo-state' });
+    // Only what the offline screens need, and the newest message lists: Android allows 6 MB in all by default.
+    const recentChats = new Set(
+      queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['messages'] })
+        .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)
+        .slice(0, MAX_SAVED_CHATS)
+        .map((q) => q.queryHash),
+    );
+    const state = dehydrate(queryClient, {
+      shouldDehydrateQuery: (q) =>
+        q.state.status === 'success' && (SAVED.has(String(q.queryKey[0])) || recentChats.has(q.queryHash)),
+    });
     AsyncStorage.setItem(cacheKey(userId, companyId), JSON.stringify({ at: Date.now(), state })).catch((e) => console.warn('[persist] cache not saved', e));
   };
   const unsubscribe = queryClient.getQueryCache().subscribe((event) => {

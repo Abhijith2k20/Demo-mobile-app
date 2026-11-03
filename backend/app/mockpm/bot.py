@@ -105,8 +105,15 @@ def checkin_content(t: dict) -> dict:
 
 # ---- Sending ----
 
+def _still_mock() -> bool:
+    """The company may have moved to its real PM app since a timer was booked: then the mock stays quiet."""
+    return bool(db.value("SELECT 1 FROM integrations WHERE company_id = current_company() AND kind = 'mock'"))
+
+
 def ask(t: dict, *, timers: bool) -> dict | None:
     """One check-in card for a task (one per task per day). With `timers`, a reminder follows if it's unanswered."""
+    if not _still_mock():
+        return None
     card_id = f"checkin-{t['id']}-{today().isoformat()}"
     try:
         card, created = cards.create(ext_id=card_id, to=t["ownerRef"], content=checkin_content(t), ref={"task": t["id"]})
@@ -130,6 +137,8 @@ def checkin_now(ref: str) -> bool:
 
 
 def morning_summary(ref: str) -> None:
+    if not _still_mock():
+        return
     rows = open_tasks_for(ref)[:5]
     if not rows:
         return
@@ -148,6 +157,8 @@ def _open_card(card_id: str) -> dict | None:
 
 
 def remind(card_id: str) -> None:
+    if not _still_mock():
+        return
     if _open_card(card_id):
         try:
             cards.nudge(card_id)
@@ -156,7 +167,10 @@ def remind(card_id: str) -> None:
 
 
 def plan_day(p: dict) -> None:
-    """Queues today's summaries and check-ins, then itself for the next midnight."""
+    """Queues today's summaries and check-ins, then itself for the next midnight. Stops once the company has
+    its real PM app (switching back to the mock books it again)."""
+    if not _still_mock():
+        return
     day, now = today(), datetime.now(zone())
     if day.weekday() in SETTINGS["workingDays"]:
         for ref in owners():
