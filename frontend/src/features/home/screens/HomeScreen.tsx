@@ -154,6 +154,9 @@ function HomeScreen() {
             value={query}
             onChangeText={setQuery}
             placeholder={t('home.jumpTo', 'Jump to…')}
+            autoCorrect={false}
+            spellCheck={false}
+            autoComplete="off"
             placeholderTextColor={c.textFaint}
             accessibilityLabel={t('home.jumpTo', 'Jump to…')}
             style={[type.body, { flex: 1, color: c.onHeader, paddingVertical: 8 }]}

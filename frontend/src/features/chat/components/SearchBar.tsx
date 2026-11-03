@@ -32,6 +32,9 @@ export function SearchBar({ query, onChange, position, total, busy, onOlder, onN
           value={query}
           onChangeText={onChange}
           placeholder={t('search.placeholder', 'Search messages')}
+          autoCorrect={false}
+          spellCheck={false}
+          autoComplete="off"
           placeholderTextColor={c.textFaint}
           autoFocus
           returnKeyType="search"

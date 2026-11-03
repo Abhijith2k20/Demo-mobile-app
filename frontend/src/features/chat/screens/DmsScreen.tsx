@@ -129,6 +129,9 @@ function DmsScreen() {
             value={query}
             onChangeText={setQuery}
             placeholder={t('dms.search', 'Find a conversation')}
+            autoCorrect={false}
+            spellCheck={false}
+            autoComplete="off"
             placeholderTextColor={c.textFaint}
             accessibilityLabel={t('dms.search', 'Find a conversation')}
             style={[type.body, { flex: 1, color: c.text, paddingVertical: 8 }]}

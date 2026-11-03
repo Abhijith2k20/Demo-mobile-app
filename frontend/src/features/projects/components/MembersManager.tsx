@@ -136,7 +136,7 @@ export function MembersManager({ projectId }: { projectId: ID }) {
       )}
 
       <Sheet visible={picker} onClose={() => setPicker(false)} title={t('members.add', 'Add member')} subtitle={t('members.addHint', 'Search the company directory')} full>
-        <SheetInput value={query} onChangeText={setQuery} placeholder={t('home.searchPeople', 'Search people')} />
+        <SheetInput value={query} onChangeText={setQuery} placeholder={t('home.searchPeople', 'Search people')} autoCorrect={false} spellCheck={false} autoComplete="off" />
         <View style={{ marginHorizontal: -space.lg, marginTop: space.sm }}>
           {candidates.length === 0 ? (
             <EmptyState icon="users" title={t('members.noneToAdd', 'No one to add')} hint={t('members.noneToAddHint', 'Everyone in the directory is already on this project.')} />

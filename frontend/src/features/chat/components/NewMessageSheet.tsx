@@ -18,7 +18,7 @@ export function NewMessageSheet({ visible, onClose }: { visible: boolean; onClos
   );
   return (
     <Sheet visible={visible} onClose={onClose} title={t('home.newMessage', 'New message')} full>
-      <SheetInput value={query} onChangeText={setQuery} placeholder={t('home.searchPeople', 'Search people')} />
+      <SheetInput value={query} onChangeText={setQuery} placeholder={t('home.searchPeople', 'Search people')} autoCorrect={false} spellCheck={false} autoComplete="off" />
       <View style={{ marginHorizontal: -space.lg, marginTop: space.sm }}>
         {people.map((u) => (
           <Row

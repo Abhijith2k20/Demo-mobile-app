@@ -98,6 +98,8 @@ function PeopleScreen() {
             value={query}
             onChangeText={setQuery}
             placeholder={t('people.search', 'Search by name or email')}
+            spellCheck={false}
+            autoComplete="off"
             accessibilityLabel={t('people.search', 'Search by name or email')}
             autoCapitalize="none"
             autoCorrect={false}
