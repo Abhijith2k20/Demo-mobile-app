@@ -113,6 +113,7 @@
     "lastReply": "Last reply {{ago}} ago",
     "loadFailed": "Couldn't load messages",
     "loadFailedHint": "They will appear when the connection is back.",
+    "mentionPerson": "Mention {{name}}",
     "messageChannel": "Message {{name}}",
     "messagePerson": "Message {{name}}",
     "micDenied": "Allow microphone access in Settings to record voice notes.",
@@ -166,7 +167,8 @@
     "previewCard": "A card to answer",
     "previewPhoto": "Photo",
     "search": "Find a conversation",
-    "title": "Direct messages"
+    "title": "Direct messages",
+    "unreadLabel": "{{name}}, {{count}} unread"
   },
   "home": {
     "archived": "Archived ({{count}})",

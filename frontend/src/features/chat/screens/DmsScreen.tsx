@@ -68,13 +68,14 @@ function DmsScreen() {
       <Pressable
         key={r.channel.id}
         accessibilityRole="button"
-        accessibilityLabel={`${name}${strong ? `, ${r.unread} unread` : ''}`}
+        accessibilityLabel={strong ? t('dms.unreadLabel', '{{name}}, {{count}} unread', { name, count: r.unread }) : name}
         onPress={() => router.push(r.peer ? `/dm/${r.peer.id}` : '/dm/bot')}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
           gap: space.md,
           paddingHorizontal: space.lg,
+          paddingVertical: space.sm,
           minHeight: 68,
           backgroundColor: pressed ? c.surfaceAlt : 'transparent',
         })}>

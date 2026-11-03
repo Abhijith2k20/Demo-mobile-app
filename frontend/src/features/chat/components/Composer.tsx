@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { IconName } from '@/components/basics';
+import { Avatar, type IconName } from '@/components/basics';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { toast, useUi } from '@/stores/ui';
@@ -13,7 +13,7 @@ import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { ID, Message, User } from '@/types/models';
 import { editMessage } from '../api';
-import { extractMentions, pickPhotos, sendMessage } from '@/features/shared';
+import { extractMentions, isBotUser, pickPhotos, sendMessage, useMe } from '@/features/shared';
 
 const MAX_VOICE_SECONDS = 120;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -68,6 +68,17 @@ export function Composer(props: Props) {
   const inputRef = useRef<TextInput>(null);
   const text = draft;
   const hasText = text.trim().length > 0;
+  const me = useMe();
+  // "@" + letters at the end of the text opens the people list (extractMentions matches first names).
+  // shortcut: only looks at the end of the text, not the cursor; enough for typing forward.
+  const mentionQuery = /(?:^|\s)@(\p{L}*)$/u.exec(text)?.[1]?.toLowerCase();
+  const mentionMatches =
+    mentionQuery === undefined
+      ? []
+      : members
+          .filter((u) => u.id !== me.id && u.isActive && u.email && !isBotUser(u) && u.name.toLowerCase().split(' ').some((w) => w.startsWith(mentionQuery)))
+          .slice(0, 5);
+  const pickMention = (u: User) => setDraft(draftKey, text.replace(/@\p{L}*$/u, `@${u.name.split(' ')[0]} `));
 
   // Editing loads the message text into the input.
   useEffect(() => {
@@ -205,6 +216,30 @@ export function Composer(props: Props) {
         </Pressable>
       ) : null}
 
+      {mentionMatches.length && recording === null ? (
+        <View style={{ borderBottomWidth: 1, borderBottomColor: c.border, paddingVertical: space.xs }}>
+          {mentionMatches.map((u) => (
+            <Pressable
+              key={u.id}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.mentionPerson', 'Mention {{name}}', { name: u.name })}
+              onPress={() => pickMention(u)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: space.md,
+                paddingHorizontal: space.lg,
+                minHeight: touch.min,
+                backgroundColor: pressed ? c.surfaceAlt : 'transparent',
+              })}>
+              <Avatar id={u.id} name={u.name} size={28} />
+              <T variant="body" numberOfLines={1} style={{ flex: 1 }}>
+                {u.name}
+              </T>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {recording !== null ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingTop: space.sm, minHeight: 56 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.danger }} />
