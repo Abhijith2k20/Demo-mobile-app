@@ -90,7 +90,7 @@ export function InviteSheet({ visible, onClose, initial }: { visible: boolean; o
             setIdentifier(v);
             setErrors((e) => ({ ...e, identifier: '' }));
           }}
-          placeholder={t('auth.identifierPlaceholder', 'name@company.com or 98765 43210')}
+          placeholder={t('auth.identifierPlaceholder', 'name@company.com')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}

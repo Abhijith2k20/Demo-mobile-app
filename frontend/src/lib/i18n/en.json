@@ -50,7 +50,7 @@
     "help": "Can't sign in? Ask your company admin to invite you.",
     "identifier": "Work email",
     "identifierInvalid": "Enter your work email, like name@company.com.",
-    "identifierPlaceholder": "name@company.com or 98765 43210",
+    "identifierPlaceholder": "name@company.com",
     "noCode": "Didn't get it?",
     "resend": "Resend code",
     "resendIn": "Resend in 0:{{s}}",

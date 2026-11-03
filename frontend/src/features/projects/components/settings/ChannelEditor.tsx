@@ -95,15 +95,13 @@ export function ChannelEditor({
             ? "#general stays open: anyone on the project can join it."
             : draft.isPrivate
               ? "Only the people ticked below can see this channel. Others cannot find or join it."
-              : "Everyone on the project is in it; people added to the project later join it too."}
+              : draft.channel
+                ? "Everyone on the project is in it; people added to the project later join it too."
+                : "Everyone on the project joins it, and people added later too. You can take people out afterwards."}
         </T>
       </View>
 
-      {!draft.channel && !draft.isPrivate ? (
-        <T variant="meta" color="textMuted">
-          Everyone on the project joins it. You can take people out afterwards.
-        </T>
-      ) : (
+      {!draft.channel && !draft.isPrivate ? null : (
         <View>
           <T
             variant="label"

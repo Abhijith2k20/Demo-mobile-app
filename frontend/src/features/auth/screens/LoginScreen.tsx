@@ -93,7 +93,7 @@ function LoginScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="go"
-          placeholder={t('auth.identifierPlaceholder', 'name@company.com or 98765 43210')}
+          placeholder={t('auth.identifierPlaceholder', 'name@company.com')}
           placeholderTextColor={c.textFaint}
           accessibilityLabel={t('auth.identifier', 'Work email')}
           style={{ flex: 1, color: c.text, fontFamily: fonts.semibold, fontSize: 17, paddingHorizontal: space.lg, paddingVertical: 0 }}
