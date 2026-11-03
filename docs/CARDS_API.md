@@ -6,7 +6,9 @@
 > cards in the person's Siteline Bot conversation, sends pushes, keeps answers made without signal, and sends
 > every answer back to the PM app by webhook.
 >
-> **The API is a bot that talks to one person at a time.** It has no access to Siteline's projects, channels or
+> **The API is a bot that sends cards to people.** Send to anyone in the company, any time, as many as you like
+> (within the rate limit); each card goes to one person's private Siteline Bot conversation, never to a group or
+> channel. The API has no access to Siteline's projects, channels or
 > messages; those are the company's own conversations. (Version 1 also had `PUT /projects` and `POST /messages`;
 > both are gone.)
 

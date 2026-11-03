@@ -642,7 +642,8 @@ The owner removed both.
 ## Version 2.2: a chat app with a bot API (2026-11-03)
 
 The owner's direction: Siteline replaces WhatsApp for the company's teams. Projects and channels are only group
-conversations; the PM app's only part is the bot, which talks to one person at a time.
+conversations; the PM app's only part is the bot, which sends cards to people (any of them, any time; each card to
+one person's bot conversation, never a channel).
 - **Projects are made only in Siteline**, by the Owner and Admins. A new project has `#general` with its creator;
   they add people to the project and to channels by hand. Nothing joins anyone automatically.
 - **No company templates or setup:** job titles, standard channels, the work channel and problem types are

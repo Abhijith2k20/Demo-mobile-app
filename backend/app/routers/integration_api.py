@@ -1,4 +1,5 @@
-"""The Cards API for a company's PM app (docs/CARDS_API.md): a bot that talks to one person at a time. Called with
+"""The Cards API for a company's PM app (docs/CARDS_API.md): a bot that sends cards to people (each card to one
+person's bot conversation, never a channel). Called with
 the company's API key, never a person's session; the key decides the company and reaches nothing but cards.
 HTTP only: the work is in services/cards.py and integrations.py."""
 from __future__ import annotations

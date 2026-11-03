@@ -2,8 +2,9 @@
 
 > **Version 2.2 — a chat app with a bot API (2026-11-03).** Siteline replaces WhatsApp for a company's teams: a
 > multi-company **Slack-style chat** (projects and channels are just group conversations, made in Siteline) plus
-> one extra: the company's project-management (PM) app can talk to **one person at a time through the Siteline
-> Bot** (the **Cards API**). The PM app decides what to ask, whom, and when; Siteline shows the card, keeps
+> one extra: the company's project-management (PM) app can send **cards to people through the Siteline Bot**
+> (the **Cards API**): to anyone in the company, any time, as many as it likes; each card goes to one person's
+> private bot conversation, never to a channel. The PM app decides what to ask, whom, and when; Siteline shows the card, keeps
 > answers made without signal, and sends every answer back by webhook. **The PM app has nothing to do with
 > projects, channels or messages in Siteline.** Every company gets the same app; the only per-company part is its
 > PM link. Companies are created by the Siteline team. Sign-in is a one-time code by email or SMS. The app ships
