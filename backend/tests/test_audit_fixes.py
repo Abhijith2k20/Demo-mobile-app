@@ -93,3 +93,77 @@ def test_guests_added_to_a_project_join_only_the_channels_picked(login):
 def test_a_damaged_platform_cookie_is_just_signed_out(client):
     r = client.get("/platform", cookies={"siteline_platform": "a|not-a-number|x"})
     assert r.status_code == 200 and "Sign in" in r.text
+
+
+# ---- Second audit (2026-11-03) ----
+
+def test_big_bodies_are_refused_before_anything_reads_them(client):
+    huge = {"content-length": str(30 * 1024 * 1024)}
+    r = client.post("/uploads", headers=huge, content=b"x")  # not signed in, and the size alone is enough
+    assert r.status_code == 413 and r.json()["error"]["code"] == "FILE_TOO_LARGE"
+    assert client.post("/auth/otp/request", headers={"content-length": str(2 * 1024 * 1024)}, content=b"x").status_code == 413
+
+
+def test_code_requests_at_once_still_stop_at_five(client):
+    send = lambda _: client.post("/auth/otp/request", json={"identifier": "ravi@paliath.in"}).status_code  # noqa: E731
+    with ThreadPoolExecutor(8) as pool:
+        codes = list(pool.map(send, range(12)))
+    assert codes.count(200) == 5 and codes.count(429) == 7
+
+
+def test_the_rate_limit_address_is_the_one_the_proxy_added():
+    from starlette.requests import Request
+
+    from app.deps import client_ip
+
+    def req(headers):
+        return Request({"type": "http", "headers": [(k.encode(), v.encode()) for k, v in headers.items()],
+                        "client": ("10.0.0.1", 1)})
+
+    assert client_ip(req({"x-forwarded-for": "1.2.3.4, 203.0.113.9"})) == "203.0.113.9"  # 1.2.3.4 was made up
+    assert client_ip(req({})) == "10.0.0.1"
+
+
+def test_a_slow_phone_does_not_hold_up_the_others():
+    import asyncio
+    import time
+
+    from app import events
+
+    class Socket:
+        def __init__(self, delay):
+            self.delay, self.sent, self.closed = delay, [], False
+
+        async def send_text(self, text):
+            await asyncio.sleep(self.delay)
+            self.sent.append(text)
+
+        async def close(self, code=None):
+            self.closed = True
+
+    hub, slow, fast = events.Hub(), Socket(60), Socket(0)
+    hub.add("a", "c1", slow)
+    hub.add("b", "c1", fast)
+    events.SEND_SECONDS, before = 0.2, events.SEND_SECONDS
+    try:
+        t = time.monotonic()
+        asyncio.run(hub.deliver("c1", ["a", "b"], {"type": "message.new"}))
+        assert time.monotonic() - t < 1 and fast.sent and slow.closed
+    finally:
+        events.SEND_SECONDS = before
+
+
+def test_signing_in_after_the_invite_was_cancelled_is_explained(login, client):
+    from conftest import sent_code
+
+    nisha = login("nisha@brightline.events")
+    inv = nisha.post("/invites", {"id": uuid7(), "identifier": "late@crew.example", "name": "Late", "role": "member"}).json()
+    client.post("/auth/otp/request", json={"identifier": "late@crew.example"})
+    nisha.delete(f"/invites/{inv['invite']['id']}")
+    r = client.post("/auth/otp/verify", json={"identifier": "late@crew.example", "code": sent_code("late@crew.example")})
+    assert r.json()["error"]["code"] == "INVITE_EXPIRED"
+
+
+def test_migrations_started_twice_at_once_both_finish():
+    with ThreadPoolExecutor(2) as pool:
+        assert list(pool.map(lambda _: db.migrate(), range(2))) == [[], []]

@@ -688,3 +688,14 @@ The owner removed phone numbers. People sign in, are invited and are named by th
 email. Gone: phone sign-in and invites, SMS (MSG91 and its settings), the `users.phone` column (migration
 `007_email_only.sql`), the +91 handling, and Babu's phone-only seed account (Babu now has an email). Someone
 without a work email can't use Siteline; the company gives them one, or an address they check.
+
+## Second audit fixes (2026-11-03)
+
+- Request bodies over 1 MB (26 MB for `/uploads`), or with no size, are refused before anything reads them.
+- Rate limits use the last `X-Forwarded-For` entry (the one Render's proxy adds); uvicorn no longer trusts the
+  whole header. Sign-in code requests take a lock per address and per IP, so parallel requests are counted.
+- The app refreshes an expired token when the live connection is refused (close code 4401), then reconnects.
+- Live events go to all phones at once, 2 seconds each at most; a slower phone is disconnected and refetches.
+- Migrations take a database lock, so the API and the worker can start together.
+- Signing in after the invite was cancelled gives `INVITE_EXPIRED`, not a server error.
+- Removed the scripted teammates' timers and `GET /internal/events`.

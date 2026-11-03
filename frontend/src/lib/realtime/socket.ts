@@ -1,4 +1,5 @@
 // Live updates: each server event marks the affected data stale, and the screens refetch it.
+import { api } from '@/lib/api/client';
 import { openEventStream } from '@/lib/api/transport';
 import { runOutbox } from '@/lib/outbox';
 import { keysFor, refresh, refreshAll } from '@/lib/queries';
@@ -49,7 +50,8 @@ function onStatus(connected: boolean): void {
 
 export function connectSocket(): void {
   disconnectSocket();
-  close = openEventStream(() => useSession.getState().accessToken, onEvent, onStatus);
+  // Any API call refreshes an expired token (one shared refresh); /me is the smallest.
+  close = openEventStream(() => useSession.getState().accessToken, onEvent, onStatus, () => api('GET', '/me'));
 }
 
 export function disconnectSocket(): void {

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import config, db
 from ..core import ApiError
-from ..deps import current_account
+from ..deps import client_ip, current_account
 from ..schemas import CodeRequest, CodeVerify, PickCompany, Refresh
 from ..services import accounts
 from ..store import person
@@ -28,7 +28,7 @@ def _choices(user: dict) -> dict:
 @router.post("/otp/request")
 def otp_request(body: CodeRequest, request: Request):
     identifier = accounts.normalize_identifier(body.identifier)
-    accounts.request_code(identifier, request.client.host if request.client else "?")
+    accounts.request_code(identifier, client_ip(request))
     # Same answer for known and unknown addresses, so nobody can test who has an account.
     return {"sent": True, "resendInSeconds": 30, "channel": "email"}
 

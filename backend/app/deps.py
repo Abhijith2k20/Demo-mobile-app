@@ -2,12 +2,21 @@
 company comes from that session (never from the request) and is set on the transaction (spec §9.7)."""
 from __future__ import annotations
 
-from fastapi import Header
+from fastapi import Header, Request
 
 from . import db
 from .core import ApiError
 from .services import accounts
 from .store import person
+
+
+def client_ip(request: Request) -> str:
+    """The caller's address for rate limits. Behind Render's proxy it is the last X-Forwarded-For entry (the one
+    the proxy added); earlier entries are written by the caller and can't be trusted."""
+    forwarded = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+    if forwarded:
+        return forwarded[-1]
+    return request.client.host if request.client else "?"
 
 
 def bearer(authorization: str) -> str:

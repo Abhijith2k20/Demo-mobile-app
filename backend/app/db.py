@@ -243,20 +243,30 @@ def _where(where: dict) -> sql.Composable:
 
 # ---- Migrations ----
 
+MIGRATION_LOCK = 7321
+
+
 def migrate() -> list[str]:
     """Applies db/migrations/*.sql not applied yet, in name order, each in its own transaction."""
     applied: list[str] = []
     with pool().connection() as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, at timestamptz DEFAULT now())")
-        conn.commit()
-        done = {r["name"] for r in conn.execute("SELECT name FROM schema_migrations").fetchall()}
-        for path in sorted(MIGRATIONS.glob("*.sql")):
-            if path.name in done:
-                continue
-            with conn.transaction():
-                conn.execute(path.read_text())
-                conn.execute("INSERT INTO schema_migrations (name) VALUES (%s)", [path.name])
-            applied.append(path.name)
+        # The API and the worker start together on a deploy: one migrates, the other waits, then finds it done.
+        conn.execute("SELECT pg_advisory_lock(%s)", [MIGRATION_LOCK])
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, at timestamptz DEFAULT now())")
+            conn.commit()
+            done = {r["name"] for r in conn.execute("SELECT name FROM schema_migrations").fetchall()}
+            for path in sorted(MIGRATIONS.glob("*.sql")):
+                if path.name in done:
+                    continue
+                with conn.transaction():
+                    conn.execute(path.read_text())
+                    conn.execute("INSERT INTO schema_migrations (name) VALUES (%s)", [path.name])
+                applied.append(path.name)
+        finally:
+            conn.rollback()
+            conn.execute("SELECT pg_advisory_unlock(%s)", [MIGRATION_LOCK])  # the connection goes back to the pool
+            conn.commit()
     return applied
 
 

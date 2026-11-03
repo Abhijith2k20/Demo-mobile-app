@@ -8,7 +8,6 @@ import asyncio
 import json
 import logging
 from collections import deque
-from typing import Callable
 
 from fastapi import WebSocket
 
@@ -41,18 +40,22 @@ class Hub:
                         await _close(ws)
             return
         text = json.dumps(event)
-        for uid in set(audience):
-            for ws, cid in list(self.conns.get(uid, {}).items()):
-                if cid == company_id:
-                    await _send(ws, text)
+        sockets = [ws for uid in set(audience) for ws, cid in list(self.conns.get(uid, {}).items()) if cid == company_id]
+        # All at once, each with a time limit: one phone on a bad line must not hold up everyone else's updates.
+        await asyncio.gather(*(_send(ws, text) for ws in sockets))
 
     def clear(self) -> None:
         self.recent.clear()
 
 
+SEND_SECONDS = 2
+
+
 async def _send(ws: WebSocket, text: str) -> None:
     try:
-        await ws.send_text(text)
+        await asyncio.wait_for(ws.send_text(text), SEND_SECONDS)
+    except asyncio.TimeoutError:  # too slow: close it; the app reconnects and fetches everything again
+        await _close(ws)
     except Exception:  # a dead socket is cleaned up by its own receive loop
         pass
 
@@ -100,43 +103,3 @@ async def listen(stop: asyncio.Event) -> None:
             if not stop.is_set():
                 log.exception("event listener failed; reconnecting")
                 await asyncio.sleep(1)
-
-
-# ---- Timers (development only: scripted teammates) ----
-
-_handles: set[asyncio.TimerHandle] = set()
-
-
-def later(seconds: float, fn: Callable[[], object]) -> asyncio.TimerHandle | None:
-    """Runs `fn` in a thread after `seconds`. Outside a running loop it's skipped."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        return None
-
-    def run() -> None:
-        _handles.discard(handle)
-
-        async def go() -> None:
-            try:
-                await asyncio.to_thread(fn)
-            except Exception:
-                log.exception("timer failed")
-
-        asyncio.ensure_future(go())
-
-    handle = loop.call_later(seconds, run)
-    _handles.add(handle)
-    return handle
-
-
-def cancel(handle: asyncio.TimerHandle | None) -> None:
-    if handle:
-        handle.cancel()
-        _handles.discard(handle)
-
-
-def cancel_all() -> None:
-    for h in list(_handles):
-        h.cancel()
-    _handles.clear()

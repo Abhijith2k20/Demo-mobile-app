@@ -65,9 +65,3 @@ def evening(user: dict = Depends(current_user)):
 def pm_down(body: dict, user: dict = Depends(current_user)):
     data.set_down(bool(body.get("down")))
     return {"down": bool(body.get("down"))}
-
-
-@router.get("/events")
-def events(user: dict = Depends(current_user)):
-    items = [e for targets, e in hub.recent if user["id"] in targets]
-    return {"events": [{"type": e["type"]} | {k: v for k, v in e.items() if k in ("channelId", "userId")} for e in items[-50:]]}

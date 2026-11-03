@@ -16,7 +16,7 @@ from psycopg import errors as pg_errors
 from . import config, db, netsim
 from .core import ApiError, ERROR_STATUS, uuid7
 from .deps import user_for_token
-from .events import cancel_all, hub, listen
+from .events import hub, listen
 from .logs import request_id, setup_logging
 from .routers import auth, cards, channels, integration_api, internal, me, messages, people, platform, projects, uploads
 
@@ -41,7 +41,6 @@ async def lifespan(_: FastAPI):
     stop.set()
     if worker_stop:
         worker_stop.set()
-    cancel_all()
     await listener
     db.close_pool()
 
@@ -96,6 +95,24 @@ async def id_taken(request: Request, e: pg_errors.UniqueViolation):
 async def unexpected(request: Request, e: Exception):
     log.exception("unexpected error")
     return error_response("INTERNAL_ERROR", "Something went wrong on our side.", {}, request_id.get())
+
+
+MAX_UPLOAD_BYTES = 26 * 1024 * 1024  # the largest file (25 MB) plus the form around it
+MAX_BODY_BYTES = 1024 * 1024
+
+
+@app.middleware("http")
+async def limit_body(request: Request, call_next):
+    """Refuses big bodies before anything reads them: the framework reads the whole body before the sign-in
+    check, so without this a stranger could fill the disk or memory with one request."""
+    if request.method in ("POST", "PUT", "PATCH"):
+        size = request.headers.get("content-length")
+        limit = MAX_UPLOAD_BYTES if request.url.path == "/uploads" else MAX_BODY_BYTES
+        if size is None and request.headers.get("transfer-encoding"):
+            return error_response("FILE_TOO_LARGE", "Send the size of what you upload.", {}, f"req_{uuid7()}")
+        if size is not None and (not size.isdigit() or int(size) > limit):
+            return error_response("FILE_TOO_LARGE", "That is too big to send.", {}, f"req_{uuid7()}")
+    return await call_next(request)
 
 
 @app.middleware("http")

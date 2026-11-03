@@ -9,4 +9,5 @@ COPY db ./db
 RUN useradd --create-home siteline && chown -R siteline /app
 USER siteline
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# No --forwarded-allow-ips "*": that trusts an X-Forwarded-For the caller writes (deps.client_ip reads Render's entry).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

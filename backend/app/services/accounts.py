@@ -51,6 +51,9 @@ def pending_invites(identifier: str) -> list[dict]:
 
 def request_code(identifier: str, ip: str) -> None:
     """Sends a code when the address belongs to someone or has an invite. The reply is the same either way."""
+    # Requests at the same moment queue here, so each one sees the others in the count (no "50 at once").
+    db.run("SELECT pg_advisory_xact_lock(hashtext(%(k)s))", k="otp-ip:" + ip)
+    db.run("SELECT pg_advisory_xact_lock(hashtext(%(k)s))", k="otp-id:" + identifier)
     db.run("DELETE FROM otp_requests WHERE at < now() - interval '1 hour'")
     by_id = db.value("SELECT count(*) FROM otp_requests WHERE identifier = %(v)s AND at > now() - interval '1 hour'", v=identifier)
     by_ip = db.value("SELECT count(*) FROM otp_requests WHERE ip = %(ip)s AND at > now() - interval '1 hour'", ip=ip)
@@ -89,7 +92,10 @@ def account_for(identifier: str) -> dict:
     user = user_by_identifier(identifier)
     if user:
         return user
-    invite = pending_invites(identifier)[0]
+    invites = pending_invites(identifier)
+    if not invites:  # the invite was cancelled or expired between asking for the code and entering it
+        raise ApiError("INVITE_EXPIRED", "This invite has expired or was cancelled. Ask for a new one.")
+    invite = invites[0]
     uid = uuid7()
     return db.insert("users", {"id": uid, "name": invite["name"], "avatarColor": avatar_tone(uid), "email": identifier})
 

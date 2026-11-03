@@ -18,6 +18,7 @@ from .. import config, db
 from ..core import ApiError, uuid7
 from ..jobs.queue import enqueue
 from ..mockpm import data as mock
+from ..deps import client_ip
 from ..schemas import CompanyCreate
 from ..services import accounts, companies, integrations
 
@@ -104,7 +105,7 @@ def panel(siteline_platform: str | None = Cookie(None), error: str = ""):
 @router.post("/login", response_class=HTMLResponse)
 def login(request: Request, email: str = Form(...)):
     email = email.strip().lower()
-    ip = request.client.host if request.client else "?"
+    ip = client_ip(request)
     if db.value("SELECT count(*) FROM otp_requests WHERE ip = %(ip)s AND at > now() - interval '1 hour'", ip=ip) >= 20:
         return RedirectResponse("/platform?error=Too+many+tries.+Wait+an+hour.", status_code=303)
     db.run("INSERT INTO otp_requests (identifier, ip) VALUES (%(v)s, %(ip)s)", v="platform:" + email, ip=ip)

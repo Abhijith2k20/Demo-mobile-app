@@ -81,6 +81,8 @@ export function openEventStream(
   getToken: () => string | null,
   onEvent: (e: ServerEvent) => void,
   onStatus: (connected: boolean) => void,
+  /** The server refused the token (it expired): get a fresh one before trying again. */
+  onTokenRefused: () => Promise<unknown>,
 ): () => void {
   let ws: WebSocket | null = null;
   let closed = false;
@@ -111,12 +113,14 @@ export function openEventStream(
         console.warn('[events] bad frame', e);
       }
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       if (ping) clearInterval(ping);
       ping = null;
       ws = null;
       onStatus(false);
-      schedule();
+      // 4401: the access token expired (it lasts an hour). Retrying with it would fail forever.
+      if (e.code === 4401) void onTokenRefused().catch(() => {}).finally(schedule);
+      else schedule();
     };
     ws.onerror = () => ws?.close();
   }
