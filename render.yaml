@@ -16,6 +16,8 @@ services:
         sync: false
       - key: SITELINE_PLATFORM_KEY
         sync: false
+      - key: SITELINE_PLATFORM_ADMINS
+        sync: false
       - key: SITELINE_PUBLIC_URL
         sync: false
       - key: SITELINE_WORKER

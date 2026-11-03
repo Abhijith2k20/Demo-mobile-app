@@ -139,7 +139,7 @@ def test_a_slow_phone_does_not_hold_up_the_others():
             self.sent.append(text)
 
         async def close(self, code=None):
-            self.closed = True
+            self.closed = code
 
     hub, slow, fast = events.Hub(), Socket(60), Socket(0)
     hub.add("a", "c1", slow)
@@ -148,7 +148,8 @@ def test_a_slow_phone_does_not_hold_up_the_others():
     try:
         t = time.monotonic()
         asyncio.run(hub.deliver("c1", ["a", "b"], {"type": "message.new"}))
-        assert time.monotonic() - t < 1 and fast.sent and slow.closed
+        assert time.monotonic() - t < 1 and fast.sent
+        assert slow.closed == events.TOO_SLOW  # not 4401, which would make the app refresh its token
     finally:
         events.SEND_SECONDS = before
 
@@ -230,3 +231,90 @@ def test_answers_still_reach_the_pm_app_while_the_company_is_suspended(login, cl
     run_jobs({"webhook"})
     with in_company("Paliath Interiors"):
         assert db.value("SELECT delivery FROM cards WHERE id = %(c)s", c=c["id"]) == "delivered"
+
+
+def test_reset_from_the_dev_panel_does_not_lock_itself(login):
+    arjun = login("arjun@paliath.in")
+    assert arjun.post("/internal/reset").json() == {"reset": True}
+
+
+def test_nul_characters_are_refused_not_a_server_error(login):
+    ravi = login("ravi@paliath.in")
+    assert ravi.get("/channels/abc%00def").status_code == 422
+    sw = channel_named(ravi, "Villa 99", "site-work")
+    r = ravi.post(f"/channels/{sw['id']}/messages", {"id": uuid7(), "type": "text", "body": "a\u0000b", "data": None})
+    assert r.status_code == 422
+
+
+def test_a_reaction_is_an_emoji_not_text(login):
+    ravi = login("ravi@paliath.in")
+    sw = channel_named(ravi, "Villa 99", "site-work")
+    m = ravi.post(f"/channels/{sw['id']}/messages", {"id": uuid7(), "type": "text", "body": "hi", "data": None}).json()
+    assert ravi.put(f"/messages/{m['id']}/reactions/{'x' * 300}", {"on": True}).status_code == 422
+    assert ravi.put(f"/messages/{m['id']}/reactions/hello", {"on": True}).status_code == 422
+    assert ravi.put(f"/messages/{m['id']}/reactions/👍", {"on": True}).json()["reactions"] == {"👍": [ravi.user["id"]]}
+
+
+def test_one_message_holds_at_most_20_different_reactions(login):
+    ravi = login("ravi@paliath.in")
+    sw = channel_named(ravi, "Villa 99", "site-work")
+    m = ravi.post(f"/channels/{sw['id']}/messages", {"id": uuid7(), "type": "text", "body": "hi", "data": None}).json()
+    with in_company("Paliath Interiors"):
+        db.run("UPDATE messages SET reactions = %(r)s WHERE id = %(id)s",
+               r=db.Json({chr(0x1F600 + i): ["x"] for i in range(20)}), id=m["id"])
+    assert ravi.put(f"/messages/{m['id']}/reactions/👍", {"on": True}).status_code == 422
+    assert ravi.put(f"/messages/{m['id']}/reactions/{chr(0x1F600)}", {"on": True}).status_code == 200  # an existing one
+
+
+def test_production_refuses_to_start_without_safe_settings(monkeypatch):
+    import pytest
+
+    from app import config
+
+    monkeypatch.setattr(config, "PRODUCTION", True)
+    monkeypatch.setattr(config, "FIXED_CODE", "")
+    monkeypatch.setattr(config, "SECRET", "s" * 40)
+    monkeypatch.setattr(config, "PLATFORM_KEY", "k" * 30)
+    monkeypatch.setattr(config, "STORAGE", "local")
+    monkeypatch.setattr(config, "PUBLIC_URL", "http://localhost:8000")
+    with pytest.raises(RuntimeError, match="SITELINE_STORAGE.*SITELINE_PUBLIC_URL"):
+        config.check()
+    monkeypatch.setattr(config, "STORAGE", "r2")
+    monkeypatch.setattr(config, "PUBLIC_URL", "https://api.siteline.app")
+    config.check()  # all good
+
+
+def test_migrations_build_an_empty_database_from_nothing(monkeypatch):
+    """What the first production deploy does. Runs every migration in a fresh, empty schema."""
+    import psycopg
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+
+    schema = f"fresh_{uuid7().replace('-', '')[:12]}"
+    with psycopg.connect(db.DATABASE_URL, autocommit=True) as conn:
+        conn.execute(f"CREATE SCHEMA {schema}")
+    fresh = ConnectionPool(db.DATABASE_URL, min_size=1, max_size=2, open=True,
+                           kwargs={"options": f"-c search_path={schema}", "row_factory": dict_row})
+    try:
+        monkeypatch.setattr(db, "_pool", fresh)
+        applied = db.migrate()
+        assert applied and applied[0].startswith("001")
+        with fresh.connection() as conn:
+            assert conn.execute(f"SELECT count(*) AS n FROM {schema}.schema_migrations").fetchone()["n"] == len(applied)
+            assert conn.execute(f"SELECT to_regclass('{schema}.companies') AS t").fetchone()["t"]
+        assert db.migrate() == []  # a second start finds everything done
+    finally:
+        fresh.close()
+        with psycopg.connect(db.DATABASE_URL, autocommit=True) as conn:
+            conn.execute(f"DROP SCHEMA {schema} CASCADE")
+
+
+def test_staff_listed_in_the_settings_become_platform_admins(monkeypatch, client):
+    from app import config
+    from app.main import _add_platform_admins
+
+    monkeypatch.setattr(config, "PLATFORM_ADMINS", ["ops@siteline.app"])
+    _add_platform_admins()
+    _add_platform_admins()  # every start: no duplicates, no error
+    with db.transaction():
+        assert db.value("SELECT count(*) FROM platform_admins WHERE email = 'ops@siteline.app'") == 1

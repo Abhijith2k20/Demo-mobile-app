@@ -26,6 +26,9 @@ def state(user: dict = Depends(current_user)):
 def reset(user: dict = Depends(current_user)):
     from ..seed import reset_everything
 
+    # End this request's own transaction first: it holds locks from the sign-in check, and the wipe (TRUNCATE)
+    # would wait on them forever.
+    db.current().finish()
     reset_everything()
     return {"reset": True}
 

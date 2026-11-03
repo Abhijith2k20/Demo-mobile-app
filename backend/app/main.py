@@ -28,6 +28,7 @@ async def lifespan(_: FastAPI):
     setup_logging()
     config.check()
     await run_in_threadpool(db.migrate)
+    await run_in_threadpool(_add_platform_admins)
     if config.DEV_TOOLS and os.environ.get("SITELINE_SEED", "1") != "0":
         await run_in_threadpool(_seed_if_empty)
     stop = asyncio.Event()
@@ -43,6 +44,12 @@ async def lifespan(_: FastAPI):
         worker_stop.set()
     await listener
     db.close_pool()
+
+
+def _add_platform_admins() -> None:
+    with db.transaction():
+        for email in config.PLATFORM_ADMINS:
+            db.run("INSERT INTO platform_admins (email) VALUES (%(e)s) ON CONFLICT DO NOTHING", e=email)
 
 
 def _seed_if_empty() -> None:
@@ -88,6 +95,13 @@ async def validation_error(request: Request, e: RequestValidationError):
 async def id_taken(request: Request, e: pg_errors.UniqueViolation):
     # An id made on the phone that already exists (in this company or, hidden by row-level security, another).
     return error_response("VALIDATION_FAILED", "Some fields need attention.", {"fields": {"id": "Already used"}},
+                          request_id.get())
+
+
+@app.exception_handler(pg_errors.DataError)
+async def bad_text(request: Request, e: pg_errors.DataError):
+    # Text the database can't store (a NUL character, a malformed value): the caller's input, not our bug.
+    return error_response("VALIDATION_FAILED", "Some fields need attention.", {"fields": {"_": "Unreadable characters"}},
                           request_id.get())
 
 

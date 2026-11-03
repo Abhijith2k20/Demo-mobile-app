@@ -127,16 +127,17 @@ export function enqueue(input: NewItem): ID {
   const userId = useSession.getState().user?.id;
   if (!userId) throw new Error('No session');
   const items = useOutbox.getState().items;
-  const { id, ...rest } = input;
+  const { id: given, ...rest } = input;
+  const id = given ?? uuidv7(); // one id for the item and its kept files
   if (rest.kind === 'message') {
     rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
-    if (rest.file) rest.file = { ...rest.file, uri: keepPhoto(rest.file.uri, `${id ?? uuidv7()}-file`) };
+    if (rest.file) rest.file = { ...rest.file, uri: keepPhoto(rest.file.uri, `${id}-file`) };
   }
   if (rest.kind === 'card') {
     rest.photos = rest.photos.map((p) => ({ ...p, uri: keepPhoto(p.uri, p.attachmentId) }));
     if (rest.voice) rest.voice = { ...rest.voice, uri: keepPhoto(rest.voice.uri, `${rest.cardId}-voice`) };
   }
-  const item = { ...rest, id: id ?? uuidv7(), userId, createdAt: new Date().toISOString(), state: 'waiting', attempts: 0, nextAt: 0, error: null } as OutboxItem;
+  const item = { ...rest, id, userId, createdAt: new Date().toISOString(), state: 'waiting', attempts: 0, nextAt: 0, error: null } as OutboxItem;
   save([...items, item]);
   void runOutbox();
   return item.id;

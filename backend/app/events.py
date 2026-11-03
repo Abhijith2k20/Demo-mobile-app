@@ -55,14 +55,17 @@ async def _send(ws: WebSocket, text: str) -> None:
     try:
         await asyncio.wait_for(ws.send_text(text), SEND_SECONDS)
     except asyncio.TimeoutError:  # too slow: close it; the app reconnects and fetches everything again
-        await _close(ws)
+        await _close(ws, TOO_SLOW)
     except Exception:  # a dead socket is cleaned up by its own receive loop
         pass
 
 
-async def _close(ws: WebSocket) -> None:
+SIGNED_OUT, TOO_SLOW = 4401, 4008  # the app refreshes its token only on 4401
+
+
+async def _close(ws: WebSocket, code: int = SIGNED_OUT) -> None:
     try:
-        await ws.close(code=4401)
+        await ws.close(code=code)
     except Exception:
         pass
 

@@ -710,3 +710,16 @@ without a work email can't use Siteline; the company gives them one, or an addre
 - The worker re-checks schedules hourly, not only at start.
 - The app saves for offline use only Home's data, the bot, Activity and the 20 newest chats (Android allows
   6 MB by default).
+
+## Found by testing the running app (2026-11-03)
+
+- **Migrations on an empty database did nothing** (the migration lock left a transaction open, which was rolled
+  back). Fixed, with a test that builds every table in an empty schema. This would have broken the first
+  production deploy.
+- **The first platform admin:** `SITELINE_PLATFORM_ADMINS` (comma-separated emails) is added at every start, so a
+  fresh production database has someone who can open the panel. Listed people still need the emailed code.
+- Production refuses to start without `SITELINE_STORAGE=r2` and an https `SITELINE_PUBLIC_URL`.
+- The dev panel's Reset no longer deadlocks on its own sign-in check.
+- A NUL character in input is a 422, not a server error. Emails must look like ordinary addresses.
+- Reactions must be emoji (no text), at most 20 different ones per message.
+- A phone too slow for live updates is closed with code 4008, so it reconnects without refreshing its token.

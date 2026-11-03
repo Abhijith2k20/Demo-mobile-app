@@ -19,6 +19,10 @@ def fixed_code_for(identifier: str) -> str | None:
     """The fixed code when this is a seeded test account (outside production), else None."""
     return FIXED_CODE if FIXED_CODE and identifier.endswith(TEST_ACCOUNTS) else None
 
+# Siteline staff who may sign in to the platform panel (comma-separated emails), added at start-up. Without this a
+# fresh production database has nobody who can open the panel. Being listed only lets them ask for a code.
+PLATFORM_ADMINS = [e.strip().lower() for e in os.environ.get("SITELINE_PLATFORM_ADMINS", "").split(",") if e.strip()]
+
 # Protects POST /platform/companies (the PM app or a script calls it).
 PLATFORM_KEY = os.environ.get("SITELINE_PLATFORM_KEY", "" if PRODUCTION else "dev-platform-key")
 
@@ -47,5 +51,9 @@ def check() -> None:
             problems.append("SITELINE_FIXED_CODE is not allowed in production")
         if not PLATFORM_KEY or len(PLATFORM_KEY) < 24:
             problems.append("SITELINE_PLATFORM_KEY must be set")
+        if STORAGE != "r2":  # local files live on the server's disk, which Render wipes on every deploy
+            problems.append("SITELINE_STORAGE must be r2")
+        if not PUBLIC_URL.startswith("https://"):  # file links and invites point here
+            problems.append("SITELINE_PUBLIC_URL must be the https address of the API")
         if problems:
             raise RuntimeError("Unsafe production settings: " + "; ".join(problems))

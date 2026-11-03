@@ -18,7 +18,8 @@ MAX_ATTEMPTS = 5
 PER_IDENTIFIER_PER_HOUR = 5
 PER_IP_PER_HOUR = 20
 
-EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Ordinary addresses only (letters, digits and . _ % + ' - before the @; a real domain after it).
+EMAIL = re.compile(r"^[a-z0-9._%+'-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$")
 
 
 # ---- Identifiers ----

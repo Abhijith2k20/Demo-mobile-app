@@ -17,6 +17,7 @@ from ..services.messaging import post_message
 router = APIRouter(tags=["messages"])
 
 CLIENT_TYPES = {"text", "image", "voice", "file"}
+MAX_REACTION_KINDS = 20  # different emoji on one message (each event carries them all)
 
 
 def _clean_data(raw: dict | None) -> dict | None:
@@ -167,6 +168,8 @@ def delete_message(message_id: str, user: dict = Depends(current_user)):
 
 @router.put("/messages/{message_id}/reactions/{emoji}")
 def set_reaction(message_id: str, emoji: str, body: Reaction, user: dict = Depends(current_user)):
+    if not emoji or len(emoji) > 16 or any(ch.isspace() or ch.isalnum() for ch in emoji):
+        raise invalid({"emoji": "Pick an emoji"})  # a reaction is an emoji, not a place to write text
     m, ch = _visible_message(user, message_id)
     if m["deletedAt"]:
         raise not_found("Message")
@@ -176,6 +179,8 @@ def set_reaction(message_id: str, emoji: str, body: Reaction, user: dict = Depen
     (people.add if body.on else people.discard)(user["id"])
     reactions = {k: v for k, v in current.items() if k != emoji}
     if people:
+        if emoji not in current and len(current) >= MAX_REACTION_KINDS:
+            raise invalid({"emoji": "This message has enough different reactions"})
         reactions[emoji] = sorted(people)
     return message_view(_save(m, {"reactions": reactions}, "message.updated", ch), user, ch)
 

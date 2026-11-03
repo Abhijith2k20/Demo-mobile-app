@@ -256,6 +256,7 @@ def migrate() -> list[str]:
             conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, at timestamptz DEFAULT now())")
             conn.commit()
             done = {r["name"] for r in conn.execute("SELECT name FROM schema_migrations").fetchall()}
+            conn.commit()  # end the read's transaction, so each migration below commits on its own
             for path in sorted(MIGRATIONS.glob("*.sql")):
                 if path.name in done:
                     continue
