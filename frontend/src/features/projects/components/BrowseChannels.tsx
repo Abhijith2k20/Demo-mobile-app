@@ -22,7 +22,7 @@ export function BrowseChannels({ projectId, visible, onClose }: { projectId: ID;
       ) : q.isError ? (
         <EmptyState icon="cloud-off" title="Couldn't load channels" hint="Check the connection and try again." action={<Button small full={false} kind="secondary" label="Try again" onPress={() => void q.refetch()} />} />
       ) : open.length === 0 ? (
-        <EmptyState icon="check-circle" title="You're in every channel you can join" hint="Private channels are by invitation from a manager." />
+        <EmptyState icon="check-circle" title="You're in every channel you can join" hint="Private channels are by invitation from an admin." />
       ) : (
         open.map((ch) => (
           <View key={ch.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 56 }}>

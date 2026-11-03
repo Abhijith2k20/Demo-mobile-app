@@ -15,23 +15,18 @@ import type { ID, Message, User } from '@/types/models';
 import { editMessage } from '../api';
 import { extractMentions, pickPhotos, sendMessage } from '@/features/shared';
 
-export type FormKind = 'issue' | 'report';
-
 const MAX_VOICE_SECONDS = 120;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 interface Props {
   channelId: ID;
   threadParentId?: ID;
-  /** Project forms (issue / report) are offered only in project channels. */
-  projectId: ID | null;
   members: User[];
   placeholder: string;
   /** Thread only: label for "Also send to #channel". */
   alsoSendLabel?: string;
   editing: Message | null;
   onDoneEditing: () => void;
-  onOpenForm: (kind: FormKind) => void;
 }
 
 function Tile({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
@@ -57,8 +52,8 @@ function Tile({ icon, label, onPress }: { icon: IconName; label: string; onPress
 }
 
 export function Composer(props: Props) {
-  const { channelId, threadParentId, projectId, members, editing } = props;
-  const { c, type, simple } = useTheme();
+  const { channelId, threadParentId, members, editing } = props;
+  const { c, type } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const draftKey = threadParentId ? `thread:${threadParentId}` : `channel:${channelId}`;
@@ -160,11 +155,6 @@ export function Composer(props: Props) {
     setDraft(draftKey, '');
   };
 
-  const openForm = (kind: FormKind) => {
-    setPlus(false);
-    props.onOpenForm(kind);
-  };
-
   const round = (icon: IconName, label: string, onPress: () => void, active: boolean) => (
     <Pressable
       accessibilityRole="button"
@@ -231,24 +221,6 @@ export function Composer(props: Props) {
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.xs, paddingHorizontal: space.sm, paddingTop: space.sm }}>
           {editing ? null : round('plus', t('chat.more', 'More options'), () => setPlus(true), false)}
-          {simple && !editing ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('plus.camera', 'Camera')}
-              onPress={() => void sendPhotos('camera')}
-              style={{
-                width: touch.large,
-                height: touch.large,
-                borderRadius: radius.card,
-                borderWidth: 2,
-                borderColor: c.accent,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: space.xs,
-              }}>
-              <Feather name="camera" size={24} color={c.accent} />
-            </Pressable>
-          ) : null}
           <TextInput
             ref={inputRef}
             value={text}
@@ -267,7 +239,7 @@ export function Composer(props: Props) {
                 paddingHorizontal: space.lg,
                 paddingTop: 10,
                 paddingBottom: 10,
-                minHeight: simple ? touch.large : touch.min,
+                minHeight: touch.min,
                 maxHeight: 132,
               },
             ]}
@@ -291,8 +263,6 @@ export function Composer(props: Props) {
             }}
           />
           <Tile icon="file-text" label={t('plus.file', 'File')} onPress={() => void sendFile()} />
-          {projectId ? <Tile icon="alert-triangle" label={t('forms.reportIssue', 'Report issue')} onPress={() => openForm('issue')} /> : null}
-          {projectId ? <Tile icon="clipboard" label={t('forms.dailyReport', 'Daily report')} onPress={() => openForm('report')} /> : null}
         </View>
       </Sheet>
     </View>

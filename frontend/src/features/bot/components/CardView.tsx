@@ -13,7 +13,7 @@ import { T } from '@/components/T';
 import { radius, space, touch } from '@/theme/spacing';
 import { useLargeText, useTheme } from '@/theme/useTheme';
 import type { CardAnswer, CardButton, CardContent, ID, Message, Tone } from '@/types/models';
-import { pickPhotos, shortProjectName, useProjectAccess } from '../../shared';
+import { pickPhotos } from '../../shared';
 import { answerCard, markSeen } from '../api';
 import { asks, useCard } from '../hooks';
 import { useCardQueue } from '../queue';
@@ -37,7 +37,7 @@ export function answerLabel(content: CardContent, a: CardAnswer): string {
 
 /** A neutral, outlined secondary action. */
 function Quiet({ icon, label, onPress, active }: { icon?: IconName; label: string; onPress: () => void; active?: boolean }) {
-  const { c, simple } = useTheme();
+  const { c } = useTheme();
   const large = useLargeText();
   return (
     <Pressable
@@ -47,7 +47,7 @@ function Quiet({ icon, label, onPress, active }: { icon?: IconName; label: strin
       onPress={onPress}
       style={({ pressed }) => ({
         flex: large ? undefined : 1,
-        minHeight: simple ? touch.large : touch.min,
+        minHeight: touch.min,
         borderRadius: radius.input,
         borderWidth: 1,
         borderColor: active ? c.textMuted : c.border,
@@ -68,10 +68,10 @@ function Quiet({ icon, label, onPress, active }: { icon?: IconName; label: strin
 
 /** One-tap scale. Stops up to `reached` are shaded and underlined. */
 function Scale({ stops, reached, onPick }: { stops: NonNullable<CardContent['scale']>; reached?: string; onPick: (id: string) => void }) {
-  const { c, simple } = useTheme();
+  const { c } = useTheme();
   const upTo = reached ? stops.findIndex((s) => s.id === reached) : -1;
   return (
-    <View style={{ flexDirection: 'row', minHeight: simple ? touch.large + 4 : 46, borderRadius: radius.input, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
+    <View style={{ flexDirection: 'row', minHeight: 46, borderRadius: radius.input, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
       {stops.map((s, i) => {
         const done = i <= upTo;
         return (
@@ -160,7 +160,6 @@ export function CardView({ message }: { message: Message }) {
   const optionRow = { flexDirection: large ? ('column' as const) : ('row' as const), gap: space.sm };
   const cardId = message.data?.cardId as ID | undefined;
   const card = useCard(cardId);
-  const access = useProjectAccess(card?.projectId);
   const queue = useCardQueue();
   const [picked, setPicked] = useState<CardButton | null>(null);
   const [waiting, setWaiting] = useState<CardAnswer | null>(null); // an answer that needs a note first
@@ -199,7 +198,7 @@ export function CardView({ message }: { message: Message }) {
   }
 
   const content = card.content;
-  const where = [card.projectName ? shortProjectName(card.projectName) : null, content.subtitle].filter(Boolean).join(' · ');
+  const where = content.subtitle ?? '';
 
   /** Title, context line and badge, identical in every state so the text always starts on the same edge. */
   const heading = (strong: boolean, right?: ReactNode) => (
@@ -272,11 +271,9 @@ export function CardView({ message }: { message: Message }) {
     );
   }
 
-  // ---- Closed by the PM app, expired, or the project was archived: nothing to answer ----
-  if (card.state !== 'open' || access.archived) {
-    const why = access.archived
-      ? t('card.archived', 'Archived')
-      : card.state === 'expired'
+  // ---- Closed by the PM app, or expired: nothing to answer ----
+  if (card.state !== 'open') {
+    const why = card.state === 'expired'
         ? t('card.expired', 'Expired')
         : (card.closedText ?? t('card.closed', 'Closed'));
     return (

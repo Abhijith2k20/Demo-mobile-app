@@ -10,10 +10,10 @@ export function useInvites(enabled: boolean): { invites: SentInvite[]; loading: 
 export interface PmLink {
   connected: boolean;
   kind?: 'mock' | 'http';
-  lastSyncAt?: string | null;
+  /** When the PM app last called Siteline. */
+  lastCallAt?: string | null;
+  /** The last answer that couldn't be delivered, in plain words. */
   lastError?: string | null;
-  /** People the PM app names who aren't in this company on Siteline yet. */
-  unmatched?: string[];
 }
 
 export function usePmLink(enabled: boolean): PmLink | undefined {

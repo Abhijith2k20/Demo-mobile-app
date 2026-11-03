@@ -1,81 +1,35 @@
-// Project members: list for everyone, add / edit / remove for Managers (§5.11).
+// Project members: list for everyone; the Owner and Admins add people, pick their channels, or remove them (§5.13).
 import { Feather } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { Avatar, Button, Chip, EmptyState, Pill, Row, Segmented } from '@/components/basics';
+import { Avatar, Button, EmptyState, Row } from '@/components/basics';
 import { Sheet, SheetInput } from '@/components/Sheet';
 import { T } from '@/components/T';
 import { space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { Channel, ID, JobTitle, Meta, ProjectRole, User } from '@/types/models';
+import type { Channel, ID, User } from '@/types/models';
 import { addMember, removeMember, updateMember } from '../api';
 import { useChannelMembership, useProjectChannels } from '../hooks';
-import { firstName, isBotUser, useMeta, useProjectAccess, useProjectMembers, useRoleLabels, useUsers, type MemberRow } from '../../shared';
+import { firstName, isBotUser, useProjectAccess, useProjectMembers, useUsers, type MemberRow } from '../../shared';
 
 interface Draft {
   user: User;
-  role: ProjectRole;
-  jobTitle: JobTitle;
   channelIds: ID[];
   isNew: boolean;
-}
-
-/** Pre-ticks the channels the server would pick for this role and job title (it decides on save). */
-function defaultsFor(channels: Channel[], role: ProjectRole, jobTitle: JobTitle, meta: Meta | undefined): ID[] {
-  // `?.`: a /meta saved on the phone from an older server may not have it yet.
-  if (meta?.rolesInEveryChannel?.includes(role)) return channels.map((c) => c.id);
-  const names = meta?.defaultChannels[role]?.[jobTitle] ?? [];
-  return channels.filter((c) => names.includes(c.name)).map((c) => c.id);
 }
 
 function MemberEditor({ draft, channels, onChange }: { draft: Draft; channels: Channel[]; onChange: (d: Draft) => void }) {
   const { c } = useTheme();
   const { t } = useTranslation();
-  const meta = useMeta();
-  // Changing role or job title re-ticks the default channels (§9.3); they stay editable.
-  const set = (patch: Partial<Pick<Draft, 'role' | 'jobTitle'>>) => {
-    const next = { ...draft, ...patch };
-    onChange({ ...next, channelIds: defaultsFor(channels, next.role, next.jobTitle, meta) });
-  };
-  // The company's job titles; some are for managers only.
-  const titles = (meta?.jobTitles ?? []).filter((jt) => draft.role === 'manager' || !jt.managersOnly);
-  const managersOnly = (name: JobTitle) => !!meta?.jobTitles.find((jt) => jt.name === name)?.managersOnly;
   return (
     <View style={{ gap: space.lg }}>
-      <View style={{ gap: 6 }}>
-        <T variant="label" color="textMuted">
-          {t('members.role', 'Role')}
-        </T>
-        <Segmented
-          value={draft.role}
-          onChange={(role) =>
-            set({ role, jobTitle: role === 'member' && managersOnly(draft.jobTitle) ? (meta?.defaultJobTitle ?? draft.jobTitle) : draft.jobTitle })
-          }
-          options={[
-            { value: 'member', label: t('you.member', 'Member') },
-            { value: 'manager', label: t('you.manager', 'Manager') },
-          ]}
-        />
-        <T variant="meta" color="textMuted">
-          {draft.role === 'manager'
-            ? t('members.managerHint', "Managers manage the project's channels and members, and hear when check-ins go unanswered.")
-            : t('members.memberHint', "Members chat in their channels and answer the bot's check-ins on their tasks.")}
-        </T>
-      </View>
-      <View style={{ gap: 6 }}>
-        <T variant="label" color="textMuted">
-          {t('members.jobTitle', 'Job title')}
-        </T>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {titles.map((jt) => (
-            <Chip key={jt.name} label={jt.label} selected={draft.jobTitle === jt.name} onPress={() => set({ jobTitle: jt.name })} />
-          ))}
-        </View>
-      </View>
       <View style={{ gap: 2 }}>
         <T variant="label" color="textMuted">
           {t('members.channels', 'Channels')}
+        </T>
+        <T variant="meta" color="textMuted">
+          {t('members.channelsHint', 'Nobody is added to a channel automatically. Tick the ones they should be in.')}
         </T>
         {channels.map((ch) => {
           const on = draft.channelIds.includes(ch.id);
@@ -102,10 +56,8 @@ function MemberEditor({ draft, channels, onChange }: { draft: Draft; channels: C
 export function MembersManager({ projectId }: { projectId: ID }) {
   const { c } = useTheme();
   const { t } = useTranslation();
-  const labels = useRoleLabels();
-  const meta = useMeta();
   const access = useProjectAccess(projectId);
-  const canManage = access.can('project.members');
+  const canManage = access.can('project.manage') && !access.archived;
   const rows = useProjectMembers(projectId);
   const channels = useProjectChannels(projectId);
   const membership = useChannelMembership(projectId);
@@ -128,12 +80,11 @@ export function MembersManager({ projectId }: { projectId: ID }) {
   }, [users.list, rows, query]);
 
   const startEdit = (row: MemberRow) =>
-    setDraft({ user: row.user, role: row.member.role, jobTitle: row.member.jobTitle, channelIds: membership.get(row.user.id) ?? [], isNew: false });
+    setDraft({ user: row.user, channelIds: membership.get(row.user.id) ?? [], isNew: false });
   const startAdd = (user: User) => {
     setPicker(false);
     setQuery('');
-    const jobTitle = meta?.defaultJobTitle ?? '';
-    setDraft({ user, role: 'member', jobTitle, channelIds: defaultsFor(channels, 'member', jobTitle, meta), isNew: true });
+    setDraft({ user, channelIds: [], isNew: true });
   };
   const d = draft ?? shownDraft;
 
@@ -163,25 +114,12 @@ export function MembersManager({ projectId }: { projectId: ID }) {
             })}>
             <Avatar id={row.user.id} name={row.user.name} />
             <View style={{ flex: 1, gap: 2 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                <T variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {row.user.name}
-                </T>
-                <View>
-                  <Pill
-                    label={labels.project(row.member.role)}
-                    bg={row.member.role === 'manager' ? c.accentSoft : c.surfaceAlt}
-                    fg={row.member.role === 'manager' ? c.accent : c.textMuted}
-                  />
-                </View>
-              </View>
+              <T variant="bodyStrong" numberOfLines={1}>
+                {row.user.name}
+                {row.user.companyRole === 'guest' ? ` · ${t('you.guest', 'Guest')}` : ''}
+              </T>
               <T variant="meta" color="textMuted" numberOfLines={1}>
-                {labels.jobTitle(row.member.jobTitle)}
-                {(membership.get(row.user.id) ?? []).length
-                  ? ` · ${(membership.get(row.user.id) ?? [])
-                      .map((id) => `#${channelName.get(id) ?? ''}`)
-                      .join(' ')}`
-                  : ''}
+                {(membership.get(row.user.id) ?? []).map((id) => `#${channelName.get(id) ?? ''}`).join(' ') || t('members.noChannels', 'No channels yet')}
               </T>
             </View>
             {canManage ? <Feather name="chevron-right" size={18} color={c.textFaint} /> : null}
@@ -207,7 +145,7 @@ export function MembersManager({ projectId }: { projectId: ID }) {
             <Button
               label={d.isNew ? t('members.addShort', 'Add') : t('common.save', 'Save')}
               onPress={() => {
-                const input = { projectId, userId: d.user.id, role: d.role, jobTitle: d.jobTitle, channelIds: d.channelIds };
+                const input = { projectId, userId: d.user.id, channelIds: d.channelIds };
                 if (d.isNew) addMember(input);
                 else updateMember(input);
                 setDraft(null);

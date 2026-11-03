@@ -47,11 +47,7 @@ function DmsScreen() {
         case 'file':
           return String(m.data?.name ?? t('plus.file', 'File'));
         case 'card':
-          return m.data?.cardId ? t('dms.previewCard', 'A card to answer') : String((m.data?.content as { title?: string } | undefined)?.title ?? '');
-        case 'issue_card':
-          return t('issue.card', 'Issue');
-        case 'daily_report':
-          return t('report.card', 'Daily report');
+          return t('dms.previewCard', 'A card to answer');
         default:
           return m.body ?? '';
       }

@@ -10,13 +10,13 @@ from ..events import publish
 from ..rules import DELETE_WINDOW_MS, EDIT_WINDOW_MS, can, can_post, is_company_admin, is_guest
 from ..schemas import DmOpen, MessageCreate, MessagePatch, Reaction, ReadMarker
 from ..access import assert_project_active, channel_audience, visible_channel
-from ..store import BOT_ID, MESSAGE_COLUMNS, add_channel_member, ensure_channel_member, message, person, project_managers, project_role
+from ..store import BOT_ID, MESSAGE_COLUMNS, add_channel_member, ensure_channel_member, message, person
 from ..views import channel_view, message_view, order_key, reply_info
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["messages"])
 
-CLIENT_TYPES = {"text", "image", "voice", "file", "issue_card", "daily_report"}
+CLIENT_TYPES = {"text", "image", "voice", "file"}
 
 
 def _save(m: dict, changes: dict, kind: str, channel: dict) -> dict:
@@ -93,9 +93,6 @@ def create_message(channel_id: str, body: MessageCreate, user: dict = Depends(cu
     if body.type in ("voice", "file"):
         upload = _own_upload(user, (data or {}).get("uploadId"))
         data = {**data, "uri": None, "name": upload["name"] or (data or {}).get("name"), "size": upload["size"]}
-    if body.type == "issue_card" and data and data.get("urgency") == "urgent" and ch["projectId"]:
-        # Urgent issues mention the project's Managers; the server decides who they are.
-        data["mentions"] = [uid for uid in project_managers(ch["projectId"]) if uid != user["id"]]
     m = post_message(ch, user["id"], type=body.type, body=body.body, data=data,
                      thread_parent_id=body.threadParentId, id=body.id)
     return message_view(m, user, ch)
@@ -122,9 +119,8 @@ def patch_message(message_id: str, body: MessagePatch, user: dict = Depends(curr
         changes["body"] = body.body
         changes["data"] = {**(m["data"] or {}), "edited": True}
     if body.pinned is not None:
-        role = project_role(user["id"], ch["projectId"]) if ch["projectId"] else None
-        if not ch["projectId"] or not can(user, "message.pin", role):
-            raise forbidden("Only managers can pin messages.")
+        if not ch["projectId"] or not can(user, "message.pin"):
+            raise forbidden("Only the owner or an admin can pin messages.")
         changes["data"] = {**(changes.get("data") or m["data"] or {}), "pinned": body.pinned}
     return message_view(_save(m, changes, "message.updated", ch), user, ch)
 
@@ -135,7 +131,7 @@ def delete_message(message_id: str, user: dict = Depends(current_user)):
     if m["deletedAt"]:
         return message_view(m, user, ch)
     if ch["projectId"]:
-        can_any = can(user, "message.delete_any", project_role(user["id"], ch["projectId"]))
+        can_any = can(user, "message.delete_any")
     else:
         can_any = is_company_admin(user) and ch["kind"] == "company"
     if not can_any:

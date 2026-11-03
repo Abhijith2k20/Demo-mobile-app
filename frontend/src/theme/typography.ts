@@ -18,9 +18,9 @@ export type TypeVariant =
   | 'label'
   | 'button';
 
-export function typography(simple: boolean): Record<TypeVariant, TextStyle> {
-  const body = simple ? 17 : 16;
-  return {
+const body = 16;
+
+export const typography: Record<TypeVariant, TextStyle> = {
     display: { fontSize: 28, lineHeight: 34, fontFamily: fonts.bold },
     title: { fontSize: 20, lineHeight: 26, fontFamily: fonts.bold },
     heading: { fontSize: 17, lineHeight: 22, fontFamily: fonts.semibold },
@@ -35,6 +35,5 @@ export function typography(simple: boolean): Record<TypeVariant, TextStyle> {
       textTransform: 'uppercase',
       letterSpacing: 0.6,
     },
-    button: { fontSize: simple ? 18 : 16, lineHeight: simple ? 24 : 22, fontFamily: fonts.semibold },
-  };
-}
+    button: { fontSize: 16, lineHeight: 22, fontFamily: fonts.semibold },
+};

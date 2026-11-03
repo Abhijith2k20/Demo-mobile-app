@@ -1,10 +1,9 @@
 import { createContext, useContext } from 'react';
-import type { ID, JobTitle, MessageView as Message, User } from '@/types/models';
+import type { ID, MessageView as Message, User } from '@/types/models';
 
 export interface ChatContextValue {
   me: User;
   users: Map<ID, User>;
-  jobTitles: Map<ID, JobTitle>;
   /** Lower-cased first names that count as @mentions here. */
   mentionNames: Set<string>;
   inThread: boolean;

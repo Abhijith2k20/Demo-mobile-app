@@ -15,10 +15,9 @@ from .rules import (
     is_company_admin,
     joins_projects,
     project_permissions,
-    simple_mode,
 )
 from .services import accounts, files
-from .store import MESSAGE_COLUMNS, company, project, project_member, project_members, project_role, setup
+from .store import MESSAGE_COLUMNS, company, project, project_members
 
 
 def public_user(u: dict, viewer: dict | None = None) -> dict:
@@ -31,34 +30,18 @@ def public_user(u: dict, viewer: dict | None = None) -> dict:
 
 
 def me_view(user: dict) -> dict:
-    titles = [r["jobTitle"] for r in db.rows("SELECT job_title FROM project_members WHERE user_id = %(u)s", u=user["id"])]
     c = company()
     return {
         "user": public_user(user),
         "permissions": company_permissions(user),
-        # The big-button layout, for people whose job titles the company marked as simple.
-        "simpleMode": simple_mode(setup(), titles),
-        "company": {"id": c["id"], "name": c["name"],
-                    # Linked companies get projects from the PM app; the app hides "New project" then.
-                    "pmLinked": bool(db.value("SELECT 1 FROM integrations WHERE company_id = current_company()"))},
+        "company": {"id": c["id"], "name": c["name"]},
         "companies": accounts.companies_for(user["id"]),
     }
 
 
 def project_view(p: dict, viewer: dict) -> dict:
-    mine = project_member(viewer["id"], p["id"])
-    role = mine["role"] if mine else None
-    members = [{k: m[k] for k in ("projectId", "userId", "role", "jobTitle", "source")} for m in project_members(p["id"])]
-    return {
-        **p,
-        "linked": bool(p.get("pmProjectId")),  # projects and people come from the PM app
-        "members": members,
-        "access": {
-            "role": role,
-            "jobTitle": mine["jobTitle"] if mine else None,
-            "permissions": project_permissions(viewer, role, bool(p["archivedAt"])),
-        },
-    }
+    members = [{k: m[k] for k in ("projectId", "userId")} for m in project_members(p["id"])]
+    return {**p, "members": members, "access": {"permissions": project_permissions(viewer, bool(p["archivedAt"]))}}
 
 
 def order_key(m: dict) -> tuple[str, str]:
@@ -115,12 +98,11 @@ def channel_view(ch: dict, viewer: dict, stats: dict | None = None) -> dict:
 
 
 def message_view(m: dict, viewer: dict, ch: dict, replies: dict[str, tuple[int, str]] | None = None) -> dict:
-    role = project_role(viewer["id"], ch["projectId"]) if ch["projectId"] else None
     own = m["senderId"] == viewer["id"]
     age = now_ms() - parse_iso_ms(m["createdAt"])
     alive = not m["deletedAt"]
     if ch["projectId"]:
-        delete_any = can(viewer, "message.delete_any", role)
+        delete_any = can(viewer, "message.delete_any")
     else:
         delete_any = is_company_admin(viewer) and ch["kind"] == "company"
     if replies is None:
@@ -132,7 +114,7 @@ def message_view(m: dict, viewer: dict, ch: dict, replies: dict[str, tuple[int, 
         "lastReplyAt": last_at,
         "canEdit": alive and own and m["type"] == "text" and age < EDIT_WINDOW_MS,
         "canDelete": alive and ((own and age < DELETE_WINDOW_MS) or delete_any),
-        "canPin": alive and bool(ch["projectId"]) and can(viewer, "message.pin", role),
+        "canPin": alive and bool(ch["projectId"]) and can(viewer, "message.pin"),
     }
 
 

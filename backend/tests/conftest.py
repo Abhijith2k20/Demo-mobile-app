@@ -3,7 +3,6 @@ import os
 # Tests use their own database and run jobs by hand (no worker thread, no scripted teammates).
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "postgresql://siteline:siteline@localhost:5433/siteline_test")
 os.environ["SITELINE_WORKER"] = "off"
-os.environ["SITELINE_ACTORS"] = "0"
 os.environ["SITELINE_SEED"] = "0"
 
 import io
@@ -54,9 +53,8 @@ def restore_seed() -> None:
                 for t in db.PER_COMPANY_TABLES:
                     conn.execute(f"ALTER TABLE {t} FORCE ROW LEVEL SECURITY")
     hub.clear()
-    from app import actors, netsim
+    from app import netsim
 
-    actors.reset()
     netsim.reset()
 
 

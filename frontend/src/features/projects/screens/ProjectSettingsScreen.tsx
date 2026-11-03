@@ -1,7 +1,7 @@
-// Project settings (Managers, Owner, Admin): details, channels, people.
+// Project settings (Owner and Admins): details, people, channels.
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, EmptyState, Pill } from '@/components/basics';
@@ -11,7 +11,7 @@ import { T } from '@/components/T';
 import { createChannel, deleteChannel, updateChannel } from '@/features/projects/api';
 import { fieldErrors } from '@/lib/mutations';
 import { useChannelMembership, useProjectChannels } from '@/features/projects/hooks';
-import { shortProjectName, useProject, useInEveryChannel, useProjectAccess, useProjectMembers } from '@/features/shared';
+import { shortProjectName, useProject, useProjectAccess, useProjectMembers } from '@/features/shared';
 import { channelCreateSchema, normalizeChannelName } from '@/contract/schemas';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -36,14 +36,8 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
   if (draft && draft !== shown) setShown(draft);
 
   const canChannels = access.can('channel.manage');
-  const canEdit = access.can('project.edit');
-  const canMembers = access.can('project.members');
-  const inEveryChannel = useInEveryChannel();
-  const managerIds = useMemo(
-    () => members.filter((m) => inEveryChannel(m.member.role)).map((m) => m.user.id),
-    [members, inEveryChannel],
-  );
-  const projectUserIds = useMemo(() => new Set(members.map((m) => m.user.id)), [members]);
+  const canEdit = access.can('project.manage');
+  const canMembers = access.can('project.manage');
   const inChannel = (channelId: ID) => members.filter((m) => (membership.get(m.user.id) ?? []).includes(channelId)).map((m) => m.user.id);
 
   const edit = (ch: Channel) => {
@@ -52,8 +46,8 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
   };
   const add = () => {
     setNameError(undefined);
-    // A new channel starts public with everyone in it; switching to private is one tap.
-    setDraft({ channel: null, name: '', isPrivate: false, memberIds: [...projectUserIds] });
+    // Nobody is added automatically: the creator ticks who is in it.
+    setDraft({ channel: null, name: '', isPrivate: false, memberIds: [] });
   };
 
   // Arriving from a channel's "Channel settings" opens that channel's editor once.
@@ -72,7 +66,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
       setNameError(parsed.error.issues[0]?.message);
       return;
     }
-    const memberIds = [...new Set([...d.memberIds, ...managerIds])];
+    const memberIds = d.memberIds;
     const before = d.channel ? inChannel(d.channel.id) : [];
     const sameMembers = before.length === memberIds.length && before.every((x) => memberIds.includes(x));
     const res = d.channel
@@ -100,7 +94,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
       {!project ? (
         <EmptyState icon="folder" title="This project isn't available" hint="You may no longer have access to it." />
       ) : !anything ? (
-        <EmptyState icon="lock" title="Only managers can change project settings" hint="Ask a project manager, the owner or an admin." />
+        <EmptyState icon="lock" title="Only the owner or an admin can change project settings" hint="Ask them to add people or channels." />
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: space.lg, gap: space.xl, paddingBottom: insets.bottom + space.xxl }}>
@@ -177,7 +171,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
                   <View style={{ flex: 1 }}>
                     <T variant="bodyStrong">Members</T>
                     <T variant="meta" color="textMuted">
-                      {members.length} {members.length === 1 ? 'person' : 'people'} · {managerIds.length} {managerIds.length === 1 ? 'manager' : 'managers'}
+                      {members.length} {members.length === 1 ? 'person' : 'people'}
                     </T>
                   </View>
                   {canMembers ? (
@@ -189,7 +183,7 @@ function SettingsScreen({ projectId: id, openChannelId }: { projectId: string; o
                 </Pressable>
               </Card>
               <T variant="meta" color="textFaint" style={{ marginTop: space.sm }}>
-                Roles, job titles and each person&apos;s channels are set on the Members screen.
+                Each person&apos;s channels are set on the Members screen.
               </T>
             </View>
 

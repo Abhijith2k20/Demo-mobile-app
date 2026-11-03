@@ -261,7 +261,7 @@ def migrate() -> list[str]:
 
 
 PER_COMPANY_TABLES = [
-    "pm_mock_cards", "pm_mock_writes", "pm_mock_tasks", "pm_mock_members", "pm_mock_projects", "uploads",
+    "pm_mock_cards", "pm_mock_writes", "pm_mock_tasks", "pm_mock_projects", "uploads",
     "activities", "cards", "messages", "channel_members", "channels", "project_members", "projects",
 ]
 GLOBAL_TABLES = [

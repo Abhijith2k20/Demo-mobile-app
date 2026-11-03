@@ -30,14 +30,13 @@ function ThreadScreen({ messageId }: { messageId: string }) {
     () => ({
       me,
       users: users.byId,
-      jobTitles: info.jobTitles,
       mentionNames: new Set(info.members.map((u) => firstName(u.name).toLowerCase())),
       inThread: true,
       isBotChat: false,
       onLongPress: setMenu,
       onOpenThread: noop,
     }),
-    [me, users.byId, info.jobTitles, info.members, noop],
+    [me, users.byId, info.members, noop],
   );
 
   const live = replies.filter((r) => !r.deletedAt).length;
@@ -72,13 +71,11 @@ function ThreadScreen({ messageId }: { messageId: string }) {
             <Composer
               channelId={parent.channelId}
               threadParentId={parent.id}
-              projectId={null}
               members={info.members}
               placeholder={t('thread.reply', 'Reply…')}
               alsoSendLabel={info.channel?.kind === 'dm' ? undefined : t('thread.alsoSend', 'Also send to {{channel}}', { channel: info.title.replace('# ', '#') })}
               editing={editing}
               onDoneEditing={() => setEditing(null)}
-              onOpenForm={noop}
             />
           ) : parent && info.channel ? (
             <ReadOnlyBar text={t('chat.readOnly', 'Only admins can post here.')} />

@@ -224,7 +224,7 @@ async function send(item: OutboxItem): Promise<void> {
         photoUploadIds: photos.map((p) => p.uploadId),
         voiceUploadId: voice?.uploadId,
       });
-      return void refresh(keys.cards, ['tasks']);
+      return void refresh(keys.cards);
     }
   }
 }

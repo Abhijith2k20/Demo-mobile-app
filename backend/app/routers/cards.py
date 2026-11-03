@@ -4,7 +4,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from .. import db
-from ..access import assert_project_active
 from ..deps import current_user
 from ..schemas import CardAnswer
 from ..services import cards
@@ -20,9 +19,6 @@ def my_cards(user: dict = Depends(current_user)):
 
 @router.post("/cards/{card_id}/answer")
 def answer_card(card_id: str, body: CardAnswer, user: dict = Depends(current_user)):
-    c = cards.card_for(user, card_id)
-    if c["state"] != "answered":
-        assert_project_active(c["projectId"])
     return cards.card_view(cards.answer(user, card_id, body.model_dump(mode="json")))
 
 

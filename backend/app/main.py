@@ -37,10 +37,6 @@ async def lifespan(_: FastAPI):
         from .worker import start_inline
 
         worker_stop = start_inline()
-    if config.DEV_TOOLS and os.environ.get("SITELINE_ACTORS", "1") != "0":
-        from . import actors
-
-        actors.start()
     yield
     stop.set()
     if worker_stop:

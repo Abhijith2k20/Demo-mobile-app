@@ -1,5 +1,4 @@
-"""The company's PM app link (spec §9.3): its API key, its webhook URL, delivering answers and other events to
-it, and the channel messages it posts. A company has one integration: the mock PM app or a real one (`http`)."""
+"""The company's PM app link (spec §9.3): its API key, its webhook URL, and delivering answers and other events to it. A company has one integration: the mock PM app or a real one (`http`)."""
 from __future__ import annotations
 
 import hashlib
@@ -11,13 +10,12 @@ import time
 import httpx
 
 from .. import config, db
-from ..core import ApiError, invalid
+from ..core import ApiError
 from ..jobs.queue import enqueue
-from ..notify import add_activity, push
-from ..store import BOT_ID, admins, project_channel, project_managers, setup
+from ..notify import add_activity
+from ..store import admins
 from . import files
-from .cards import person_for_ref, project_for_ref, set_delivery
-from .messaging import post_message
+from .cards import set_delivery
 from .secrets import decrypt, encrypt
 
 WEBHOOK_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
@@ -172,47 +170,6 @@ def gave_up(payload: dict) -> None:
         return
     set_delivery(card["id"], "failed", "Couldn't reach the PM app")
     for uid in admins():
-        add_activity(userId=uid, kind="notice", actorId=card["userId"], projectId=card["projectId"], channelId=None,
+        add_activity(userId=uid, kind="notice", actorId=card["userId"], projectId=None, channelId=None,
                      messageId=None, taskIds=[], text=f"An answer to \"{card['content']['title']}\" couldn't reach the PM app.",
                      lines=[])
-
-
-# ---- Messages the PM app posts in project channels ----
-
-def post_channel_message(*, ext_id: str, project_ref: str, channel: str | None, card: dict,
-                         notify: dict | None = None) -> dict:
-    """A status card in a project channel, with Activity and pushes when asked. The same id again
-    is the same message."""
-    if existing := db.row("SELECT * FROM messages WHERE data->>'extId' = %(e)s AND type = 'card'", e=ext_id):
-        return existing
-    project = project_for_ref(project_ref)
-    ch = project_channel(project["id"], channel or setup()["workChannel"])
-    if not ch:
-        raise invalid({"channel": "No such channel in this project"})
-    for upload_id in card.get("photos") or []:
-        if not db.value("SELECT 1 FROM uploads WHERE id = %(id)s", id=upload_id):
-            raise invalid({"photos": "Upload not found"})
-    data = {"extId": ext_id, "content": card}
-    m = post_message(ch, BOT_ID, type="card", body=None, data=data)
-    notify = notify or {}
-    people = set(project_managers(project["id"]) if notify.get("managers") else [])
-    people |= {person_for_ref(ref)["id"] for ref in notify.get("people") or []}
-    for uid in people:
-        add_activity(userId=uid, kind="notice", actorId=BOT_ID, projectId=project["id"], channelId=ch["id"],
-                     messageId=m["id"], taskIds=[], text=card["title"], lines=list(card.get("lines") or [])[:2])
-    if people and notify.get("push"):
-        push(sorted(people), project["name"], notify["push"], {"url": f"/channel/{ch['id']}"}, kind="notice")
-    return m
-
-
-def unmatched() -> list[str]:
-    """People the PM app named who aren't on Siteline yet (from every project it sent)."""
-    i = current()
-    found = (i or {}).get("options", {}).get("unmatchedByProject") or {}
-    return sorted({ref for refs in found.values() for ref in refs})
-
-
-def remember_unmatched(project_ref: str, refs: list[str]) -> None:
-    db.run("""UPDATE integrations SET options = jsonb_set(options, '{unmatchedByProject}',
-                coalesce(options->'unmatchedByProject', '{}') || jsonb_build_object(%(p)s::text, %(r)s::jsonb))
-              WHERE company_id = current_company()""", p=project_ref, r=json.dumps(refs))

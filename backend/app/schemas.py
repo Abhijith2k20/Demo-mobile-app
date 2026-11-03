@@ -11,10 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Id = str
 CHANNEL_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
-MessageType = Literal["text", "image", "voice", "file", "card", "issue_card", "daily_report", "system"]
-# Job titles are the company's own (see the setup); routes check them against it.
-JobTitle = str
-ProjectRole = Literal["manager", "member"]
+MessageType = Literal["text", "image", "voice", "file", "card", "system"]
 
 
 class Body(BaseModel):
@@ -192,7 +189,6 @@ class CardContent(Body):
 class CardCreate(CardContent):
     id: str = Field(min_length=1, max_length=120)
     to: str = Field(min_length=3, max_length=120)
-    project: Optional[str] = Field(default=None, max_length=120)
     ref: dict[str, Any] = {}
     expiresAt: Optional[datetime] = None
 
@@ -218,43 +214,6 @@ class CardPatch(Body):
     closedText: Optional[str] = Field(default=None, max_length=120)
 
 
-class ChannelCard(Body):
-    title: str = Text
-    lines: list[str] = Field(default=[], max_length=8)
-    tone: Literal["info", "success", "warning", "danger"] = "info"
-    photos: list[str] = Field(default=[], max_length=4)
-
-
-class Notify(Body):
-    managers: bool = False
-    people: list[str] = Field(default=[], max_length=50)
-    push: Optional[str] = Field(default=None, max_length=180)
-
-
-class ChannelMessageCreate(Body):
-    id: str = Field(min_length=1, max_length=120)
-    project: str = Field(min_length=1, max_length=120)
-    channel: Optional[str] = Field(default=None, max_length=30)
-    card: ChannelCard
-    notify: Optional[Notify] = None
-
-
-class PmMember(Body):
-    ref: str = Field(min_length=3, max_length=120)
-    name: Optional[str] = Field(default=None, max_length=80)
-    role: Literal["manager", "member"]
-    roleName: Optional[str] = Field(default=None, max_length=60)
-
-
-class PmProject(Body):
-    name: str = Field(min_length=1, max_length=120)
-    client: str = Field(default="", max_length=120)
-    address: str = Field(default="", max_length=200)
-    url: Optional[str] = Field(default=None, max_length=500)
-    status: Literal["active", "closed"] = "active"
-    members: list[PmMember] = Field(default=[], max_length=500)
-
-
 class CardAnswer(Body):
     """From the app (through the send queue)."""
     scale: Optional[str] = Field(default=None, max_length=40)
@@ -272,10 +231,10 @@ class CardAnswer(Body):
 class ProjectCreate(Body):
     id: Id
     name: str
-    client: str
+    client: str = ""
     address: str = ""
     v_n = field_validator("name")(_name(2, 80, "Give the project a name"))
-    v_c = field_validator("client")(_name(1, 80, "Who is the client?"))
+    v_c = field_validator("client")(_name(0, 80, ""))
     v_a = field_validator("address")(_name(0, 160, ""))
 
 
@@ -303,15 +262,12 @@ class ProjectPatch(Body):
 
 class MemberAdd(Body):
     userId: Id
-    role: ProjectRole
-    jobTitle: JobTitle
     channelIds: list[Id] = []
 
 
 class MemberPatch(Body):
-    role: Optional[ProjectRole] = None
-    jobTitle: Optional[JobTitle] = None
-    channelIds: Optional[list[Id]] = None
+    """The channels of this project the person is in."""
+    channelIds: list[Id]
 
 
 class ChannelCreate(Body):
@@ -357,7 +313,6 @@ class RoleChange(Body):
 class CompanyCreate(Body):
     name: str
     timeZone: str = "Asia/Kolkata"
-    template: Literal["interiors", "events", "general"] = "general"
     ownerName: str
     ownerIdentifier: str = Field(min_length=3, max_length=120)
     pmCompanyId: Optional[str] = None
@@ -383,10 +338,6 @@ class CompanyCreate(Body):
 class NetworkConfig(Body):
     mode: Optional[Literal["online", "slow", "flaky"]] = None
     inject: Optional[Literal["500", "403", "422", "timeout_after_save", "none"]] = None
-
-
-class ActorsConfig(Body):
-    paused: bool
 
 
 class AsUser(Body):

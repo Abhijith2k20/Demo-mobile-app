@@ -99,9 +99,9 @@ export async function signInDemo(identifier: string, company: string, code = '12
 useSession.subscribe((st, prev) => {
   if (!st.user || !st.accessToken || !st.refreshToken || !st.company || !st.companies) return;
   if (st.accessToken === prev.accessToken && st.user === prev.user && st.permissions === prev.permissions &&
-      st.simpleMode === prev.simpleMode && st.companies === prev.companies) return;
+      st.companies === prev.companies) return;
   void saveSession({ accessToken: st.accessToken, refreshToken: st.refreshToken, user: st.user, permissions: st.permissions,
-    simpleMode: st.simpleMode, company: st.company, companies: st.companies });
+    company: st.company, companies: st.companies });
 });
 
 setAuthLostHandler(() => {

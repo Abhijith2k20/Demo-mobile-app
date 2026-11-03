@@ -163,7 +163,7 @@ function DemoPanel() {
               ) : (
                 mine.map((m) => (
                   <T key={m.projectId} variant="meta" color="textMuted">
-                    {shortProjectName(projects.byId.get(m.projectId)?.name ?? 'Project')} — {m.role} · {m.jobTitle}
+                    {shortProjectName(projects.byId.get(m.projectId)?.name ?? 'Project')}
                   </T>
                 ))
               )}
@@ -251,28 +251,16 @@ function DemoPanel() {
           <Button small kind="secondary" icon="moon" label="Send evening check-in now" onPress={needUser(demo.eveningCheckin)} />
         </Section>
 
-        <Section title="PM app (mock)" hint="Stands in for the company's PM app: it decides what to ask. Edit its tasks in the platform panel (/platform).">
-          <Button small kind="secondary" icon="refresh-cw" label="Send projects and members again" onPress={() => void run(demo.pmPublish, 'Projects sent.')} />
+        <Section title="PM app (mock)" hint="Stands in for the company's PM app: it decides what to ask, and only talks to people through the bot. Edit its tasks in the platform panel (/platform).">
           <Button small kind="secondary" icon="wifi-off" label="Make the PM app stop answering" onPress={() => void run(() => demo.pmDown(true), 'The mock PM app is down: answers wait and retry.')} />
           <Button small kind="secondary" icon="wifi" label="Bring the PM app back" onPress={() => void run(() => demo.pmDown(false), 'The mock PM app answers again.')} />
         </Section>
 
-        <Section title="5 · Teammates" hint="Scripted teammates act every 20–40 s while someone is signed in.">
-          <Button
-            small
-            kind="secondary"
-            icon={server.data?.actorsPaused ? 'play' : 'pause'}
-            label={server.data?.actorsPaused ? 'Resume scripted activity' : 'Pause scripted activity'}
-            onPress={() => void run(() => demo.setActorsPaused(!server.data?.actorsPaused))}
-          />
-          <Button small kind="secondary" icon="lock" label="Someone posts in a private channel now" onPress={() => void run(demo.rohanPosts, 'Posted in Villa 99 #qs (visible to QS, Managers, Owner and Admin only).')} />
-        </Section>
-
-        <Section title="6 · Refresh" hint="The app keeps nothing on the phone; this fetches everything on screen again.">
+        <Section title="5 · Refresh" hint="The app keeps nothing on the phone; this fetches everything on screen again.">
           <Button small kind="secondary" icon="refresh-cw" label="Refresh now" onPress={() => void refreshAll()} />
         </Section>
 
-        <Section title="7 · Log" hint="Newest first. This is the only place codes and request ids are shown.">
+        <Section title="6 · Log" hint="Newest first. This is the only place codes and request ids are shown.">
           <Card>
             <T variant="label" color="textMuted" style={{ marginBottom: 4 }}>
               API calls
@@ -301,7 +289,7 @@ function DemoPanel() {
           </Card>
         </Section>
 
-        <Section title="8 · Reset" hint="Server data goes back to the seed and you sign in again.">
+        <Section title="7 · Reset" hint="Server data goes back to the seed and you sign in again.">
           <Button kind="danger" icon="rotate-ccw" label="Reset demo" onPress={() => void reset()} />
         </Section>
       </ScrollView>

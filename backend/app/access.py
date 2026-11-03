@@ -5,11 +5,11 @@ from __future__ import annotations
 
 from .core import ApiError, not_found
 from .rules import is_company_admin, is_guest
-from .store import admins, channel, channel_member_ids, humans, is_channel_member, project, project_member_ids, project_role
+from .store import admins, channel, channel_member_ids, humans, is_channel_member, project, project_member, project_member_ids
 
 
 def can_see_project(user: dict, project_id: str) -> bool:
-    return is_company_admin(user) or project_role(user["id"], project_id) is not None
+    return is_company_admin(user) or project_member(user["id"], project_id) is not None
 
 
 def can_see_channel(user: dict, ch: dict) -> bool:

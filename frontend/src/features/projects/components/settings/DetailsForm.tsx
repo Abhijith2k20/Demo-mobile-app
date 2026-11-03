@@ -1,4 +1,4 @@
-// Project name, client and site address: editable for managers, plain text for everyone else.
+// Project name, client and address: editable for the Owner and Admins, plain text for everyone else.
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Button, Card } from '@/components/basics';

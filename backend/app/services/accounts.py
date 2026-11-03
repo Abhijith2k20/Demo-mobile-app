@@ -205,13 +205,11 @@ def join_company(company_id: str, user_id: str, role: str, channel_ids: list[str
             for ch in db.rows("SELECT id FROM channels WHERE kind = 'company'"):
                 add_channel_member(ch["id"], user_id)
         else:
-            # A guest joins the projects of the channels they were given, as a guest member (spec §5.13).
+            # A guest joins the projects of the channels they were given (spec §5.13).
             for ch in db.rows("SELECT id, project_id FROM channels WHERE id = ANY(%(ids)s) AND kind = 'project'",
                               ids=list(channel_ids or [])):
-                setup = db.value("SELECT setup FROM companies WHERE id = %(c)s", c=company_id)
-                db.run("""INSERT INTO project_members (company_id, project_id, user_id, role, job_title, source)
-                          VALUES (%(c)s, %(p)s, %(u)s, 'member', %(t)s, 'guest') ON CONFLICT DO NOTHING""",
-                       c=company_id, p=ch["projectId"], u=user_id, t=setup["defaultJobTitle"])
+                db.run("""INSERT INTO project_members (company_id, project_id, user_id) VALUES (%(c)s, %(p)s, %(u)s)
+                          ON CONFLICT DO NOTHING""", c=company_id, p=ch["projectId"], u=user_id)
                 add_channel_member(ch["id"], user_id)
         if not db.value("""SELECT 1 FROM channels c JOIN channel_members m ON m.channel_id = c.id
                            WHERE c.kind = 'bot' AND m.user_id = %(u)s""", u=user_id):

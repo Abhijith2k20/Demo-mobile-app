@@ -1,4 +1,4 @@
-"""The signed-in person: profile, settings, push tokens, activity, and the company's setup."""
+"""The signed-in person: profile, settings, push tokens, activity, and fixed rules the app shows."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -8,15 +8,10 @@ from ..core import now_iso
 from ..deps import current_user
 from ..events import publish
 from ..notify import public_activity
-from ..rules import (
-    DELETE_WINDOW_MS,
-    EDIT_WINDOW_MS,
-    ROLES_IN_EVERY_CHANNEL,
-    default_channel_names,
-)
+from ..rules import DELETE_WINDOW_MS, EDIT_WINDOW_MS
 from ..schemas import MePatch, PushToken
 from ..services import accounts
-from ..store import company, human_ids, person, setup
+from ..store import company, human_ids, person
 from ..views import me_view, public_user
 
 router = APIRouter(tags=["me"])
@@ -66,22 +61,8 @@ def get_company(user: dict = Depends(current_user)):
 
 @router.get("/meta")
 def meta(user: dict = Depends(current_user)):
-    """The company's setup and fixed rules the app needs to lay out forms (it never decides them itself)."""
-    st = setup()
-    titles = [jt["name"] for jt in st["jobTitles"]]
-    return {
-        "jobTitles": [{"name": jt["name"], "label": jt["name"], "managersOnly": jt.get("managersOnly", False)}
-                      for jt in st["jobTitles"]],
-        "defaultJobTitle": st["defaultJobTitle"],
-        "problemTypes": [{"key": p["key"], "label": p["key"], "inCheckins": p.get("inCheckins", True)}
-                         for p in st["problemTypes"]],
-        "editWindowMs": EDIT_WINDOW_MS,
-        "deleteWindowMs": DELETE_WINDOW_MS,
-        "rolesInEveryChannel": ROLES_IN_EVERY_CHANNEL,
-        "defaultChannels": {
-            role: {jt: default_channel_names(st, role, jt) for jt in titles} for role in ("manager", "member")
-        },
-    }
+    """Fixed rules the app shows (it never decides them itself)."""
+    return {"editWindowMs": EDIT_WINDOW_MS, "deleteWindowMs": DELETE_WINDOW_MS}
 
 
 @router.get("/activity")

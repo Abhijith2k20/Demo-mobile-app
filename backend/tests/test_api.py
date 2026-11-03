@@ -6,10 +6,10 @@ from conftest import channel_named, events_for, in_company, project_id
 
 def test_validation_errors_use_the_standard_format(login):
     api = login("arjun@paliath.in")
-    r = api.post("/projects", json={"id": uuid7(), "name": "x", "client": ""})
+    r = api.post("/projects", json={"id": uuid7(), "name": "x"})
     err = r.json()["error"]
     assert r.status_code == 422 and err["code"] == "VALIDATION_FAILED"
-    assert err["details"]["fields"] == {"name": "Give the project a name", "client": "Who is the client?"}
+    assert err["details"]["fields"] == {"name": "Give the project a name"}
     assert err["request_id"]
 
 
@@ -25,14 +25,12 @@ def test_members_only_see_their_projects_and_hidden_ones_are_404(login):
 
 
 def test_project_permissions_come_from_the_server(login):
-    amit, ravi = login("amit@paliath.in"), login("ravi@paliath.in")
-    villa = amit.get(f"/projects/{project_id(amit, 'Villa 99')}").json()
-    assert "channel.manage" in villa["access"]["permissions"] and "project.delete" not in villa["access"]["permissions"]
-    assert villa["linked"] is True
-    ravi_access = ravi.get(f"/projects/{project_id(ravi, 'Villa 99')}").json()["access"]
-    assert ravi_access["role"] == "member" and ravi_access["permissions"] == []
-    assert "project.create" in login("arjun@paliath.in").get("/me").json()["permissions"]
-
+    arjun, amit = login("arjun@paliath.in"), login("amit@paliath.in")
+    villa = arjun.get(f"/projects/{project_id(arjun, 'Villa 99')}").json()
+    assert {"project.manage", "channel.manage", "project.delete"} <= set(villa["access"]["permissions"])
+    assert amit.get(f"/projects/{project_id(amit, 'Villa 99')}").json()["access"]["permissions"] == []
+    assert "project.create" in arjun.get("/me").json()["permissions"]
+    assert "project.create" not in amit.get("/me").json()["permissions"]
 
 def test_private_channel_is_hidden_from_members_not_in_it(login):
     ravi = login("ravi@paliath.in")
@@ -56,15 +54,17 @@ def test_posting_updates_unread_and_sends_events_only_to_the_audience(login):
 
 
 def test_message_permissions_are_per_viewer(login):
-    amit, ravi = login("amit@paliath.in"), login("ravi@paliath.in")
+    meera, ravi = login("meera@paliath.in"), login("ravi@paliath.in")
     sw = channel_named(ravi, "Villa 99", "site-work")
     mine = ravi.post(f"/channels/{sw['id']}/messages", {"id": uuid7(), "type": "text", "body": "ok", "data": None}).json()
     assert mine["canEdit"] and mine["canDelete"] and not mine["canPin"]
-    seen_by_amit = amit.get(f"/channels/{sw['id']}/messages?limit=1").json()["messages"][0]
-    assert seen_by_amit["id"] == mine["id"] and not seen_by_amit["canEdit"] and seen_by_amit["canPin"]
-    assert amit.patch(f"/messages/{mine['id']}", {"body": "hack"}).json()["error"]["code"] == "FORBIDDEN"
+    seen_by_admin = meera.get(f"/channels/{sw['id']}/messages?limit=1").json()["messages"][0]
+    assert seen_by_admin["id"] == mine["id"] and not seen_by_admin["canEdit"] and seen_by_admin["canPin"]
+    assert seen_by_admin["canDelete"]  # Owner/Admin delete anyone's
+    assert meera.patch(f"/messages/{mine['id']}", {"body": "hack"}).json()["error"]["code"] == "FORBIDDEN"
+    amit = login("amit@paliath.in")
+    assert amit.patch(f"/messages/{mine['id']}", {"pinned": True}).json()["error"]["code"] == "FORBIDDEN"
     assert amit.put(f"/messages/{mine['id']}/reactions/👍", {"on": True}).json()["reactions"] == {"👍": [amit.user["id"]]}
-
 
 def test_mentions_and_announcements(login):
     amit, ravi = login("amit@paliath.in"), login("ravi@paliath.in")
@@ -164,31 +164,40 @@ def test_voice_notes_and_pdfs(login):
     assert too_big.json()["error"]["code"] == "FILE_TOO_LARGE"
 
 
-def test_project_updates_and_files(login):
+def test_project_files(login):
     amit, ravi = login("amit@paliath.in"), login("ravi@paliath.in")
     oith, villa = project_id(amit, "OITH"), project_id(ravi, "Villa 99")
     files = amit.get(f"/projects/{oith}/files").json()["files"]
     assert files and {f["kind"] for f in files} <= {"photo", "file"}
     names = {f.get("name") for f in ravi.get(f"/projects/{villa}/files").json()["files"]}
     assert "TV_unit_revC.pdf" not in names  # Ravi isn't in Villa 99 #design
-    assert amit.get(f"/projects/{oith}/updates").status_code == 200
 
 
 # ---- Projects ----
 
 
-def test_linked_projects_take_people_from_the_pm_app(login):
-    amit, ravi = login("amit@paliath.in"), login("ravi@paliath.in")
-    villa = project_id(amit, "Villa 99")
-    assert amit.patch(f"/projects/{villa}/members/{ravi.user['id']}", {"role": "manager"}).json()["error"]["code"] == "PROJECT_LINKED"
-    assert amit.delete(f"/projects/{villa}/members/{ravi.user['id']}").json()["error"]["code"] == "PROJECT_LINKED"
-    assert amit.patch(f"/projects/{villa}", {"name": "Renamed"}).json()["error"]["code"] == "PROJECT_LINKED"
-    assert login("arjun@paliath.in").post("/projects", {"id": uuid7(), "name": "New", "client": "C"}).json()["error"]["code"] == "PROJECT_LINKED"
-    # A manager still decides who is in which channel.
-    qs = channel_named(amit, "Villa 99", "qs")
-    amit.patch(f"/projects/{villa}/members/{ravi.user['id']}", {"channelIds": [qs["id"]]})
-    assert "qs" in {c["name"] for c in ravi.get("/channels").json()["channels"] if c["projectId"]}
-
+def test_owner_and_admins_make_projects_and_add_people_by_hand(login):
+    meera, ravi, amit = login("meera@paliath.in"), login("ravi@paliath.in"), login("amit@paliath.in")
+    pid = uuid7()
+    p = meera.post("/projects", {"id": pid, "name": "Lake House"}).json()
+    assert p["members"] == []
+    chans = meera.get(f"/projects/{pid}/channels").json()["channels"]
+    assert [c["name"] for c in chans] == ["general"] and chans[0]["memberIds"] == []  # admins aren't listed
+    assert not any(x["name"] == "Lake House" for x in ravi.get("/projects").json()["projects"])  # nobody else, yet
+    assert amit.post("/projects", {"id": uuid7(), "name": "Mine"}).status_code == 403  # members can't create projects
+    # A new channel with Ravi in it puts him on the project too.
+    ch = meera.post(f"/projects/{pid}/channels", {"id": uuid7(), "name": "Tiling", "memberIds": [ravi.user["id"]]}).json()
+    assert ch["channel"]["name"] == "tiling"
+    assert any(x["name"] == "Lake House" for x in ravi.get("/projects").json()["projects"])
+    names = {c["name"] for c in ravi.get("/channels").json()["channels"] if c["projectId"] == pid}
+    assert names == {"tiling"}  # not #general: nobody is added anywhere automatically
+    # Adding someone to the project alone gives them no channel.
+    meera.post(f"/projects/{pid}/members", {"userId": amit.user["id"]})
+    assert not any(c["projectId"] == pid for c in amit.get("/channels").json()["channels"])
+    assert amit.post(f"/projects/{pid}/channels", {"id": uuid7(), "name": "extra"}).status_code == 403
+    assert meera.patch(f"/projects/{pid}", {"name": "Lake House 2"}).json()["name"] == "Lake House 2"
+    meera.delete(f"/projects/{pid}/members/{ravi.user['id']}")
+    assert not any(c["projectId"] == pid for c in ravi.get("/channels").json()["channels"])
 
 def test_owner_and_admins_are_never_added_to_a_project(login):
     kavya = login("kavya@paliath.in")
@@ -196,8 +205,6 @@ def test_owner_and_admins_are_never_added_to_a_project(login):
     admin = next(u for u in people if u["companyRole"] in ("owner", "admin"))
     worker = next(u for u in people if u["companyRole"] == "member")
     assert admin["joinsProjects"] is False and worker["joinsProjects"] is True
-    assert kavya.get("/meta").json()["rolesInEveryChannel"] == ["manager"]
-
 
 def test_websocket_needs_a_token(client, login):
     import pytest
@@ -211,32 +218,28 @@ def test_websocket_needs_a_token(client, login):
         ws.send_text("ping")  # accepted and kept open
 
 
-def test_setup_comes_from_the_server(client, login):
+def test_the_same_app_for_every_company(client, login):
     accounts = client.get("/auth/demo-accounts").json()["accounts"]
     assert {"identifier": "ravi@paliath.in", "email": "ravi@paliath.in", "name": "Ravi Kumar", "companyRole": "member",
-            "company": "Paliath Interiors", "jobTitle": "Worker"} in accounts
+            "company": "Paliath Interiors"} in accounts
     assert any(a["identifier"] == "+919800000005" for a in accounts)  # a phone-only person in Brightline
     amit = login("amit@paliath.in")
     assert amit.get("/company").json()["name"] == "Paliath Interiors"
-    meta = amit.get("/meta").json()
-    assert {"name": "Worker", "label": "Worker", "managersOnly": False} in meta["jobTitles"]
-    assert {"key": "Damage", "label": "Damage", "inCheckins": False} in meta["problemTypes"]
-    assert login("ravi@paliath.in").get("/me").json()["simpleMode"] is True
-    assert amit.get("/me").json()["simpleMode"] is False
-
+    assert amit.get("/meta").json() == {"editWindowMs": 15 * 60 * 1000, "deleteWindowMs": 60 * 60 * 1000}
+    assert "simpleMode" not in amit.get("/me").json()
 
 def test_channels_come_in_display_order(login):
     amit = login("amit@paliath.in")
     chans = amit.get("/channels").json()["channels"]
     villa = project_id(amit, "Villa 99")
-    assert [c["name"] for c in chans if c["projectId"] == villa] == ["general", "design", "site-work", "qs"]
+    assert [c["name"] for c in chans if c["projectId"] == villa] == ["general", "design", "qs", "site-work"]
     assert [c["name"] for c in chans if c["kind"] == "company"][0] == "announcements"
     kinds = [c["kind"] for c in chans]
     assert kinds == sorted(kinds, key=["project", "company", "bot", "dm"].index)
 
 
-def test_a_company_without_a_pm_link_makes_its_own_projects(client):
-    r = client.post("/platform/companies", json={"name": "Solo Builders", "template": "general", "ownerName": "Sam Owner",
+def test_a_new_company_starts_empty_and_makes_its_own_projects(client):
+    r = client.post("/platform/companies", json={"name": "Solo Builders", "ownerName": "Sam Owner",
                                                  "ownerIdentifier": "sam@solo.example", "pmKind": "none"},
                     headers={"X-Platform-Key": "dev-platform-key"})
     assert r.status_code == 200, r.text
@@ -248,8 +251,9 @@ def test_a_company_without_a_pm_link_makes_its_own_projects(client):
     h = {"Authorization": f"Bearer {s['accessToken']}"}
     pid = uuid7()
     p = client.post("/projects", json={"id": pid, "name": "Hebbal flat", "client": "Rao", "address": "Hebbal"}, headers=h).json()
-    assert p["linked"] is False and p["access"]["permissions"]
+    assert p["access"]["permissions"] and "linked" not in p
     chans = {c["name"] for c in client.get(f"/projects/{pid}/channels", headers=h).json()["channels"]}
-    assert chans == {"general", "field", "managers"}  # the general template's channels
+    assert chans == {"general"}
     assert client.patch(f"/projects/{pid}", json={"archived": True}, headers=h).json()["archivedAt"]
     assert client.delete(f"/projects/{pid}", headers=h).json() == {"deleted": True}
+

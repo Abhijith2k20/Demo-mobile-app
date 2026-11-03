@@ -8,7 +8,7 @@ import { T } from '@/components/T';
 import { space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import type { Channel, ID } from '@/types/models';
-import { useInEveryChannel, type MemberRow } from '../../../shared';
+import type { MemberRow } from '../../../shared';
 
 /** The one channel every project keeps: it cannot be renamed, made private or deleted. */
 export const HOME_CHANNEL = 'general';
@@ -33,7 +33,6 @@ export function ChannelEditor({
   error?: string;
 }) {
   const { c } = useTheme();
-  const inEveryChannel = useInEveryChannel();
   const home = draft.channel?.name === HOME_CHANNEL;
   const toggle = (id: ID) =>
     onChange({ ...draft, memberIds: draft.memberIds.includes(id) ? draft.memberIds.filter((x) => x !== id) : [...draft.memberIds, id] });
@@ -74,10 +73,10 @@ export function ChannelEditor({
         </View>
         <T variant="meta" color="textMuted">
           {home
-            ? '#general stays open to everyone on the project.'
+            ? '#general stays open: anyone on the project can join it.'
             : draft.isPrivate
               ? 'Only the people ticked below can see this channel. Others cannot find or join it.'
-              : 'Anyone on the project can find this channel and join it. The people ticked below are in it from the start.'}
+              : 'Anyone on the project can find this channel and join it. Only the people ticked below are in it.'}
         </T>
       </View>
 
@@ -85,33 +84,27 @@ export function ChannelEditor({
         <T variant="label" color="textMuted" style={{ marginBottom: space.xs }}>
           People in this channel
         </T>
-        {members.map(({ user, member }) => {
-          const manager = inEveryChannel(member.role);
-          const on = manager || home || draft.memberIds.includes(user.id);
-          const locked = manager || home;
+        {members.map(({ user }) => {
+          const on = draft.memberIds.includes(user.id);
           return (
             <Pressable
               key={user.id}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: on, disabled: locked }}
-              disabled={locked}
+              accessibilityState={{ checked: on }}
               onPress={() => toggle(user.id)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}>
-              <Feather name={on ? 'check-square' : 'square'} size={20} color={locked ? c.textFaint : on ? c.accent : c.textFaint} />
+              <Feather name={on ? 'check-square' : 'square'} size={20} color={on ? c.accent : c.textFaint} />
               <Avatar id={user.id} name={user.name} size={28} />
-              <View style={{ flex: 1 }}>
-                <T variant="body" numberOfLines={1}>
-                  {user.name}
-                </T>
-                <T variant="meta" color="textMuted">
-                  {manager ? 'Manager · in every channel' : member.jobTitle}
-                </T>
-              </View>
+              <T variant="body" numberOfLines={1} style={{ flex: 1 }}>
+                {user.name}
+              </T>
             </Pressable>
           );
         })}
         <T variant="meta" color="textFaint" style={{ marginTop: space.xs }}>
-          The owner and admins can see every project channel.
+          {members.length === 0
+            ? 'Add people to the project first (Members), then pick their channels here.'
+            : 'The owner and admins can see every project channel.'}
         </T>
       </View>
     </View>

@@ -30,15 +30,6 @@ def person_for_ref(ref: str) -> dict:
     return {"id": uid, "ref": ident}
 
 
-def project_for_ref(ref: str | None) -> dict | None:
-    if not ref:
-        return None
-    p = db.row("SELECT * FROM projects WHERE pm_project_id = %(r)s", r=str(ref))
-    if not p:
-        raise not_found("Project")
-    return p
-
-
 def _row(card_id: str) -> dict | None:
     return db.row("SELECT * FROM cards WHERE id = %(id)s", id=card_id)
 
@@ -56,10 +47,8 @@ def state(c: dict) -> str:
 
 def card_view(c: dict) -> dict:
     """What the app draws (and the PM app reads back with GET /cards/{id})."""
-    project = db.row("SELECT name FROM projects WHERE id = %(p)s", p=c["projectId"]) if c["projectId"] else None
     return {
-        "id": c["id"], "extId": c["extId"], "userId": c["userId"], "projectId": c["projectId"],
-        "projectName": project["name"] if project else None, "content": c["content"], "state": state(c),
+        "id": c["id"], "extId": c["extId"], "userId": c["userId"], "content": c["content"], "state": state(c),
         "closedText": c["closedText"], "answer": c["answer"], "answeredAt": c["answeredAt"], "seenAt": c["seenAt"],
         "nudgedAt": c["nudgedAt"], "delivery": c["delivery"], "deliveryError": c["deliveryError"],
         "expiresAt": c["expiresAt"], "askedAt": c["createdAt"],
@@ -72,21 +61,20 @@ def _publish(c: dict, kind: str = "card.updated") -> None:
 
 # ---- From the PM app ----
 
-def create(*, ext_id: str, to: str, content: dict, project_ref: str | None = None, ref: dict | None = None,
+def create(*, ext_id: str, to: str, content: dict, ref: dict | None = None,
            expires_at: str | None = None) -> tuple[dict, bool]:
     """Sends a card to one person. The same `ext_id` again returns the first card (no second card or push).
     Returns (card, created)."""
     if existing := by_ext_id(ext_id):
         return existing, False
     person = person_for_ref(to)
-    project = project_for_ref(project_ref)
     ch = bot_channel_for(person["id"])
     if not ch:
         raise ApiError("NOT_A_MEMBER", f"{to} has no Siteline Bot conversation.")
     cid = uuid7()
     message = post_message(ch, BOT_ID, type="card", body=None, data={"cardId": cid})
     c = db.insert("cards", {"id": cid, "companyId": db.company_id(), "extId": ext_id, "userId": person["id"],
-                            "projectId": project["id"] if project else None, "messageId": message["id"],
+                            "messageId": message["id"],
                             "content": {k: content[k] for k in CONTENT_KEYS if content.get(k) is not None},
                             "ref": ref or {}, "expiresAt": expires_at})
     _publish(c, "card.new")
@@ -210,12 +198,3 @@ def set_delivery(card_id: str, delivery: str, error: str | None = None) -> None:
     c = db.update("cards", {"id": card_id}, {"delivery": delivery, "deliveryError": error, "updatedAt": now_iso()})
     if c:
         _publish(c)
-
-
-def recent_tasks(project_id: str) -> list[dict]:
-    """Tasks named in this project's cards in the last 30 days (for "Related task" in Report issue)."""
-    seen: dict[str, dict] = {}
-    for c in db.rows("""SELECT ref, content FROM cards WHERE project_id = %(p)s AND created_at > now() - interval '30 days'
-                        AND ref ? 'task' ORDER BY created_at DESC""", p=project_id):
-        seen.setdefault(str(c["ref"]["task"]), {"id": str(c["ref"]["task"]), "name": c["content"]["title"]})
-    return sorted(seen.values(), key=lambda t: t["name"])

@@ -153,5 +153,4 @@ def integration(user: dict = Depends(current_user)):
     lk = integrations.current()
     if not lk:
         return {"connected": False}
-    return {"connected": True, "kind": lk["kind"], "lastCallAt": lk["lastCallAt"], "lastError": lk["lastError"],
-            "unmatched": integrations.unmatched()}
+    return {"connected": True, "kind": lk["kind"], "lastCallAt": lk["lastCallAt"], "lastError": lk["lastError"]}

@@ -1,10 +1,9 @@
-// Project, member and channel writes. The server applies the rules (default channels,
-// managers in every channel, one manager minimum, #general can't change…).
+// Project, member and channel writes. The server applies the rules (Owner/Admin only, #general can't change…).
 import { uuidv7 } from 'uuidv7';
 import { api } from '@/lib/api/client';
 import { attempt, submit } from '@/lib/mutations';
 import { keys } from '@/lib/queries';
-import type { Channel, ChannelView, ID, JobTitle, Project, ProjectRole, ProjectView } from '@/types/models';
+import type { Channel, ChannelView, ID, Project, ProjectView } from '@/types/models';
 
 export interface ProjectDetails {
   name: string;
@@ -14,17 +13,18 @@ export interface ProjectDetails {
 
 const projectKeys = (projectId: ID) => [keys.projects, keys.channels, keys.browse(projectId)];
 
-/** Creates a project with its four channels. Field errors come back for the form. */
+/** Creates a project with its #general (the creator only). Field errors come back for the form. */
 export function createProject(input: ProjectDetails) {
   return submit(() => api<ProjectView>('POST', '/projects', { id: uuidv7(), ...input }), [keys.projects, keys.channels]);
 }
 
-export function addMember(input: { projectId: ID; userId: ID; role: ProjectRole; jobTitle: JobTitle; channelIds: ID[] }): Promise<unknown> {
+export function addMember(input: { projectId: ID; userId: ID; channelIds: ID[] }): Promise<unknown> {
   const { projectId, ...body } = input;
   return attempt(() => api('POST', `/projects/${projectId}/members`, body), projectKeys(projectId));
 }
 
-export function updateMember(input: { projectId: ID; userId: ID; role: ProjectRole; jobTitle: JobTitle; channelIds: ID[] }): Promise<unknown> {
+/** The person's channels in this project become exactly `channelIds`. */
+export function updateMember(input: { projectId: ID; userId: ID; channelIds: ID[] }): Promise<unknown> {
   const { projectId, userId, ...body } = input;
   return attempt(() => api('PATCH', `/projects/${projectId}/members/${userId}`, body), projectKeys(projectId));
 }

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from .. import actors, db, netsim
+from .. import db, netsim
 from ..deps import current_user
 from ..events import hub
 from ..mockpm import bot, data
-from ..schemas import ActorsConfig, NetworkConfig
+from ..schemas import NetworkConfig
 from ..services import accounts
 
 router = APIRouter(prefix="/internal", tags=["dev"])
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/internal", tags=["dev"])
 
 @router.get("/state")
 def state():
-    return {"network": netsim.state(), "actorsPaused": actors.paused(),
+    return {"network": netsim.state(),
             "connections": {k: len(v) for k, v in hub.conns.items()}}
 
 
@@ -32,18 +32,6 @@ def reset():
 def network(body: NetworkConfig):
     netsim.configure(body.mode, body.inject)
     return netsim.state()
-
-
-@router.post("/actors")
-def set_actors(body: ActorsConfig):
-    actors.set_paused(body.paused)
-    return {"actorsPaused": actors.paused()}
-
-
-@router.post("/actors/rohan-posts")
-def rohan_posts(user: dict = Depends(current_user)):
-    actors.rohan_posts_qs(0)
-    return {"ok": True}
 
 
 @router.post("/expire-token")
@@ -69,12 +57,6 @@ def morning(user: dict = Depends(current_user)):
 @router.post("/bot/evening-checkin")
 def evening(user: dict = Depends(current_user)):
     return {"asked": bot.checkin_now(bot.ref_of(user["id"]))}
-
-
-@router.post("/pm/publish")
-def pm_publish(user: dict = Depends(current_user)):
-    bot.publish_projects()
-    return {"published": True}
 
 
 @router.post("/pm/down")

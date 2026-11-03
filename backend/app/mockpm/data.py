@@ -33,29 +33,6 @@ def is_down() -> bool:
     return bool(db.value("SELECT (options->>'down')::boolean FROM integrations WHERE company_id = current_company()"))
 
 
-def list_projects() -> list[dict]:
-    _check_up()
-    return db.rows("SELECT id, name, client, address, status, url, updated_at FROM pm_mock_projects ORDER BY name")
-
-
-def list_members(project_id: str) -> list[dict]:
-    _check_up()
-    return db.rows("""SELECT person_ref AS ref, name, role, role_name FROM pm_mock_members
-                      WHERE project_id = %(p)s ORDER BY name""", p=project_id)
-
-
-def list_tasks(project_id: str | None = None) -> list[dict]:
-    _check_up()
-    q = "SELECT * FROM pm_mock_tasks WHERE deleted_at IS NULL" + (" AND project_id = %(p)s" if project_id else "")
-    return [_task(t) for t in db.rows(q + " ORDER BY planned_start, name", p=project_id)]
-
-
-def get_task(task_id: str) -> dict | None:
-    _check_up()
-    t = db.row("SELECT * FROM pm_mock_tasks WHERE id = %(id)s AND deleted_at IS NULL", id=task_id)
-    return _task(t) if t else None
-
-
 def write_status(task_id: str, change: dict, key: str) -> dict:
     """`change` is {status, percent?, note?, problem?}. The same `key` twice writes once."""
     _check_up()
@@ -102,10 +79,11 @@ def delete_task(task_id: str) -> None:
 
 
 def set_project_status(project_id: str, status: str) -> None:
-    from .bot import publish_projects
+    from .bot import task_changed
 
     db.run("UPDATE pm_mock_projects SET status = %(s)s, updated_at = now() WHERE id = %(id)s", s=status, id=project_id)
-    publish_projects()
+    for t in db.rows("SELECT id FROM pm_mock_tasks WHERE project_id = %(p)s AND deleted_at IS NULL", p=project_id):
+        task_changed(t["id"])  # a closed project closes its open cards
 
 
 def set_down(down: bool) -> None:

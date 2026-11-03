@@ -3,7 +3,7 @@
     "ALREADY_MEMBER": "This person is already in the company.",
     "AUTH_EXPIRED": "Please sign in again.",
     "CHANNEL_NAME_TAKEN": "This project already has a channel with that name.",
-    "CHANNEL_PRIVATE": "This channel is private. Ask a manager to add you.",
+    "CHANNEL_PRIVATE": "This channel is private. Ask an admin to add you.",
     "CHANNEL_READ_ONLY": "Only admins can post here.",
     "COMPANY_SUSPENDED": "This company isn't available on Siteline right now. Ask your admin.",
     "DEPENDENCY_FAILED": "A photo couldn't be uploaded, so this wasn't sent.",
@@ -21,12 +21,12 @@
     "OTP_INVALID": "That code isn't right. Check it and try again.",
     "OTP_TOO_MANY_ATTEMPTS": "Too many wrong codes. Ask for a new code.",
     "PROJECT_ARCHIVED": "This project is archived. Unarchive it to make changes.",
-    "PROJECT_LINKED": "This comes from the PM app. Change it there.",
     "RATE_LIMITED": "Too many requests. Wait a moment and try again.",
     "SERVICE_UNAVAILABLE": "The server is busy. Try again in a moment.",
     "TIMEOUT": "The server took too long. It may not have saved; check and try again.",
     "UNKNOWN": "Something went wrong. Please try again.",
     "VALIDATION_FAILED": "Some details aren't right. Check and try again.",
-    "sessionEnded": "You were signed out. Please sign in again."
+    "sessionEnded": "You were signed out. Please sign in again.",
+    "CARD_CLOSED": "This card can't be answered any more."
   }
 }

@@ -9,8 +9,8 @@ from .store import BOT_ID
 
 # Which pushes each notification level sends (You → Notifications, spec §5.9).
 LEVELS = {
-    "all": {"dm", "mention", "thread", "card", "notice", "issue"},
-    "important": {"dm", "mention", "card", "notice", "issue"},
+    "all": {"dm", "mention", "thread", "card"},
+    "important": {"dm", "mention", "card"},
     "off": set(),
 }
 

@@ -20,11 +20,8 @@ export const keys = {
   thread: (parentId: string) => ['thread', parentId] as const,
   pins: (channelId: string) => ['pins', channelId] as const,
   dm: (userId: string) => ['dm', userId] as const,
-  /** Tasks the PM app asked about in a project lately. */
-  tasks: (projectId: string) => ['tasks', projectId] as const,
   cards: ['cards'] as const,
   activity: ['activity'] as const,
-  updates: (projectId: string) => ['updates', projectId] as const,
   files: (projectId: string) => ['files', projectId] as const,
 };
 
@@ -56,13 +53,12 @@ export function keysFor(e: ServerEvent): QueryKey[] {
         keys.channel(m.channelId),
         keys.thread(m.threadParentId ?? m.id),
         keys.pins(m.channelId),
-        ['updates'],
         ['files'],
       ];
     }
     case 'project.updated':
     case 'project.deleted':
-      return [keys.projects, keys.me, keys.channels, ['browse'], ['tasks']];
+      return [keys.projects, keys.me, keys.channels, ['browse']];
     case 'channel.updated':
     case 'channel.deleted':
     case 'channel.member_added':
@@ -72,7 +68,7 @@ export function keysFor(e: ServerEvent): QueryKey[] {
       return [keys.channels, keys.channel(e.channelId)];
     case 'card.new':
     case 'card.updated':
-      return [keys.cards, ['tasks']];
+      return [keys.cards];
     case 'activity.new':
     case 'activity.read':
       return [keys.activity];

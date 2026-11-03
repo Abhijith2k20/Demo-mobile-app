@@ -18,7 +18,7 @@ function ProjectScreen({ projectId: id }: { projectId: string }) {
   const insets = useSafeAreaInsets();
   const project = useProject(id);
   const access = useProjectAccess(id);
-  const canManage = access.canArchive || access.isAdmin || access.can('channel.manage') || access.can('project.members');
+  const canManage = access.canArchive || access.isAdmin || access.can('channel.manage') || access.can('project.manage');
   const [tab, setTab] = useState<Tab>('info');
 
   return (

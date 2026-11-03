@@ -144,10 +144,6 @@ function PeopleScreen() {
                 personProjects.map(({ m, p }) => (
                   <T key={m.projectId} variant="body">
                     {shortProjectName(p!.name)}
-                    <T variant="body" color="textMuted">
-                      {' · '}
-                      {labels.project(m.role)} · {labels.jobTitle(m.jobTitle)}
-                    </T>
                   </T>
                 ))
               )}

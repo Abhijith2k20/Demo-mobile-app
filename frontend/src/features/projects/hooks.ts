@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { get, keys } from '@/lib/queries';
-import type { Attachment, ChannelView, ID, MessageView } from '@/types/models';
+import type { Attachment, ChannelView, ID } from '@/types/models';
 import { useChannels } from '../shared';
 
 
@@ -31,15 +31,6 @@ export function useBrowseChannels(projectId: ID, enabled = true) {
 }
 
 /** Last few status cards from the PM app across the project's channels. */
-export function useRecentUpdates(projectId: ID | null | undefined): MessageView[] {
-  const q = useQuery({
-    queryKey: keys.updates(projectId ?? ''),
-    queryFn: get<{ messages: MessageView[] }>(`/projects/${projectId}/updates`),
-    enabled: !!projectId,
-  });
-  return q.data?.messages ?? [];
-}
-
 export interface ProjectFile {
   key: string;
   kind: 'photo' | 'file';

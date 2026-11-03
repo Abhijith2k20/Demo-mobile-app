@@ -7,30 +7,19 @@ from .. import db
 from ..core import ApiError, forbidden, invalid, not_found, now_iso
 from ..deps import current_user
 from ..events import publish
-from ..rules import HOME_CHANNEL, can, channel_rank, is_company_admin, is_guest
+from ..rules import HOME_CHANNEL, can, is_company_admin, is_guest
 from ..schemas import ChannelCreate, ChannelPatch
 from ..access import can_see_channel, channel_audience, project_audience, visible_channel, visible_project
-from ..store import (
-    BOT_ID,
-    add_channel_member,
-    admins,
-    channel,
-    ensure_channel_member,
-    first_name,
-    is_channel_member,
-    project_managers,
-    project_member_ids,
-    project_role,
-    setup,
-)
+from ..store import BOT_ID, channel, ensure_channel_member, first_name, is_channel_member, person, project_member_ids
+from ..services import projects as spaces
 from ..views import channel_stats, channel_view
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["channels"])
 
 
-def _manager(user: dict, project_id: str) -> bool:
-    return can(user, "channel.manage", project_role(user["id"], project_id))
+def _manager(user: dict) -> bool:
+    return can(user, "channel.manage")
 
 
 def _project_channel(user: dict, channel_id: str) -> tuple[dict, dict]:
@@ -38,15 +27,15 @@ def _project_channel(user: dict, channel_id: str) -> tuple[dict, dict]:
     if not ch or ch["kind"] != "project" or not ch["projectId"]:
         raise not_found("Channel")
     project = visible_project(user, ch["projectId"])
-    # Private channels are invisible to project members who aren't in them (managers excepted).
-    if not can_see_channel(user, ch) and not _manager(user, project["id"]) and (ch["isPrivate"] or is_guest(user)):
+    # Private channels are invisible to project members who aren't in them (Owner/Admin excepted).
+    if not can_see_channel(user, ch) and not _manager(user) and (ch["isPrivate"] or is_guest(user)):
         raise not_found("Channel")
     return ch, project
 
 
-def _require_manage(user: dict, project: dict) -> None:
-    if not _manager(user, project["id"]):
-        raise forbidden("Only managers can manage channels.")
+def _require_manage(user: dict) -> None:
+    if not _manager(user):
+        raise forbidden("Only the owner or an admin can manage channels.")
 
 
 def _assert_name_free(project_id: str, name: str, except_id: str | None = None) -> None:
@@ -56,31 +45,21 @@ def _assert_name_free(project_id: str, name: str, except_id: str | None = None) 
                        {"fields": {"name": "Name already used"}})
 
 
-def _add(ch: dict, user_id: str) -> None:
-    if add_channel_member(ch["id"], user_id):
-        publish({"type": "channel.member_added", "channelId": ch["id"], "userId": user_id}, [*channel_audience(ch), user_id])
-
-
-def _remove(ch: dict, user_id: str) -> None:
-    if not is_channel_member(user_id, ch["id"]):
-        return
-    audience = [*channel_audience(ch), user_id]
-    db.delete("channel_members", {"channelId": ch["id"], "userId": user_id})
-    publish({"type": "channel.member_removed", "channelId": ch["id"], "userId": user_id}, audience)
+def _people(ids: list[str]) -> list[str]:
+    """Active people in this company among `ids` (unknown ones are dropped)."""
+    return [i for i in dict.fromkeys(ids) if (p := person(i)) and p["isActive"] and i != BOT_ID]
 
 
 def _set_members(ch: dict, ids: list[str]) -> None:
-    """The channel's project members become exactly `ids` (Owner/Admin rows are left alone)."""
-    allowed = project_member_ids(ch["projectId"])
-    # Managers are in every channel of their project (§9.3), so they're never removed.
-    want = {i for i in ids if i in allowed} | set(project_managers(ch["projectId"]))
-    current = [r["userId"] for r in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=ch["id"])
-               if r["userId"] in allowed]
-    for uid in current:
-        if uid not in want:
-            _remove(ch, uid)
+    """The channel's people become exactly `ids`; adding someone also puts them on the project. Owner/Admin
+    rows (kept for their read markers) are left alone: they see every channel anyway."""
+    want = set(_people(ids))
+    for r in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=ch["id"]):
+        u = person(r["userId"])
+        if r["userId"] not in want and u and not is_company_admin(u):
+            spaces.remove_from_channel(ch, r["userId"])
     for uid in want:
-        _add(ch, uid)
+        spaces.add_to_channel(ch, uid)
 
 
 @router.get("/channels")
@@ -98,14 +77,17 @@ def list_channels(user: dict = Depends(current_user)):
 
 
 def _in_display_order(views: list[dict]) -> list[dict]:
-    """Project channels in the company's standard order, then company channels (admin-only
-    ones like announcements first), the bot, and DMs with the latest conversation first."""
-    st = setup()
+    """Project channels (#general first, then by name), then company channels (admin-only ones like
+    announcements first), the bot, and DMs with the latest conversation first."""
     by_kind = {k: [v for v in views if v["kind"] == k] for k in ("project", "company", "bot", "dm")}
-    by_kind["project"].sort(key=lambda v: (v["projectId"], channel_rank(st, v)))
+    by_kind["project"].sort(key=lambda v: (v["projectId"], _rank(v)))
     by_kind["company"].sort(key=lambda v: (v["postingPolicy"] != "admins", v["name"]))
     by_kind["dm"].sort(key=lambda v: (v["lastMessage"] or {}).get("createdAt", ""), reverse=True)
     return [v for k in ("project", "company", "bot", "dm") for v in by_kind[k]]
+
+
+def _rank(v: dict) -> tuple:
+    return (v["name"] != HOME_CHANNEL, v["name"])
 
 
 @router.get("/channels/{channel_id}")
@@ -118,7 +100,7 @@ def browse_channels(project_id: str, user: dict = Depends(current_user)):
     """Every channel the user may know about in a project, joined or not (for "Browse channels").
     Guests only see the channels they're in."""
     project = visible_project(user, project_id)
-    manager = _manager(user, project["id"])
+    manager = _manager(user)
     on_project = project_member_ids(project["id"])
     out = []
     for c in db.rows("SELECT * FROM channels WHERE project_id = %(p)s", p=project["id"]):
@@ -128,13 +110,13 @@ def browse_channels(project_id: str, user: dict = Depends(current_user)):
         count = sum(1 for uid in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=c["id"])
                     if uid["userId"] in on_project)
         out.append({**channel_view(c, user), "memberCount": count})
-    return {"channels": sorted(out, key=lambda v: channel_rank(setup(), v))}
+    return {"channels": sorted(out, key=_rank)}
 
 
 @router.post("/projects/{project_id}/channels")
 def create_channel(project_id: str, body: ChannelCreate, user: dict = Depends(current_user)):
     project = visible_project(user, project_id)
-    _require_manage(user, project)
+    _require_manage(user)
     if existing := channel(body.id):
         if existing["projectId"] == project["id"]:
             return {"channel": channel_view(existing, user)}  # a retry
@@ -143,9 +125,8 @@ def create_channel(project_id: str, body: ChannelCreate, user: dict = Depends(cu
     ch = db.insert("channels", {"id": body.id, "companyId": db.company_id(), "projectId": project["id"], "name": body.name,
                                 "kind": "project", "isPrivate": body.isPrivate, "postingPolicy": "everyone",
                                 "updatedAt": now_iso()})
-    members = {i for i in body.memberIds if i in project_member_ids(project["id"])}
-    for uid in [*members, *project_managers(project["id"]), *admins(), user["id"]]:
-        _add(ch, uid)
+    for uid in _people([user["id"], *body.memberIds]):
+        spaces.add_to_channel(ch, uid)
     post_message(ch, BOT_ID, type="system", body=f"{first_name(user['id'])} created #{ch['name']}")
     return {"channel": channel_view(ch, user)}
 
@@ -153,7 +134,7 @@ def create_channel(project_id: str, body: ChannelCreate, user: dict = Depends(cu
 @router.patch("/channels/{channel_id}")
 def patch_channel(channel_id: str, body: ChannelPatch, user: dict = Depends(current_user)):
     ch, project = _project_channel(user, channel_id)
-    _require_manage(user, project)
+    _require_manage(user)
     home = ch["name"] == HOME_CHANNEL
     changes: dict = {}
     if body.name is not None and body.name != ch["name"]:
@@ -180,7 +161,7 @@ def delete_channel(channel_id: str, user: dict = Depends(current_user)):
     if not channel(channel_id):
         return {"deleted": True}  # already gone: safe to repeat
     ch, project = _project_channel(user, channel_id)
-    _require_manage(user, project)
+    _require_manage(user)
     if ch["name"] == HOME_CHANNEL:
         raise invalid({"name": "#general cannot be deleted"})
     audience = channel_audience(ch)
@@ -198,8 +179,8 @@ def join_channel(channel_id: str, user: dict = Depends(current_user)):
     if is_guest(user) and not is_channel_member(user["id"], ch["id"]):
         raise not_found("Channel")
     if ch["isPrivate"] and not is_channel_member(user["id"], ch["id"]) and not is_company_admin(user):
-        raise ApiError("CHANNEL_PRIVATE", "This channel is private. Ask a manager to add you.")
-    _add(ch, user["id"])
+        raise ApiError("CHANNEL_PRIVATE", "This channel is private. Ask an admin to add you.")
+    spaces.add_to_channel(ch, user["id"])
     return {"channel": channel_view(ch, user)}
 
 
@@ -210,7 +191,5 @@ def leave_channel(channel_id: str, user: dict = Depends(current_user)):
         return {"left": True}
     if ch["name"] == HOME_CHANNEL:
         raise invalid({"name": "Everyone stays in #general"})
-    if ch["projectId"] and user["id"] in project_managers(ch["projectId"]):
-        raise invalid({"name": "Managers stay in every channel"})
-    _remove(ch, user["id"])
+    spaces.remove_from_channel(ch, user["id"])
     return {"left": True}

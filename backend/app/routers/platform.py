@@ -7,7 +7,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import html
-import json
 import secrets
 import time
 from datetime import date
@@ -18,7 +17,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import config, db
 from ..core import ApiError, uuid7
 from ..jobs.queue import enqueue
-from ..mockpm import bot as mock_bot
 from ..mockpm import data as mock
 from ..schemas import CompanyCreate
 from ..services import accounts, companies, integrations
@@ -34,7 +32,7 @@ SESSION_SECONDS = 8 * 60 * 60
 def api_create_company(body: CompanyCreate, x_platform_key: str = Header("")):
     if not config.PLATFORM_KEY or not hmac.compare_digest(x_platform_key, config.PLATFORM_KEY):
         raise ApiError("FORBIDDEN", "A valid X-Platform-Key is needed.")
-    c = companies.create(name=body.name, time_zone=body.timeZone, template=body.template, owner_name=body.ownerName,
+    c = companies.create(name=body.name, time_zone=body.timeZone, owner_name=body.ownerName,
                          owner_identifier=body.ownerIdentifier, actor="platform-api", pm_kind=body.pmKind,
                          pm_company_id=body.pmCompanyId, webhook_url=body.pmWebhookUrl)
     return {"company": {"id": c["id"], "name": c["name"], "slug": c["slug"]}}
@@ -93,7 +91,6 @@ def panel(siteline_platform: str | None = Cookie(None), error: str = ""):
 <h2>New company</h2><form method="post" action="/platform/companies/new">
 <label>Name <input name="name" required></label>
 <label>Time zone <input name="time_zone" value="Asia/Kolkata" required></label>
-<label>Template <select name="template"><option>general</option><option>interiors</option><option>events</option></select></label>
 <label>Owner's name <input name="owner_name" required></label>
 <label>Owner's email or phone <input name="owner_identifier" required></label>
 <label>PM company id <input name="pm_company_id"></label>
@@ -150,13 +147,13 @@ def _back(company_id: str, note: str = "") -> RedirectResponse:
 
 @router.post("/companies/new")
 def panel_create(siteline_platform: str | None = Cookie(None), name: str = Form(...), time_zone: str = Form(...),
-                 template: str = Form(...), owner_name: str = Form(...), owner_identifier: str = Form(...),
+                 owner_name: str = Form(...), owner_identifier: str = Form(...),
                  pm_company_id: str = Form(""), pm_kind: str = Form("mock"), pm_webhook_url: str = Form("")):
     admin = _require(siteline_platform)
     try:
-        body = CompanyCreate(name=name, timeZone=time_zone, template=template, ownerName=owner_name,
+        body = CompanyCreate(name=name, timeZone=time_zone, ownerName=owner_name,
                              ownerIdentifier=owner_identifier, pmKind=pm_kind)
-        c = companies.create(name=body.name, time_zone=body.timeZone, template=body.template, owner_name=body.ownerName,
+        c = companies.create(name=body.name, time_zone=body.timeZone, owner_name=body.ownerName,
                              owner_identifier=body.ownerIdentifier, actor=admin, pm_kind=pm_kind,
                              pm_company_id=pm_company_id or None, webhook_url=pm_webhook_url or None)
     except (ApiError, ValueError) as e:
@@ -194,8 +191,7 @@ PM company {_e(c['pmCompanyId'])}</p><p>{_e(note)}</p>
 <input name="name" required> email or phone <input name="identifier" required></label><button class="quiet">Send owner invite</button></form>
 <form method="post" action="/platform/companies/{_e(company_id)}/transfer"><label>Transfer ownership to
 <select name="user_id">{options}</select></label><button class="quiet">Transfer</button></form>
-<h2>PM link</h2><p class="muted">Last API call {_e(link.get('lastCallAt'))} <span class="err">{_e(link.get('lastError'))}</span>
-· Not on Siteline yet: {_e(', '.join(sorted({r for refs in ((link.get('options') or {}).get('unmatchedByProject') or {}).values() for r in refs})))}</p>
+<h2>PM link</h2><p class="muted">Last API call {_e(link.get('lastCallAt'))} <span class="err">{_e(link.get('lastError'))}</span></p>
 <form method="post" action="/platform/companies/{_e(company_id)}/pm-link">
 <label>Kind <select name="kind"><option value="mock" {'selected' if link.get('kind') == 'mock' else ''}>Mock PM app</option>
 <option value="http" {'selected' if link.get('kind') == 'http' else ''}>PM app API</option></select></label>
@@ -206,9 +202,7 @@ PM company {_e(c['pmCompanyId'])}</p><p>{_e(note)}</p>
 {'A key is set.' if link.get('apiKeyHash') else 'No key yet.'}</p>
 <button>Save</button></form>
 <form method="post" action="/platform/companies/{_e(company_id)}/pm-key"><button class="quiet">Make a new API key and webhook secret</button></form>
-<h2>Setup</h2><form method="post" action="/platform/companies/{_e(company_id)}/setup">
-<textarea name="setup" rows="18" style="width:100%;font-family:monospace">{_e(json.dumps(c['setup'], indent=2, ensure_ascii=False))}</textarea>
-<button>Save setup</button></form>{mock_section}""")
+{mock_section}""")
 
 
 def _mock_section(company_id: str) -> str:
@@ -239,10 +233,9 @@ def _mock_section(company_id: str) -> str:
 <form class="inline" method="post" action="/platform/companies/{_e(company_id)}/mock/projects/{_e(p['id'])}">
 <input type="hidden" name="status" value="{'closed' if p['status'] == 'active' else 'active'}">
 <button class="quiet">{'Close' if p['status'] == 'active' else 'Reopen'}</button></form></li>""" for p in projects)
-    return f"""<h2>Mock PM app</h2><p class="muted">Stands in for this company's PM app. Changes here reach Siteline through the Cards API.</p>
+    return f"""<h2>Mock PM app</h2><p class="muted">Stands in for this company's PM app. Its projects and tasks stay here; it only sends cards to people.</p>
 <form method="post" action="/platform/companies/{_e(company_id)}/mock/down"><input type="hidden" name="down" value="{'0' if down else '1'}">
 <button class="quiet">{'Bring the mock PM app back' if down else 'Make the mock PM app stop answering'}</button></form>
-<form method="post" action="/platform/companies/{_e(company_id)}/mock/publish"><button class="quiet">Send projects and members to Siteline</button></form>
 <ul>{project_rows}</ul>
 <table><tr><th>Project</th><th>Task</th><th>Start</th><th>Finish</th><th>Owner (email/phone)</th><th>Status</th><th>%</th><th></th><th></th></tr>
 {rows}<tr><form method="post" action="/platform/companies/{_e(company_id)}/mock/tasks"><input type="hidden" name="id" value="">
@@ -268,16 +261,6 @@ def owner_invite(company_id: str, name: str = Form(...), identifier: str = Form(
 def transfer(company_id: str, user_id: str = Form(...), siteline_platform: str | None = Cookie(None)):
     companies.transfer_ownership(company_id, user_id, _require(siteline_platform))
     return _back(company_id, "Ownership transferred.")
-
-
-@router.post("/companies/{company_id}/setup")
-def save_setup(company_id: str, setup: str = Form(...), siteline_platform: str | None = Cookie(None)):
-    admin = _require(siteline_platform)
-    try:
-        companies.update_setup(company_id, json.loads(setup), admin)
-    except (ValueError, ApiError) as e:
-        return _back(company_id, f"Setup not saved: {getattr(e, 'details', {}).get('fields') or e}")
-    return _back(company_id, "Setup saved.")
 
 
 @router.post("/companies/{company_id}/pm-link")
@@ -342,14 +325,6 @@ def mock_down(company_id: str, down: str = Form(...), siteline_platform: str | N
     _as_company(company_id)
     mock.set_down(down == "1")
     return _back(company_id, "The mock PM app is down." if down == "1" else "The mock PM app is answering again.")
-
-
-@router.post("/companies/{company_id}/mock/publish")
-def mock_publish(company_id: str, siteline_platform: str | None = Cookie(None)):
-    _require(siteline_platform)
-    _as_company(company_id)
-    mock_bot.publish_projects()
-    return _back(company_id, "Projects sent to Siteline.")
 
 
 @router.get("/audit", response_class=HTMLResponse)

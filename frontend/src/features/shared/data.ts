@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { get, keys, refreshAll } from '@/lib/queries';
 import { useSession } from '@/stores/session';
-import type { ChannelView, CompanyRef, ID, Meta, ProjectMember, ProjectRole, ProjectView, User, UserView } from '@/types/models';
+import type { ChannelView, CompanyRef, ID, Meta, ProjectMember, ProjectView, User, UserView } from '@/types/models';
 
 export function useMeta(): Meta | undefined {
   return useQuery({ queryKey: keys.meta, queryFn: get<Meta>('/meta'), staleTime: Infinity }).data;
@@ -13,12 +13,6 @@ export function useMeta(): Meta | undefined {
 /** The company of the current session (it comes with the session; switching company starts a new one). */
 export function useCompany(): CompanyRef | undefined {
   return useSession((s) => s.company);
-}
-
-/** Whether a project role is always in every channel (the server's rule, from /meta). */
-export function useInEveryChannel(): (role: ProjectRole) => boolean {
-  const roles = useMeta()?.rolesInEveryChannel;
-  return useCallback((role: ProjectRole) => roles?.includes(role) ?? false, [roles]);
 }
 
 /** Everyone in the company, deactivated people included (they keep their history). */
@@ -66,7 +60,7 @@ export interface MemberRow {
   user: User;
 }
 
-/** The project's members, managers first. Deactivated people keep their history but aren't listed. */
+/** The project's members by name. Deactivated people keep their history but aren't listed. */
 export function useProjectMembers(projectId: ID | null | undefined): MemberRow[] {
   const project = useProject(projectId);
   const users = useUsers();
@@ -76,7 +70,7 @@ export function useProjectMembers(projectId: ID | null | undefined): MemberRow[]
       const user = users.byId.get(member.userId);
       if (user?.isActive) rows.push({ member, user });
     }
-    return rows.sort((a, b) => a.member.role.localeCompare(b.member.role) || a.user.name.localeCompare(b.user.name));
+    return rows.sort((a, b) => a.user.name.localeCompare(b.user.name));
   }, [project?.members, users.byId]);
 }
 

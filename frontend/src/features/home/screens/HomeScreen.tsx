@@ -59,8 +59,7 @@ function HomeScreen() {
   const home = useHome();
   const users = useUsers();
   const company = useCompany();
-  // Linked companies get their projects from the PM app.
-  const admin = canCreate && !company?.pmLinked;
+  const admin = canCreate;
   const several = (useSession((s) => s.companies) ?? []).length > 1;
   const [switching, setSwitching] = useState(false);
   const { refreshing, refresh } = useRefresh();
@@ -201,7 +200,7 @@ function HomeScreen() {
             <SectionHeader title={t('home.projects', 'Projects')} collapsed={collapsed.projects} onToggle={() => toggle('projects')} />
             {collapsed.projects ? null : home.projects.length === 0 ? (
               <T variant="meta" color="textMuted" style={{ paddingHorizontal: space.lg, paddingVertical: space.md }}>
-                {t('home.noProjects', "You're not on any project yet. A manager can add you.")}
+                {t('home.noProjects', "You're not on any project yet. An admin can add you.")}
               </T>
             ) : (
               <>

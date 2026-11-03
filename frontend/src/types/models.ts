@@ -1,9 +1,6 @@
 export type ID = string; // UUIDv7
 
 export type CompanyRole = 'owner' | 'admin' | 'member' | 'guest';
-export type ProjectRole = 'manager' | 'member';
-/** Job titles are the company's own words (its setup on the server, sent in /meta). */
-export type JobTitle = string;
 
 export interface User {
   id: ID;
@@ -24,22 +21,15 @@ export interface Project {
   name: string;
   client: string;
   address: string;
-  /** The project in the company's PM app; null for a project made in Siteline. */
-  pmProjectId: ID | null;
-  /** Link to the project in the PM app, when it gives one. */
-  pmUrl: string | null;
   /** Set when the project is archived: everything in it becomes read-only. */
   archivedAt: string | null;
   updatedAt: string;
 }
 
+/** Someone on a project: they can see it and browse its channels. The Owner and Admins see every project. */
 export interface ProjectMember {
   projectId: ID;
   userId: ID;
-  role: ProjectRole;
-  jobTitle: JobTitle;
-  /** Where the membership comes from: the PM app, added in Siteline, or a guest. */
-  source?: 'pm' | 'manual' | 'guest';
 }
 
 export type ChannelKind = 'project' | 'company' | 'dm' | 'bot';
@@ -66,8 +56,6 @@ export type MessageType =
   | 'voice'
   | 'file'
   | 'card'
-  | 'issue_card'
-  | 'daily_report'
   | 'system';
 
 /** 'pending' and 'failed' only exist on the phone, for messages still in the send queue. */
@@ -86,12 +74,6 @@ export interface Message {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
-}
-
-/** A task the PM app asked about in this project lately (for "Related task" in Report issue). */
-export interface RelatedTask {
-  id: ID;
-  name: string;
 }
 
 // ---- Cards from the PM app (docs/CARDS_API.md). The app draws them from their content and decides nothing. ----
@@ -135,8 +117,6 @@ export interface Card {
   id: ID;
   extId: string;
   userId: ID;
-  projectId: ID | null;
-  projectName: string | null;
   content: CardContent;
   /** expired: an open card past its expiry (worked out by the server). */
   state: 'open' | 'answered' | 'closed' | 'expired';
@@ -150,15 +130,6 @@ export interface Card {
   seenAt: string | null;
   /** The answer is in the send queue on this phone. */
   sending?: boolean;
-}
-
-/** A card the PM app posted in a project channel (status updates). */
-export interface ChannelCard {
-  title: string;
-  lines?: string[];
-  tone?: Tone;
-  /** Upload ids; the server adds signed links in `photoUrls`. */
-  photos?: ID[];
 }
 
 // ---- Additions beyond the spec's model list (see DECISIONS.md) ----
@@ -199,14 +170,10 @@ export interface Activity {
 
 /** What the server says the viewer may do in a project (the app's hook adds helpers: `useProjectAccess`). */
 export interface ProjectAccessInfo {
-  role: ProjectRole | null;
-  jobTitle: JobTitle | null;
   /** Actions the viewer may take in this project right now (e.g. 'channel.manage', 'project.archive'). */
   permissions: string[];
 }
 export interface ProjectView extends Project {
-  /** Linked to a project in the PM app. */
-  linked: boolean;
   members: ProjectMember[];
   access: ProjectAccessInfo;
 }
@@ -239,10 +206,7 @@ export interface Company {
   id: ID;
   name: string;
 }
-export interface CompanyRef extends Company {
-  /** Projects and people come from the company's PM app (no "New project" in Siteline). */
-  pmLinked?: boolean;
-}
+export type CompanyRef = Company;
 
 /** A company the person can open, with their role there. */
 export interface CompanyChoice extends Company {
@@ -270,14 +234,13 @@ export interface SentInvite {
   invitedBy: string | null;
 }
 
-/** Development and staging builds: one sign-in per role in each seeded company. */
+/** Development and staging builds: everyone in each seeded company. */
 export interface DemoAccount {
   identifier: string;
   email: string | null;
   company: string;
   name: string;
   companyRole: CompanyRole;
-  jobTitle: string | null;
 }
 
 export interface UserView extends User {
@@ -294,17 +257,8 @@ export interface ActivityView extends Activity {
 }
 
 export interface Meta {
-  jobTitles: { name: JobTitle; label: string; managersOnly: boolean }[];
-  /** Job title a new project member starts with. */
-  defaultJobTitle: JobTitle;
-  /** Quick picks for Report issue. "Other" is added by the app. */
-  problemTypes: { key: string; label: string; inCheckins: boolean }[];
   editWindowMs: number;
   deleteWindowMs: number;
-  /** role → job title → channel names a new member joins by default */
-  defaultChannels: Record<ProjectRole, Record<JobTitle, string[]>>;
-  /** Project roles that are always in every channel of their project. */
-  rolesInEveryChannel: ProjectRole[];
 }
 
 export type ServerEvent =

@@ -12,8 +12,8 @@
 > Version 2.0 had Siteline's own bot reading the PM app's tasks; 2.1 moved those decisions to the PM app; 2.2
 > removes the rest of the PM link to projects and channels, company templates, and the site forms (§0.2).
 >
-> **Status:** steps 1–8 of §15 are built; step 9 (chat only, this version) is next; step 10 (launch) needs the
-> accounts listed in the README. `DECISIONS.md` says where the build differs.
+> **Status:** steps 1–9 of §15 are built (step 9 is this version); step 10 (launch) needs the accounts listed in
+> the README. `DECISIONS.md` says where the build differs.
 
 ---
 
@@ -636,7 +636,7 @@ Secrets come only from the environment.
 | `GET /invites` / `POST /invites` `{id, identifier, name, role, channelIds?}` / `POST /invites/:id/resend` / `DELETE /invites/:id` | Owner/Admin |
 | `GET /integration` | PM link status (Owner/Admin) |
 | `GET /projects` / `GET /projects/:id` / `POST /projects` / `PATCH` / `DELETE` | Create, edit, delete: Owner/Admin |
-| `POST /projects/:id/members` / `DELETE /projects/:id/members/:userId` | Owner/Admin |
+| `POST /projects/:id/members` `{userId, channelIds?}` / `PATCH /projects/:id/members/:userId` `{channelIds}` / `DELETE` | Owner/Admin |
 | `GET /projects/:id/files` | |
 | `GET /projects/:id/channels` / `POST /projects/:id/channels` | |
 | `GET /channels` / `GET|PATCH|DELETE /channels/:id` / `POST /channels/:id/join|leave` | |

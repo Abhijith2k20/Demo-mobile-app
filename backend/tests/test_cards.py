@@ -5,7 +5,6 @@ import json
 import httpx
 
 from app import db
-from app.core import uuid7
 from app.mockpm import bot as mock
 from app.services import integrations
 from conftest import channel_named, events_for, in_company, run_jobs
@@ -31,10 +30,12 @@ def pm_task(name: str) -> dict:
 
 # ---- The person ----
 
-def test_an_answer_reaches_the_pm_app_and_its_status_card_follows(login):
+def test_an_answer_reaches_the_pm_app_and_nothing_is_posted_in_channels(login):
     ravi, amit = login("ravi@paliath.in"), login("amit@paliath.in")
     c = open_card(ravi)
-    assert c["content"]["title"] == "False ceiling – living room" and c["projectName"] == "Villa 99"
+    assert c["content"]["title"] == "False ceiling – living room" and c["content"]["subtitle"].startswith("Villa 99")
+    sw = channel_named(amit, "Villa 99", "site-work")
+    newest = amit.get(f"/channels/{sw['id']}/messages").json()["messages"][0]["id"]
     r = ravi.post(f"/cards/{c['id']}/answer", {"scale": "75", "note": "Boards fixed"}).json()
     assert r["state"] == "answered" and r["delivery"] == "pending"
     run_jobs({"webhook"})
@@ -43,11 +44,8 @@ def test_an_answer_reaches_the_pm_app_and_its_status_card_follows(login):
     with in_company("Paliath Interiors"):
         t = pm_task("False ceiling – living room")
         assert (t["status"], t["percent"]) == ("in_progress", 75)
-    sw = channel_named(amit, "Villa 99", "site-work")
-    last = amit.get(f"/channels/{sw['id']}/messages").json()["messages"][0]
-    assert last["type"] == "card" and "75%" in last["data"]["content"]["title"]
-    assert last["data"]["content"]["lines"] == ["“Boards fixed”"]
-    assert any(a["kind"] == "notice" for a in amit.get("/activity").json()["items"])
+    assert amit.get(f"/channels/{sw['id']}/messages").json()["messages"][0]["id"] == newest  # the PM app talks to people only
+    assert not any(a["kind"] == "notice" for a in amit.get("/activity").json()["items"])
     # Answering again changes nothing.
     assert ravi.post(f"/cards/{c['id']}/answer", {"scale": "25"}).json()["answer"]["scale"] == "75"
 
@@ -166,7 +164,6 @@ def test_cards_api_refuses_bad_keys_strangers_and_other_companies(client):
     body = {**CARD, "id": "snag-2", "to": "ravi@paliath.in"}
     assert client.post("/api/v1/cards", json=body, headers={"Authorization": "Bearer sk_nope"}).status_code == 401
     assert client.post("/api/v1/cards", json=body, headers=brightline).json()["error"]["code"] == "NOT_A_MEMBER"
-    assert client.post("/api/v1/cards", json={**body, "project": "no-such"}, headers=paliath).status_code == 404
     bad = {**body, "scale": [{"id": "a", "label": "A"}, {"id": "a", "label": "B"}]}
     assert client.post("/api/v1/cards", json=bad, headers=paliath).status_code == 422
     client.post("/api/v1/cards", json=body, headers=paliath)
@@ -189,26 +186,11 @@ def test_a_rotated_key_works_for_a_day(client):
     assert client.get("/api/v1/cards/none", headers=third).status_code == 404
 
 
-def test_cards_api_projects_and_channel_messages(login, client):
+def test_the_cards_api_reaches_nothing_but_cards(client):
     key = api_key("Paliath Interiors")
-    project = {"name": "Lake House", "client": "Rao family", "members": [
-        {"ref": "amit@paliath.in", "role": "manager", "roleName": "Project Manager"},
-        {"ref": "ravi@paliath.in", "role": "member", "roleName": "Worker"},
-        {"ref": "stranger@nowhere.in", "role": "member"}]}
-    r = client.put("/api/v1/projects/LH-1", json=project, headers=key).json()
-    assert r["unmatched"] == ["stranger@nowhere.in"]
-    ravi = login("ravi@paliath.in")
-    assert any(p["name"] == "Lake House" for p in ravi.get("/projects").json()["projects"])
-    msg = {"id": "status-lh-1", "project": "LH-1", "card": {"title": "Ravi · Tiling → 50%", "tone": "info"},
-           "notify": {"managers": True}}
-    first = client.post("/api/v1/messages", json=msg, headers=key).json()["message"]["id"]
-    assert client.post("/api/v1/messages", json=msg, headers=key).json()["message"]["id"] == first
-    amit = login("amit@paliath.in")
-    assert any(a["text"] == "Ravi · Tiling → 50%" for a in amit.get("/activity").json()["items"])
-    client.put("/api/v1/projects/LH-1", json={**project, "members": project["members"][:1]}, headers=key)
-    assert not any(p["name"] == "Lake House" for p in ravi.get("/projects").json()["projects"])
-    client.delete("/api/v1/projects/LH-1", headers=key)
-    assert next(p for p in amit.get("/projects").json()["projects"] if p["name"] == "Lake House")["archivedAt"]
+    assert client.put("/api/v1/projects/LH-1", json={"name": "Lake House"}, headers=key).status_code in (404, 405)
+    msg = {"id": "status-1", "project": "LH-1", "card": {"title": "Hello"}}
+    assert client.post("/api/v1/messages", json=msg, headers=key).status_code in (404, 405)
 
 
 # ---- Webhooks to a real PM app ----

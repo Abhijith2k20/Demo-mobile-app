@@ -11,14 +11,15 @@ from zoneinfo import ZoneInfo
 from .. import db
 from ..core import ApiError
 from ..jobs.queue import enqueue
-from ..services import cards, integrations
-from ..services import projects as spaces
-from ..store import company, setup
+from ..services import cards
+from ..store import company
 from . import data
 from .data import OPEN, Refused
 
 SETTINGS = {"workingDays": [0, 1, 2, 3, 4, 5], "morningSummaryAt": "08:30", "checkinAt": "17:30",
             "reminderAfterMin": 60}
+# The mock's own quick picks for "Problem" (a real PM app keeps its own list).
+PROBLEMS = ["Material not arrived", "Waiting for design", "Labour short"]
 SCALE = [{"id": "25", "label": "25%"}, {"id": "50", "label": "50%"}, {"id": "75", "label": "75%"},
          {"id": "90", "label": "90%"}, {"id": "done", "label": "Done"}]
 
@@ -87,8 +88,7 @@ def _due(t: dict) -> str:
 def checkin_content(t: dict) -> dict:
     overdue = str(t["plannedFinish"]) < today().isoformat()
     reached = next((s["id"] for s in reversed(SCALE[:-1]) if int(s["id"]) <= (t["percent"] or 0)), None)
-    problems = [{"id": _slug(p["key"]), "label": p["key"]} for p in setup().get("problemTypes") or []
-                if p.get("inCheckins", True)]
+    problems = [{"id": _slug(p), "label": p} for p in PROBLEMS]
     return {
         "title": t["name"],
         "subtitle": f"{t['projectName']} · due {_due(t)}",
@@ -110,9 +110,8 @@ def ask(t: dict, *, timers: bool) -> dict | None:
     """One check-in card for a task (one per task per day). With `timers`, a reminder follows if it's unanswered."""
     card_id = f"checkin-{t['id']}-{today().isoformat()}"
     try:
-        card, created = cards.create(ext_id=card_id, to=t["ownerRef"], project_ref=t["projectId"],
-                                     content=checkin_content(t), ref={"task": t["id"]})
-    except ApiError:  # the owner isn't on Siteline (yet), or the project isn't published
+        card, created = cards.create(ext_id=card_id, to=t["ownerRef"], content=checkin_content(t), ref={"task": t["id"]})
+    except ApiError:  # the owner isn't on Siteline (yet)
         return None
     if created:
         db.insert("pm_mock_cards", {"companyId": db.company_id(), "cardId": card_id, "taskId": t["id"], "kind": "checkin",
@@ -184,9 +183,6 @@ def change_for(answer: dict) -> dict | None:
 def receive(event: str, body: dict) -> dict:
     """The mock's webhook endpoint. Raises Unavailable while "down", so Siteline retries."""
     data._check_up()
-    if event in ("person.joined", "person.left"):
-        publish_projects()
-        return {"result": "accepted"}
     if event != "card.answered":
         return {"result": "accepted"}
     task_id = (body.get("ref") or {}).get("task")
@@ -198,30 +194,7 @@ def receive(event: str, body: dict) -> dict:
             data.write_status(task_id, change, key=body["card"])
     except Refused as e:
         return {"result": "refused", "message": str(e)}
-    t = _row(task_id)
-    if t:
-        _status_card(t, body)
     return {"result": "accepted"}
-
-
-def _status_card(t: dict, body: dict) -> None:
-    a, note = body["answer"], body.get("note") or {}
-    who = db.value("""SELECT u.name FROM users u WHERE lower(u.email) = lower(%(r)s) OR u.phone = %(r)s""", r=body["person"])
-    first = (who or body["person"]).split(" ")[0]
-    if a.get("scale"):
-        what, tone = ("done", "success") if a["scale"] == "done" else (f"→ {a['scale']}%", "info")
-    elif a.get("button") == "problem":
-        label = next((p["key"] for p in setup().get("problemTypes") or [] if _slug(p["key"]) == a.get("choice")), "Other")
-        what, tone = f"— problem: {label}", "danger"
-    else:
-        what, tone = "not started yet", "warning"
-    title = f"{first} · {t['name']} {what}"
-    lines = [f"“{note['text']}”"] if note.get("text") else []
-    photos = [p["upload"] for p in note.get("photos") or []]
-    integrations.post_channel_message(
-        ext_id=f"status-{body['card']}", project_ref=t["projectId"], channel=None,
-        card={"title": title[:200], "lines": lines, "tone": tone, "photos": photos},
-        notify={"managers": True, "push": f"{first}: {t['name']} {what}" if tone == "danger" else None})
 
 
 # ---- Changes in the mock (platform panel, dev panel) ----
@@ -245,16 +218,3 @@ def _owner_id(t: dict) -> str | None:
         return cards.person_for_ref(t["ownerRef"])["id"]
     except ApiError:
         return None
-
-
-def publish_projects() -> None:
-    """Sends every mock project and its members to Siteline (PUT /projects/{ref})."""
-    for p in db.rows("SELECT * FROM pm_mock_projects ORDER BY name"):
-        members = db.rows("SELECT person_ref AS ref, name, role, role_name FROM pm_mock_members WHERE project_id = %(p)s",
-                          p=p["id"])
-        _, unmatched = spaces.apply_pm_project(p["id"], {"name": p["name"], "client": p["client"] or "",
-                                                         "address": p["address"] or "", "url": p["url"],
-                                                         "status": p["status"], "members": members})
-        integrations.remember_unmatched(p["id"], unmatched)
-        for r in db.rows("SELECT id FROM pm_mock_tasks WHERE project_id = %(p)s AND deleted_at IS NULL", p=p["id"]):
-            task_changed(r["id"])

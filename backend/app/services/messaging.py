@@ -17,8 +17,7 @@ def channel_label(ch: dict) -> str:
 def _preview(type: str, body: str | None, data: dict | None) -> str:
     if body:
         return body
-    return {"image": "Photo", "voice": "Voice note", "file": "File", "issue_card": "Issue reported",
-            "daily_report": "Daily report"}.get(type, "New message")
+    return {"image": "Photo", "voice": "Voice note", "file": "File"}.get(type, "New message")
 
 
 def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, data: dict | None = None,
@@ -46,11 +45,10 @@ def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, 
         add_activity(
             userId=uid, kind="mention", actorId=sender_id, projectId=channel["projectId"], channelId=channel["id"],
             messageId=thread_parent_id or m["id"], taskIds=[],
-            text=f"{who} mentioned you in {channel_label(channel)}", lines=[body or (data or {}).get("what") or ""],
+            text=f"{who} mentioned you in {channel_label(channel)}", lines=[body or ""],
         )
     url = f"/thread/{thread_parent_id}" if thread_parent_id else f"/channel/{channel['id']}"
-    push(mentions, f"{who} in {channel_label(channel)}", preview, {"url": url},
-         kind="issue" if type == "issue_card" else "mention")
+    push(mentions, f"{who} in {channel_label(channel)}", preview, {"url": url}, kind="mention")
     if channel["kind"] == "dm":
         push([uid for uid in audience if uid != sender_id], who, preview, {"url": url}, kind="dm")
     if thread_parent_id:

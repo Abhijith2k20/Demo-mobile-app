@@ -1,31 +1,27 @@
-"""Project spaces (spec §5.6, §5.13): their members, recent updates, files, and tasks named in its recent cards.
-Projects from the PM app get their name, archive state and members from it (PUT /api/v1/projects); here a
-Manager only changes who is in which channel and adds or removes guests."""
+"""Projects (spec §5.6, §5.13): groups of channels for conversation. The Owner and Admins create, edit, archive
+and delete them and add people; being on a project lets a person see it and browse its channels."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
 from .. import db
-from ..core import ApiError, forbidden, invalid, not_found, now_iso
+from ..access import assert_project_active, can_see_channel, can_see_project, project_audience, visible_project
+from ..core import forbidden, invalid, not_found, now_iso
 from ..deps import current_user
 from ..events import publish
-from ..rules import can, company_permissions, is_company_admin, is_guest, job_title_error, joins_projects
+from ..rules import can, company_permissions, is_company_admin, joins_projects
 from ..schemas import MemberAdd, MemberPatch, ProjectCreate, ProjectPatch
-from ..access import can_see_channel, assert_project_active, can_see_project, project_audience, visible_project
-from ..store import BOT_ID, MESSAGE_COLUMNS, first_name, person, project_channel, project_channels, project_member, project_role, setup
-from ..services import cards
 from ..services import projects as spaces
-from ..views import message_view, project_view, with_links
 from ..services.messaging import post_message
+from ..store import BOT_ID, MESSAGE_COLUMNS, first_name, person, project_channel, project_channels, project_member
+from ..views import project_view, with_links
 
 router = APIRouter(tags=["projects"])
 
-LINKED = "This project's people come from the PM app. Change them there."
 
-
-def _require_members(user: dict, project: dict) -> None:
-    if not can(user, "project.members", project_role(user["id"], project["id"])):
-        raise forbidden("Only managers can manage members.")
+def _require_manage(user: dict) -> None:
+    if not can(user, "project.manage"):
+        raise forbidden("Only the owner or an admin can manage projects.")
 
 
 @router.get("/projects")
@@ -45,38 +41,28 @@ def get_project(project_id: str, user: dict = Depends(current_user)):
 
 @router.post("/projects")
 def create_project(body: ProjectCreate, user: dict = Depends(current_user)):
-    """Only for companies without a PM link: linked companies get their projects from the PM app."""
     if "project.create" not in company_permissions(user):
         raise forbidden("Only the owner or an admin can create projects.")
     if existing := db.row("SELECT * FROM projects WHERE id = %(id)s", id=body.id):
         return project_view(existing, user)  # a retry (Owner/Admin see every project anyway)
-    if db.value("SELECT 1 FROM integrations WHERE company_id = current_company()"):
-        raise ApiError("PROJECT_LINKED", "Projects come from the PM app. Create it there.")
-    return project_view(spaces.create_space(id=body.id, name=body.name, client=body.client, address=body.address), user)
+    return project_view(spaces.create_space(creator_id=user["id"], id=body.id, name=body.name, client=body.client,
+                                            address=body.address), user)
 
 
 @router.patch("/projects/{project_id}")
 def patch_project(project_id: str, body: ProjectPatch, user: dict = Depends(current_user)):
     project = visible_project(user, project_id)
-    role = project_role(user["id"], project["id"])
+    _require_manage(user)
     fields = body.model_dump(exclude_unset=True)
     archived = fields.pop("archived", None)
-    linked = bool(project["pmProjectId"])
-    if linked and (fields or archived is not None):
-        raise ApiError("PROJECT_LINKED", "This project's details come from the PM app. Change them there.")
     if archived is not None and archived != bool(project["archivedAt"]):
-        if not can(user, "project.edit", role):
-            raise forbidden("Only managers can archive a project.")
         project = db.update("projects", {"id": project["id"]}, {"archivedAt": now_iso() if archived else None})
         project = spaces.project_updated(project)
         if home := project_channel(project["id"], "general"):
             post_message(home, BOT_ID, type="system",
                          body=f"{first_name(user['id'])} {'archived' if archived else 'unarchived'} this project")
-    if project["archivedAt"] and fields:
-        assert_project_active(project["id"])
     if fields:
-        if not can(user, "project.edit", role):
-            raise forbidden("Only managers can edit project details.")
+        assert_project_active(project["id"])
         db.update("projects", {"id": project["id"]}, fields)
         project = spaces.project_updated(project)
     return project_view(project, user)
@@ -92,90 +78,57 @@ def delete_project(project_id: str, user: dict = Depends(current_user)):
     if not is_company_admin(user):
         raise forbidden("Only the owner or an admin can delete a project.")
     audience = project_audience(project["id"])
-    db.delete("projects", {"id": project["id"]})  # channels, messages, members and check-ins go with it
+    db.delete("projects", {"id": project["id"]})  # channels, messages and members go with it
     publish({"type": "project.deleted", "projectId": project["id"]}, audience)
     return {"deleted": True}
+
+
+def _set_channels(project_id: str, user_id: str, channel_ids: list[str]) -> None:
+    """The person's channels in this project become exactly `channel_ids`."""
+    for ch in project_channels(project_id):
+        if ch["id"] in channel_ids:
+            spaces.add_to_channel(ch, user_id)
+        else:
+            spaces.remove_from_channel(ch, user_id)
 
 
 @router.post("/projects/{project_id}/members")
 def add_member(project_id: str, body: MemberAdd, user: dict = Depends(current_user)):
     project = visible_project(user, project_id)
-    _require_members(user, project)
+    _require_manage(user)
+    assert_project_active(project["id"])
     target = person(body.userId)
     if not target or not target["isActive"]:
         raise not_found("Person")
     if not joins_projects(target):
         raise invalid({"userId": "The owner and admins already see every project"})
-    if project["pmProjectId"] and not is_guest(target):
-        raise ApiError("PROJECT_LINKED", LINKED)
-    if is_guest(target) and body.role == "manager":
-        raise invalid({"role": "Guests can't be managers"})
-    if error := job_title_error(setup(), body.role, body.jobTitle):
-        raise invalid({"jobTitle": error})
-    spaces.save_member(project["id"], target["id"], body.role, body.jobTitle,
-                       "guest" if is_guest(target) else "manual", body.channelIds)
+    spaces.add_member(project["id"], target["id"])
+    if body.channelIds:
+        _set_channels(project["id"], target["id"], body.channelIds)
     spaces.project_updated(project)
-    return {"projectId": project["id"], "userId": target["id"], "role": body.role, "jobTitle": body.jobTitle}
+    return {"projectId": project["id"], "userId": target["id"]}
 
 
 @router.patch("/projects/{project_id}/members/{user_id}")
 def patch_member(project_id: str, user_id: str, body: MemberPatch, user: dict = Depends(current_user)):
     project = visible_project(user, project_id)
-    _require_members(user, project)
-    member = project_member(user_id, project["id"])
-    if not member:
+    _require_manage(user)
+    assert_project_active(project["id"])
+    if not project_member(user_id, project["id"]):
         raise not_found("Member")
-    from_pm = member["source"] == "pm"
-    if from_pm and (body.role or body.jobTitle):
-        raise ApiError("PROJECT_LINKED", LINKED)
-    role, title = body.role or member["role"], body.jobTitle or member["jobTitle"]
-    if role == "member" and member["role"] == "manager":
-        managers = db.value("SELECT count(*) FROM project_members WHERE project_id = %(p)s AND role = 'manager'", p=project["id"])
-        if managers <= 1:
-            raise invalid({"role": "A project needs at least one manager"})
-    if member["source"] == "guest" and role == "manager":
-        raise invalid({"role": "Guests can't be managers"})
-    if error := job_title_error(setup(), role, title):
-        raise invalid({"jobTitle": error})
-    if (role, title) != (member["role"], member["jobTitle"]):
-        db.update("project_members", {"projectId": project["id"], "userId": user_id}, {"role": role, "jobTitle": title})
-    if role == "manager":
-        spaces.set_member_channels(project["id"], user_id, [c["id"] for c in project_channels(project["id"])])
-    elif body.channelIds is not None:
-        spaces.set_member_channels(project["id"], user_id, body.channelIds)
+    _set_channels(project["id"], user_id, body.channelIds)
     spaces.project_updated(project)
-    return {"projectId": project["id"], "userId": user_id, "role": role, "jobTitle": title}
+    return {"projectId": project["id"], "userId": user_id}
 
 
 @router.delete("/projects/{project_id}/members/{user_id}")
 def remove_member(project_id: str, user_id: str, user: dict = Depends(current_user)):
     project = visible_project(user, project_id)
-    _require_members(user, project)
-    member = project_member(user_id, project["id"])
-    if not member:
-        return {"removed": True}  # already gone: safe to repeat
-    if member["source"] == "pm":
-        raise ApiError("PROJECT_LINKED", LINKED)
-    spaces.remove_member(project["id"], user_id)
-    spaces.project_updated(project)
-    return {"removed": True}
-
-
-@router.get("/projects/{project_id}/tasks")
-def project_tasks(project_id: str, user: dict = Depends(current_user)):
-    """Tasks the PM app asked about in this project lately (for "Related task" in Report issue)."""
-    project = visible_project(user, project_id)
-    return {"tasks": cards.recent_tasks(project["id"])}
-
-
-@router.get("/projects/{project_id}/updates")
-def project_updates(project_id: str, user: dict = Depends(current_user)):
-    """The last few cards the PM app posted (status updates) across the project's channels."""
-    project = visible_project(user, project_id)
-    channels = {c["id"]: c for c in project_channels(project["id"])}
-    cards = db.rows(f"""SELECT {MESSAGE_COLUMNS} FROM messages m WHERE channel_id = ANY(%(ids)s) AND type = 'card'
-                        AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 5""", ids=list(channels))
-    return {"messages": [message_view(m, user, channels[m["channelId"]]) for m in cards]}
+    _require_manage(user)
+    if project_member(user_id, project["id"]):
+        spaces.remove_member(project["id"], user_id)
+        spaces.project_updated(project)
+    return {"removed": True}  # already gone: safe to repeat
 
 
 @router.get("/projects/{project_id}/files")
@@ -185,8 +138,7 @@ def project_files(project_id: str, user: dict = Depends(current_user)):
     channels = [c["id"] for c in project_channels(project["id"]) if can_see_channel(user, c)]
     files = []
     for m in db.rows(f"""SELECT {MESSAGE_COLUMNS} FROM messages m WHERE channel_id = ANY(%(ids)s) AND deleted_at IS NULL
-                         AND type IN ('image', 'file', 'issue_card', 'daily_report') ORDER BY created_at DESC LIMIT 400""",
-                     ids=channels):
+                         AND type IN ('image', 'file') ORDER BY created_at DESC LIMIT 400""", ids=channels):
         m = with_links(m)
         if m["type"] == "file":
             files.append({"key": m["id"], "kind": "file", "name": str((m["data"] or {}).get("name", "File")),

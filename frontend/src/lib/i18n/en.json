@@ -3,7 +3,7 @@
     "ALREADY_MEMBER": "This person is already in the company.",
     "AUTH_EXPIRED": "Please sign in again.",
     "CHANNEL_NAME_TAKEN": "This project already has a channel with that name.",
-    "CHANNEL_PRIVATE": "This channel is private. Ask a manager to add you.",
+    "CHANNEL_PRIVATE": "This channel is private. Ask an admin to add you.",
     "CHANNEL_READ_ONLY": "Only admins can post here.",
     "COMPANY_SUSPENDED": "This company isn't available on Siteline right now. Ask your admin.",
     "DEPENDENCY_FAILED": "A photo couldn't be uploaded, so this wasn't sent.",
@@ -21,13 +21,13 @@
     "OTP_INVALID": "That code isn't right. Check it and try again.",
     "OTP_TOO_MANY_ATTEMPTS": "Too many wrong codes. Ask for a new code.",
     "PROJECT_ARCHIVED": "This project is archived. Unarchive it to make changes.",
-    "PROJECT_LINKED": "This comes from the PM app. Change it there.",
     "RATE_LIMITED": "Too many requests. Wait a moment and try again.",
     "SERVICE_UNAVAILABLE": "The server is busy. Try again in a moment.",
     "TIMEOUT": "The server took too long. It may not have saved; check and try again.",
     "UNKNOWN": "Something went wrong. Please try again.",
     "VALIDATION_FAILED": "Some details aren't right. Check and try again.",
     "sessionEnded": "You were signed out. Please sign in again.",
+    "CARD_CLOSED": "This card can't be answered any more.",
     "boundaryHint": "This screen had a problem. Your data is safe.",
     "boundaryTitle": "Something went wrong"
   },
@@ -66,6 +66,20 @@
     "left": "{{count}} cards need an answer",
     "oneLeft": "1 card needs an answer",
     "progress": "{{done}} of {{total}} done"
+  },
+  "card": {
+    "addPhoto": "Add a photo",
+    "closed": "Closed",
+    "delivering": "Sending to the PM app…",
+    "expired": "Expired",
+    "loading": "Loading…",
+    "note": "Note",
+    "noteHint": "Your note is sent with the answer you tap above.",
+    "notSaved": "Not saved: {{reason}}",
+    "photoAdded": "Photo added · tap to remove",
+    "reminderLine": "Reminder: {{title}} still needs an answer",
+    "send": "Send",
+    "update": "Update"
   },
   "channel": {
     "botSubtitle": "Check-ins and reminders",
@@ -148,30 +162,10 @@
     "emptyHint": "Message someone on your team to get started.",
     "emptyTitle": "No direct messages yet",
     "noMessages": "No messages yet",
+    "previewCard": "A card to answer",
     "previewPhoto": "Photo",
     "search": "Find a conversation",
-    "title": "Direct messages",
-    "previewCard": "A card to answer"
-  },
-  "forms": {
-    "dailyReport": "Daily report",
-    "details": "Details",
-    "detailsHint": "Add a few words (optional)",
-    "normal": "Normal",
-    "normalHint": "Posted to the channel for the team.",
-    "photos": "Photos",
-    "problems": "Problems (optional)",
-    "relatedTask": "Related task (optional)",
-    "reportIssue": "Report issue",
-    "sendIssue": "Report issue",
-    "sendReport": "Send report",
-    "tomorrow": "Tomorrow's plan",
-    "urgency": "Urgency",
-    "urgentHint": "Urgent issues notify the project managers.",
-    "whatsWrong": "What's wrong",
-    "workDone": "Work done today",
-    "workDoneHint": "What got done today?",
-    "workers": "People working today"
+    "title": "Direct messages"
   },
   "home": {
     "archived": "Archived ({{count}})",
@@ -179,7 +173,7 @@
     "jumpTo": "Jump to…",
     "newMessage": "New message",
     "newProject": "New project",
-    "noProjects": "You're not on any project yet. A manager can add you.",
+    "noProjects": "You're not on any project yet. An admin can add you.",
     "noResults": "Nothing matches",
     "noResultsHint": "Try a channel, person or project name.",
     "projectOverview": "Project info",
@@ -212,12 +206,6 @@
     "resent": "Sent again to {{who}}.",
     "title": "Invites"
   },
-  "issue": {
-    "card": "Issue",
-    "other": "Other",
-    "relatedTask": "Task",
-    "urgent": "Urgent"
-  },
   "key": "English",
   "members": {
     "add": "Add member",
@@ -225,18 +213,16 @@
     "addName": "Add {{name}}",
     "addShort": "Add",
     "channels": "Channels",
+    "channelsHint": "Nobody is added to a channel automatically. Tick the ones they should be in.",
     "empty": "No members yet",
     "emptyHint": "Add the people who work on this project.",
-    "jobTitle": "Job title",
-    "managerHint": "Managers manage the project's channels and members, and hear when check-ins go unanswered.",
-    "memberHint": "Members chat in their channels and answer the bot's check-ins on their tasks.",
+    "noChannels": "No channels yet",
     "noneToAdd": "No one to add",
     "noneToAddHint": "Everyone in the directory is already on this project.",
     "remove": "Remove from project",
     "removeBody": "{{name}} will lose access to this project. Their messages stay.",
     "removeShort": "Remove",
-    "removeTitle": "Remove member?",
-    "role": "Role"
+    "removeTitle": "Remove member?"
   },
   "offline": {
     "noServer": "Can't reach Siteline. Check your connection; changes need it to save.",
@@ -267,8 +253,7 @@
   },
   "photos": {
     "cameraDenied": "Allow camera access in Settings to take photos.",
-    "failed": "Couldn't open photos. Try again.",
-    "remove": "Remove photo"
+    "failed": "Couldn't open photos. Try again."
   },
   "picker": {
     "different": "Use a different email or phone",
@@ -287,28 +272,20 @@
     "gallery": "Gallery"
   },
   "pm": {
-    "hint": "Projects, people and tasks come from the PM app. The bot asks task owners for updates and sends their answers back.",
-    "invite": "Invite",
-    "lastSync": "Last sync {{when}}",
+    "hint": "The PM app talks to people one at a time through the Siteline Bot: it sends cards and gets the answers back. It has no access to projects, channels or messages.",
+    "lastCall": "Last heard from {{when}}",
     "live": "Your PM app",
     "mock": "Test PM app (stand-in)",
-    "neverSynced": "Not synced yet",
+    "neverCalled": "Not heard from yet",
     "none": "Not linked",
-    "noneHint": "Projects are made in Siteline. Ask the Siteline team to link your PM app.",
-    "title": "PM app link",
-    "unmatched": "{{count}} people in the PM app aren't on Siteline yet"
+    "noneHint": "Without a PM app the bot sends no cards. Ask the Siteline team to link it.",
+    "title": "PM app link"
   },
   "project": {
     "address": "Site address",
     "client": "Client",
     "create": "Create project",
     "name": "Project name"
-  },
-  "report": {
-    "card": "Daily report",
-    "problems": "Problems",
-    "tomorrow": "Tomorrow's plan",
-    "workersCount": "{{count}} people working"
   },
   "tabs": {
     "activity": "Activity",
@@ -323,6 +300,7 @@
     "title": "Thread"
   },
   "unsent": {
+    "card": "Answer: {{title}}",
     "discard": "Discard",
     "discardBody": "It hasn't reached the server and will be lost.",
     "discardTitle": "Discard this change?",
@@ -335,8 +313,7 @@
     "sendNow": "Try sending now",
     "title": "Unsent items",
     "waiting": "Waiting to send",
-    "waitingReason": "Waiting for a connection.",
-    "card": "Answer: {{title}}"
+    "waitingReason": "Waiting for a connection."
   },
   "you": {
     "admin": "Admin",
@@ -351,7 +328,6 @@
     "logoutAnyway": "Log out anyway",
     "logoutTitle": "Log out?",
     "logoutWarning": "{{count}} changes haven't been sent yet. Logging out deletes them.",
-    "manager": "Manager",
     "member": "Member",
     "notifications": "Notifications",
     "notifyAll": "All",
@@ -371,20 +347,5 @@
     "themeDark": "Dark",
     "themeLight": "Light",
     "themeSystem": "System"
-  },
-  "card": {
-    "loading": "Loading…",
-    "reminderLine": "Reminder: {{title}} still needs an answer",
-    "delivering": "Sending to the PM app…",
-    "notSaved": "Not saved: {{reason}}",
-    "archived": "Archived",
-    "expired": "Expired",
-    "closed": "Closed",
-    "update": "Update",
-    "note": "Note",
-    "photoAdded": "Photo added · tap to remove",
-    "addPhoto": "Add a photo",
-    "send": "Send",
-    "noteHint": "Your note is sent with the answer you tap above."
   }
 }

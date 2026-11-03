@@ -8,7 +8,7 @@ export interface DemoUser {
   identifier: string;
   company: string;
   name: string;
-  /** Job title, or Owner / Admin. */
+  /** Their role and company. */
   subtitle: string;
 }
 
@@ -22,7 +22,7 @@ export function useDemoAccounts(): DemoUser[] {
         identifier: a.identifier,
         company: a.company,
         name: a.name,
-        subtitle: `${a.jobTitle ?? labels.company(a.companyRole)} · ${a.company}`,
+        subtitle: `${labels.company(a.companyRole)} · ${a.company}`,
       })),
     [q.data, labels],
   );

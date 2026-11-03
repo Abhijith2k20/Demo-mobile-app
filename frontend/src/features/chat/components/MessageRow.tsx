@@ -97,12 +97,9 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
     );
   }
 
-  const jobTitle = chat.jobTitles.get(m.senderId);
   const chip = bot
     ? t('chat.bot', 'Bot')
-    : jobTitle
-      ? labels.jobTitle(jobTitle)
-      : sender && sender.companyRole !== 'member'
+    : sender && sender.companyRole !== 'member'
         ? labels.company(sender.companyRole)
         : null;
 

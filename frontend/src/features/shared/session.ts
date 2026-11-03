@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { get, keys } from '@/lib/queries';
 import { useSession, type Me } from '@/stores/session';
-import type { ID, JobTitle, ProjectRole, User } from '@/types/models';
+import type { ID, User } from '@/types/models';
 import { useProject } from './data';
 
 export function useMe(): User {
@@ -18,7 +18,7 @@ export function useCan(): (action: string) => boolean {
   return useCallback((action: string) => permissions.includes(action), [permissions]);
 }
 
-/** Keeps the signed-in user's profile, permissions and layout mode current. */
+/** Keeps the signed-in user's profile and permissions current. */
 export function useMeSync(): void {
   const q = useQuery({ queryKey: keys.me, queryFn: get<Me>('/me') });
   useEffect(() => {
@@ -27,8 +27,7 @@ export function useMeSync(): void {
 }
 
 export interface ProjectAccess {
-  role: ProjectRole | null;
-  jobTitle: JobTitle | null;
+  /** Owner or Admin: runs this project (its channels and people). */
   isAdmin: boolean;
   /** The project is archived (read-only). */
   archived: boolean;
@@ -43,8 +42,6 @@ export function useProjectAccess(projectId: ID | null | undefined): ProjectAcces
   const permissions = project?.access.permissions;
   const can = useCallback((action: string) => !!permissions?.includes(action), [permissions]);
   return {
-    role: project?.access.role ?? null,
-    jobTitle: project?.access.jobTitle ?? null,
     isAdmin: can('project.delete'),
     archived: !!project?.archivedAt,
     canArchive: can('project.archive'),

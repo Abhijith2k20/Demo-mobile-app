@@ -12,7 +12,6 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | Setting | Default | Meanin
 |---|---|---|
 | `SITELINE_DEMO` | `1` | `0` removes the `/internal/*` Demo panel routes |
-| `SITELINE_ACTORS` | `1` | `0` stops the scripted teammates |
 
 - Interactive docs: `/docs`. Live events: `WS /ws?token=<access token>`.
 - Data resets on restart or `POST /internal/reset`. Uploaded photos are kept in `uploads/`.

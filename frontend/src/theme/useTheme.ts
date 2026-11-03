@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { Platform, useColorScheme, useWindowDimensions } from 'react-native';
-import { useSession } from '@/stores/session';
 import { useUi } from '@/stores/ui';
 import { dark, light, type Colors } from './colors';
 import { typography, type TypeVariant } from './typography';
@@ -9,7 +8,6 @@ import type { TextStyle } from 'react-native';
 export interface Theme {
   c: Colors;
   mode: 'light' | 'dark';
-  simple: boolean;
   type: Record<TypeVariant, TextStyle>;
 }
 
@@ -18,11 +16,10 @@ export function useTheme(): Theme {
   const stored = useUi((s) => s.theme);
   // iOS apps follow the system appearance only (HIG: no app-specific appearance setting).
   const pref = Platform.OS === 'ios' ? 'system' : stored;
-  const simple = useSession((s) => s.simpleMode);
   const mode: 'light' | 'dark' = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
   return useMemo(
-    () => ({ c: mode === 'dark' ? dark : light, mode, simple, type: typography(simple) }),
-    [mode, simple],
+    () => ({ c: mode === 'dark' ? dark : light, mode, type: typography }),
+    [mode],
   );
 }
 

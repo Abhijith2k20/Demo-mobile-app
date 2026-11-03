@@ -9,9 +9,6 @@ from datetime import date, datetime, timedelta
 
 from . import db
 from .core import avatar_tone, iso_ms
-from .rules import default_channel_names
-from .setups.events import SETUP as EVENTS_SETUP
-from .setups.interiors import SETUP as PALIATH_SETUP
 from .store import BOT_ID, BOT_EMAIL
 
 _seq = 0
@@ -31,7 +28,14 @@ class Data:
     messages: dict[str, dict] = field(default_factory=dict)
     asks: list[tuple[str, str]] = field(default_factory=list)  # (person, task id): the mock PM app sends these cards
     activities: list[dict] = field(default_factory=list)
-    pm: dict = field(default_factory=lambda: {"projects": {}, "tasks": {}, "members": []})
+    pm: dict = field(default_factory=lambda: {"projects": {}, "tasks": {}})  # the mock PM app's own data
+
+
+def channel_plan(channels: list[tuple[str, bool]], members: list[tuple[str, list[str] | None]]) -> dict[str, list[str]]:
+    """Who is in which project channel: each member's list of names (None = every channel). In the app the
+    Owner and Admins add people by hand; the seed just writes the result."""
+    return {name: [k for k, mine in members if mine is None or name in mine] for name, _ in channels}
+
 
 def uuid_at(ms: float) -> str:
     """UUIDv7-shaped id for a given time, ordered by time then by creation order."""
@@ -65,8 +69,7 @@ def build() -> Data:
         return int(now - mins * 60_000)
 
     company_id = uuid_at(epoch)
-    s = Data(company_id=company_id, company={"id": company_id, "name": "Paliath Interiors", "slug": "paliath-interiors",
-                                             "setup": PALIATH_SETUP})
+    s = Data(company_id=company_id, company={"id": company_id, "name": "Paliath Interiors", "slug": "paliath-interiors"})
 
     # ---- Users ----
     U: dict[str, str] = {}
@@ -102,39 +105,31 @@ def build() -> Data:
         return cid
 
     # ---- Projects ----
-    def add_project(name: str, client: str, address: str, members: list[tuple[str, str, str]]) -> dict:
-        # The project lives in the (mock) PM app; Siteline keeps a project space linked to it.
+    CHANNELS = [("general", False), ("design", False), ("site-work", False), ("qs", True)]
+    DESIGN, QS, SITE = ["general", "design"], ["general", "qs"], ["general", "site-work"]
+
+    def add_project(name: str, client: str, address: str, members: list[tuple[str, list[str] | None]]) -> dict:
+        """A project as the Owner made it in Siteline, plus the same project in the mock PM app (its own copy, for
+        its tasks; the two aren't linked)."""
         pm_id = uuid_at(epoch)
         s.pm["projects"][pm_id] = {"id": pm_id, "name": name, "client": client, "address": address, "status": "active",
                                    "url": None, "updatedAt": iso(epoch)}
         pid = uuid_at(epoch)
-        project = {"id": pid, "companyId": company_id, "name": name, "client": client, "address": address,
-                   "pmProjectId": pm_id, "archivedAt": None, "updatedAt": iso(epoch)}
-        s.projects[pid] = project
-        for k, role, jt in members:
-            s.project_members.append({"projectId": pid, "userId": U[k], "role": role, "jobTitle": jt, "source": "pm",
-                                      "joinedAt": iso(epoch)})
-            s.pm["members"].append({"projectId": pm_id, "personRef": s.users[U[k]]["email"], "name": s.users[U[k]]["name"],
-                                    "role": role, "roleName": jt})
-        ch = {}
-        for std in PALIATH_SETUP["projectChannels"]:
-            cname = std["name"]
-            joined = [k for k, role, jt in members if cname in default_channel_names(PALIATH_SETUP, role, jt)]
-            ch[cname] = add_channel(cname, "project", pid, list(dict.fromkeys([*joined, *admin_keys])),
-                                    isPrivate=std.get("private", False))
-        return {"id": pid, "pmId": pm_id, "project": project, "ch": ch}
+        s.projects[pid] = {"id": pid, "companyId": company_id, "name": name, "client": client, "address": address,
+                           "archivedAt": None, "updatedAt": iso(epoch)}
+        for k, _ in members:
+            s.project_members.append({"projectId": pid, "userId": U[k], "joinedAt": iso(epoch)})
+        plan = channel_plan(CHANNELS, members)
+        ch = {cname: add_channel(cname, "project", pid, list(dict.fromkeys([*plan[cname], *admin_keys])), isPrivate=private)
+              for cname, private in CHANNELS}
+        return {"id": pid, "pmId": pm_id, "ch": ch}
 
     sharma = add_project("Villa 99", "Villa 99 owners", "Bengaluru", [
-        ("amit", "manager", "Project Manager"), ("kavya", "member", "Designer"), ("rohan", "member", "QS"),
-        ("suresh", "manager", "Supervisor"), ("ravi", "member", "Worker"), ("manju", "member", "Worker"),
-        ("imran", "member", "Worker"),
+        ("amit", None), ("kavya", DESIGN), ("rohan", QS), ("suresh", None), ("ravi", SITE), ("manju", SITE), ("imran", SITE),
     ])
-    mehta = add_project("RV University", "RV University", "Bengaluru", [
-        ("kavya", "manager", "Project Manager"), ("rohan", "member", "QS"),
-    ])
+    mehta = add_project("RV University", "RV University", "Bengaluru", [("kavya", None), ("rohan", QS)])
     cafe = add_project("OITH", "OITH", "Bengaluru", [
-        ("amit", "manager", "Project Manager"), ("suresh", "member", "Supervisor"), ("imran", "member", "Worker"),
-        ("lakshmi", "member", "Worker"), ("prakash", "member", "Worker"),
+        ("amit", None), ("suresh", SITE), ("imran", SITE), ("lakshmi", SITE), ("prakash", SITE),
     ])
 
     announcements = add_channel("announcements", "company", None, human_keys, postingPolicy="admins")
@@ -249,13 +244,6 @@ def build() -> Data:
     def file(name: str, size_kb: int) -> dict:
         return {"type": "file", "data": {"name": name, "sizeKb": size_kb}}
 
-    def status(user: str, task_name: str, percent: int, ms: int) -> dict:
-        """A status card the PM app posted after an answer (as the mock PM app does)."""
-        first = s.users[U[user]]["name"].split(" ")[0]
-        return {"type": "card", "data": {"extId": f"status-seed-{ms}",
-                                         "content": {"title": f"{first} · {task_name} → {percent}%", "lines": [], "tone": "info",
-                                                     "photos": []}}}
-
     # Villa 99 — #site-work
     sw = sharma["ch"]["site-work"]
     say(sw, at(9, 9, 10), "suresh", "Good morning team. Electrical and plumbing are closed out. False ceiling starts today in the living room.")
@@ -277,17 +265,10 @@ def build() -> Data:
     say(sw, at(6, 9, 15), "suresh", "24 boards. Living room stock is enough for now.", parent=thread)
     say(sw, at(6, 9, 40), "amit", "Called the vendor — promised tomorrow before noon.", parent=thread)
     say(sw, at(6, 9, 48), "ravi", "Ok sir, we will continue living room till then.", parent=thread)
-    say(sw, at(6, 9, 30), "suresh", None, type="issue_card", data={
-        "what": "Material not arrived", "note": "Gypsum boards for master bedroom, 24 nos.", "urgency": "urgent",
-        "taskId": T["False ceiling – master bedroom"], "taskName": "False ceiling – master bedroom",
-        "attachments": [img("stone", "Master bedroom – empty bay")], "mentions": [U["amit"]],
-    })
-    say(sw, at(6, 18, 4), "bot", None, **status("ravi", "False ceiling – living room", 25, at(6, 18, 4)))
-    say(sw, at(6, 18, 20), "suresh", None, type="daily_report", data={
-        "workDone": "Living room boarding started, 8 boards fixed. Kitchen wall cleared for carpentry.", "workers": 6,
-        "problems": "Master bedroom boards not delivered.", "tomorrow": "Continue living room boarding. Receive gypsum boards.",
-        "attachments": [img("linen", "Boarding – living room"), img("stone", "Kitchen wall cleared")],
-    })
+    say(sw, at(6, 9, 30), "suresh", "Master bedroom bay is empty till the boards come.",
+        **photos(img("stone", "Master bedroom – empty bay")))
+    say(sw, at(6, 18, 20), "suresh", "Living room boarding started, 8 boards fixed. Kitchen wall cleared for carpentry.",
+        **photos(img("linen", "Boarding – living room"), img("stone", "Kitchen wall cleared")))
     say(sw, at(5, 9, 20), "ravi", None, type="voice", data={"durationSec": 14})
     say(sw, at(5, 14, 15), "suresh", "Living room boarding progress",
         **photos(img("linen", "Boarding – centre"), img("stone", "Boarding – cove edge"), img("sage", "Window side")))
@@ -298,7 +279,6 @@ def build() -> Data:
     say(sw, at(3, 10, 5), "imran", "Carcass cutting started. 18mm BWP for base units.", **photos(img("sand", "Carcass panels cut")))
     say(sw, at(3, 10, 30), "amit", "Imran, please check drawing rev C — the TV unit is 6 inches wider now.", data={"edited": True})
     say(sw, at(3, 10, 36), "imran", "Seen. Will follow rev C.")
-    say(sw, at(3, 18, 2), "bot", None, **status("ravi", "False ceiling – living room", 50, at(3, 18, 2)))
     say(sw, at(2, 9, 30), "suresh", "Electrician coming at 3 pm for cove light points. Ravi, keep the channel open on the window side.")
     say(sw, at(2, 9, 41), "ravi", "Ok sir")
     say(sw, at(2, 15, 10), "amit", "Latest false ceiling layout for site.", **file("Villa99_FC_layout_revC.pdf", 842))
@@ -452,8 +432,6 @@ def build() -> Data:
         if m:
             activity(who, "mention", "amit", m["createdAt"], channel_id=sw, message_id=m["id"],
                      text="Amit mentioned you in #site-work", lines=[m["body"] or ""])
-    activity("amit", "notice", "ravi", iso(at(3, 18, 2)), channel_id=sw, task_ids=[T["False ceiling – living room"]],
-             text="Ravi updated False ceiling – living room to 50%")
     activity("suresh", "thread_reply", "ravi", iso(at(6, 9, 48)), channel_id=sw, message_id=thread,
              text="Ravi replied to your message in #site-work", lines=["Ok sir, we will continue living room till then."])
 
@@ -495,7 +473,7 @@ def build_brightline(paliath: Data) -> Data:
         return (date.today() + timedelta(days=offset)).isoformat()
 
     cid = uuid_at(epoch)
-    s = Data(company_id=cid, company={"id": cid, "name": "Brightline Events", "slug": "brightline-events", "setup": EVENTS_SETUP})
+    s = Data(company_id=cid, company={"id": cid, "name": "Brightline Events", "slug": "brightline-events"})
     suresh = next(u for u in paliath.users.values() if u["email"] == "suresh@paliath.in")
     U: dict[str, str] = {"suresh": suresh["id"]}
     s.users[suresh["id"]] = suresh
@@ -533,29 +511,24 @@ def build_brightline(paliath: Data) -> Data:
     general = add_channel("general", "company", None, people)
     bot_dm = {k: add_channel("Siteline Bot", "bot", None, [k], isPrivate=True) for k in people}
 
-    def add_project(name: str, client: str, members: list[tuple[str, str, str]]) -> dict:
+    CHANNELS = [("general", False), ("vendors", False), ("on-the-day", False), ("budget", True)]
+    VENDORS, CREW = ["general", "vendors"], ["general", "on-the-day"]
+
+    def add_project(name: str, client: str, members: list[tuple[str, list[str] | None]]) -> dict:
         pm_id, pid = uuid_at(epoch), uuid_at(epoch)
         s.pm["projects"][pm_id] = {"id": pm_id, "name": name, "client": client, "address": "Bengaluru", "status": "active",
                                    "url": None, "updatedAt": iso(epoch)}
         s.projects[pid] = {"id": pid, "companyId": cid, "name": name, "client": client, "address": "Bengaluru",
-                           "pmProjectId": pm_id, "archivedAt": None, "updatedAt": iso(epoch)}
-        for k, role, jt in members:
-            s.project_members.append({"projectId": pid, "userId": U[k], "role": role, "jobTitle": jt, "source": "pm",
-                                      "joinedAt": iso(epoch)})
-            ref = s.users[U[k]]["email"] or s.users[U[k]]["phone"]
-            s.pm["members"].append({"projectId": pm_id, "personRef": ref, "name": s.users[U[k]]["name"], "role": role,
-                                    "roleName": jt})
-        ch = {}
-        for std in EVENTS_SETUP["projectChannels"]:
-            joined = [k for k, role, jt in members if std["name"] in default_channel_names(EVENTS_SETUP, role, jt)]
-            ch[std["name"]] = add_channel(std["name"], "project", pid, list(dict.fromkeys([*joined, "nisha"])),
-                                          isPrivate=std.get("private", False))
+                           "archivedAt": None, "updatedAt": iso(epoch)}
+        for k, _ in members:
+            s.project_members.append({"projectId": pid, "userId": U[k], "joinedAt": iso(epoch)})
+        plan = channel_plan(CHANNELS, members)
+        ch = {cname: add_channel(cname, "project", pid, list(dict.fromkeys([*plan[cname], "nisha"])), isPrivate=private)
+              for cname, private in CHANNELS}
         return {"id": pid, "pmId": pm_id, "ch": ch}
 
-    wedding = add_project("Sharma Wedding", "Sharma family", [
-        ("farhan", "manager", "Event Lead"), ("anu", "member", "Coordinator"), ("suresh", "member", "Coordinator"),
-        ("babu", "member", "Crew")])
-    conf = add_project("TechConf 2026", "TechConf", [("farhan", "manager", "Event Lead"), ("anu", "member", "Coordinator")])
+    wedding = add_project("Sharma Wedding", "Sharma family", [("farhan", None), ("anu", VENDORS), ("suresh", VENDORS), ("babu", CREW)])
+    conf = add_project("TechConf 2026", "TechConf", [("farhan", None), ("anu", VENDORS)])
 
     def task(p: dict, name: str, start: int, finish: int, status: str, percent: int, owner: str | None) -> None:
         tid = uuid_at(epoch)
@@ -586,8 +559,8 @@ def build_all() -> list[Data]:
 
 
 def load(companies: list[Data]) -> None:
-    """Writes seed data to an empty database. The mock PM app then sends its projects and a few cards through
-    the Cards API functions, as it would live."""
+    """Writes seed data to an empty database. The mock PM app then sends a few cards through the Cards API
+    functions, as it would live."""
     from .mockpm import bot
 
     with db.transaction():
@@ -598,14 +571,14 @@ def load(companies: list[Data]) -> None:
         db.insert("platform_admins", {"email": PLATFORM_ADMIN})
         for d in companies:
             db.insert("companies", {"id": d.company_id, "name": d.company["name"], "slug": d.company["slug"],
-                                    "timeZone": "Asia/Kolkata", "setup": d.company["setup"]})
+                                    "timeZone": "Asia/Kolkata"})
             db.insert_many("memberships", [{"companyId": d.company_id, "userId": uid, "role": role, "status": "active"}
                                            for uid, role in d.roles.items()])
             db.insert("integrations", {"companyId": d.company_id, "kind": "mock", "options": {}})
     for d in companies:
         cid = d.company_id
         with db.transaction(cid):
-            db.insert_many("projects", [{**p, "pmUrl": None} for p in d.projects.values()])
+            db.insert_many("projects", list(d.projects.values()))
             db.insert_many("project_members", [{"companyId": cid, **m} for m in d.project_members])
             db.insert_many("channels", list(d.channels.values()))
             db.insert_many("channel_members", [{"companyId": cid, **m} for m in d.channel_members])
@@ -614,9 +587,7 @@ def load(companies: list[Data]) -> None:
             db.insert_many("pm_mock_projects", [{"companyId": cid, **{k: p[k] for k in ("id", "name", "client", "address",
                                                                                          "status", "url", "updatedAt")}}
                                                 for p in d.pm["projects"].values()])
-            db.insert_many("pm_mock_members", [{"companyId": cid, **m} for m in d.pm["members"]])
             db.insert_many("pm_mock_tasks", [{"companyId": cid, **t} for t in d.pm["tasks"].values()])
-            bot.publish_projects()
             for ref, task_id in d.asks:
                 bot.morning_summary(ref)
                 bot.ask(next(t for t in bot.open_tasks_for(ref) if t["id"] == task_id), timers=False)
@@ -624,11 +595,10 @@ def load(companies: list[Data]) -> None:
 
 def reset_everything() -> None:
     """Development and tests: empty database, then the seed."""
-    from . import actors, netsim
+    from . import netsim
     from .events import hub
 
     db.wipe()
     load(build_all())
-    actors.reset()
     netsim.reset()
     hub.clear()

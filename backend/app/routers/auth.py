@@ -93,23 +93,15 @@ def logout(user: dict = Depends(current_account)):
 
 @router.get("/demo-accounts")
 def demo_accounts():
-    """Development and staging only: one sign-in per role in each seeded company (the code is fixed there)."""
+    """Development and staging only: everyone in each seeded company (the code is fixed there)."""
     if not config.DEV_TOOLS:
         raise ApiError("NOT_FOUND", "Not found.")
     picked = []
-    for c in db.rows("SELECT id, name, setup FROM companies WHERE status = 'active' ORDER BY created_at"):
+    for c in db.rows("SELECT id, name FROM companies WHERE status = 'active' ORDER BY created_at"):
         db.current().set_company(c["id"])
-        seen = set()
-        for u in db.rows("""SELECT u.id, u.name, u.email, u.phone, m.role,
-                              (SELECT job_title FROM project_members pm WHERE pm.user_id = u.id ORDER BY joined_at LIMIT 1) AS title
-                            FROM memberships m JOIN users u ON u.id = m.user_id
+        for u in db.rows("""SELECT u.name, u.email, u.phone, m.role FROM memberships m JOIN users u ON u.id = m.user_id
                             WHERE m.company_id = %(c)s AND m.status = 'active' ORDER BY m.joined_at, u.id""", c=c["id"]):
-            key = u["role"] if u["role"] != "member" else f"member:{u['title']}"
-            if key in seen or (u["role"] == "member" and not u["title"]):
-                continue
-            seen.add(key)
             picked.append({"identifier": u["email"] or u["phone"], "email": u["email"], "name": u["name"],
-                           "companyRole": u["role"], "company": c["name"],
-                           "jobTitle": u["title"]})
+                           "companyRole": u["role"], "company": c["name"]})
     db.current().set_company(None)
     return {"accounts": picked}

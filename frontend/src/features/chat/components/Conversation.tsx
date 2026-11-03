@@ -16,8 +16,7 @@ import { leaveChannel } from '../../projects/api';
 import { firstName, useMe, useProject, useProjectAccess, useUsers } from '../../shared';
 import { ChatContext, type ChatContextValue } from '../context';
 import { useChannelInfo, useChannelMessages, usePinned, type ListItem } from '../hooks';
-import { Composer, ReadOnlyBar, type FormKind } from './Composer';
-import { DailyReportSheet, IssueSheet } from './forms';
+import { Composer, ReadOnlyBar } from './Composer';
 import { MessageMenu } from './MessageMenu';
 import { DayDivider, MessageRow, NewDivider } from './MessageRow';
 
@@ -39,7 +38,6 @@ export function Conversation({ channelId }: { channelId: ID }) {
   const pinned = usePinned(channelId);
   const [menu, setMenu] = useState<MessageView | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
-  const [form, setForm] = useState<FormKind | null>(null);
   const [details, setDetails] = useState(false);
   const listRef = useRef<FlashListRef<ListItem>>(null);
 
@@ -48,19 +46,17 @@ export function Conversation({ channelId }: { channelId: ID }) {
     () => ({
       me,
       users: users.byId,
-      jobTitles: info.jobTitles,
       mentionNames: new Set(info.members.map((u) => firstName(u.name).toLowerCase())),
       inThread: false,
       isBotChat: info.isBot,
       onLongPress: setMenu,
       onOpenThread,
     }),
-    [me, users.byId, info.jobTitles, info.members, info.isBot, onOpenThread],
+    [me, users.byId, info.members, info.isBot, onOpenThread],
   );
 
   // The bot conversation shows one open card at a time.
   const Queue = info.isBot ? CardQueueProvider : Fragment;
-  const projectId = info.channel?.projectId ?? null;
   const placeholder = info.channel?.kind === 'dm' ? t('chat.messagePerson', 'Message {{name}}', { name: firstName(info.peer?.name) }) : t('chat.messageChannel', 'Message {{name}}', { name: info.title });
 
   return (
@@ -128,12 +124,10 @@ export function Conversation({ channelId }: { channelId: ID }) {
           {info.canPost && !access.archived ? (
             <Composer
               channelId={channelId}
-              projectId={projectId}
               members={info.members}
               placeholder={placeholder}
               editing={editing}
               onDoneEditing={() => setEditing(null)}
-              onOpenForm={setForm}
             />
           ) : info.channel ? (
             <ReadOnlyBar
@@ -155,12 +149,6 @@ export function Conversation({ channelId }: { channelId: ID }) {
           onClose={() => setMenu(null)}
           onEdit={setEditing}
         />
-        {projectId ? (
-          <>
-            <IssueSheet visible={form === 'issue'} onClose={() => setForm(null)} projectId={projectId} channelId={channelId} />
-            <DailyReportSheet visible={form === 'report'} onClose={() => setForm(null)} projectId={projectId} channelId={channelId} />
-          </>
-        ) : null}
 
         <Sheet visible={details} onClose={() => setDetails(false)} title={info.title} subtitle={info.subtitle} full>
           {pinned.length > 0 ? (
@@ -192,7 +180,7 @@ export function Conversation({ channelId }: { channelId: ID }) {
                   }}
                 />
               ) : null}
-              {!access.can('channel.manage') && !access.archived && info.channel.name !== 'general' && access.role ? (
+              {!access.can('channel.manage') && !access.archived && info.channel.name !== 'general' && !access.isAdmin && !!info.channel.projectId ? (
                 <Button
                   kind="secondary"
                   icon="log-out"
@@ -221,7 +209,6 @@ export function Conversation({ channelId }: { channelId: ID }) {
                 key={u.id}
                 left={<Avatar id={u.id} name={u.name} size={32} />}
                 title={u.name}
-                subtitle={info.jobTitles.get(u.id) ?? undefined}
                 height={52}
               />
             ))}

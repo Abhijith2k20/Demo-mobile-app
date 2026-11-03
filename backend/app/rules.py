@@ -2,23 +2,13 @@
 from __future__ import annotations
 
 # ---- Permissions (spec §9) ----
+# Projects have no roles of their own: the Owner and Admins run projects and channels (spec 2.2).
 
-PROJECT_PERMISSIONS: dict[str, list[str]] = {
-    "manager": [
-        "project.edit",
-        "project.members",
-        "channel.manage",
-        "message.delete_any",
-        "message.pin",
-    ],
-    "member": [],
-}
-ALL_PROJECT_ACTIONS = sorted({a for acts in PROJECT_PERMISSIONS.values() for a in acts})
+PROJECT_ACTIONS = ["project.manage", "channel.manage", "message.delete_any", "message.pin"]
 
 EDIT_WINDOW_MS = 15 * 60 * 1000
 DELETE_WINDOW_MS = 60 * 60 * 1000
 HOME_CHANNEL = "general"
-ROLES_IN_EVERY_CHANNEL = ["manager"]  # §9.3: managers are in every channel of their project
 
 
 def is_company_admin(user: dict) -> bool:
@@ -30,18 +20,17 @@ def joins_projects(user: dict) -> bool:
     return not is_company_admin(user)
 
 
-def can(user: dict, action: str, project_role: str | None) -> bool:
-    if is_company_admin(user):
-        return True
-    return bool(project_role) and action in PROJECT_PERMISSIONS[project_role]
+def can(user: dict, action: str) -> bool:
+    return is_company_admin(user) and action in PROJECT_ACTIONS
 
 
-def project_permissions(user: dict, project_role: str | None, archived: bool) -> list[str]:
-    """What the user may do in a project right now. An archived project is read-only."""
-    allowed = [a for a in ALL_PROJECT_ACTIONS if can(user, a, project_role)]
-    lifecycle = (["project.archive"] if "project.edit" in allowed else []) + (["project.delete"] if is_company_admin(user) else [])
-    # Archived: read-only, but it can still be unarchived or deleted.
-    return lifecycle if archived else allowed + lifecycle
+def project_permissions(user: dict, archived: bool) -> list[str]:
+    """What the user may do in a project right now. An archived project is read-only, but can still be
+    unarchived or deleted."""
+    if not is_company_admin(user):
+        return []
+    lifecycle = ["project.archive", "project.delete"]
+    return lifecycle if archived else PROJECT_ACTIONS + lifecycle
 
 
 def is_guest(user: dict) -> bool:
@@ -51,9 +40,8 @@ def is_guest(user: dict) -> bool:
 
 COMPANY_PERMISSIONS = {
     "owner": ["company.people", "company.directory", "user.invite", "user.invite_admin", "user.role", "project.create",
-              "project.delete", "pm.status"],
-    "admin": ["company.people", "company.directory", "user.invite", "user.role", "project.create", "project.delete",
               "pm.status"],
+    "admin": ["company.people", "company.directory", "user.invite", "user.role", "project.create", "pm.status"],
     "member": ["company.directory"],
     "guest": [],
 }
@@ -96,39 +84,3 @@ def can_post(user: dict, channel: dict) -> bool:
     if channel["postingPolicy"] == "admins":
         return is_company_admin(user)
     return True
-
-
-# ---- The company's own setup (job titles, channels, problem types; see seed.py) ----
-# Nothing below knows an industry: each company's words and defaults are data.
-
-def job_title_info(setup: dict, name: str) -> dict | None:
-    return next((jt for jt in setup["jobTitles"] if jt["name"] == name), None)
-
-
-def job_title_error(setup: dict, role: str, name: str) -> str | None:
-    """Why this job title can't be used for this project role, or None if it can."""
-    jt = job_title_info(setup, name)
-    if not jt:
-        return "Pick one of the company's job titles"
-    if jt.get("managersOnly") and role != "manager":
-        return "This job title is for managers"
-    return None
-
-
-def default_channel_names(setup: dict, role: str, job_title: str) -> list[str]:
-    """§9.3 — channels a new project member joins by default."""
-    if role in ROLES_IN_EVERY_CHANNEL:
-        return [c["name"] for c in setup["projectChannels"]]
-    jt = job_title_info(setup, job_title)
-    return list(jt["channels"]) if jt else [HOME_CHANNEL]
-
-
-def simple_mode(setup: dict, job_titles: list[str]) -> bool:
-    """Big-button layout when every project role the person has is marked simple."""
-    return bool(job_titles) and all((job_title_info(setup, jt) or {}).get("simpleMode", False) for jt in job_titles)
-
-
-def channel_rank(setup: dict, channel: dict) -> tuple:
-    """The company's standard project channels first, in setup order, then the rest by name."""
-    names = [c["name"] for c in setup["projectChannels"]]
-    return (names.index(channel["name"]) if channel["name"] in names else len(names), channel["name"])

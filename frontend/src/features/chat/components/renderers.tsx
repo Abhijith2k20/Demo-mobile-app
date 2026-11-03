@@ -1,18 +1,16 @@
 // Message renderer registry (§7.4): one component per message type.
 import { Feather } from '@expo/vector-icons';
-import { format, parseISO } from 'date-fns';
 import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Card, Pill } from '@/components/basics';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { T } from '@/components/T';
 import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { Attachment, ChannelCard, ID, Message, MessageType, Tone } from '@/types/models';
+import type { Attachment, Message, MessageType } from '@/types/models';
 import { CardView } from '../../bot/components/CardView';
-import { firstName, useProblemTypes } from '../../shared';
+import { firstName } from '../../shared';
 import { useChat } from '../context';
 
 type Props = { message: Message };
@@ -168,118 +166,9 @@ function FileMessage({ message }: Props) {
   );
 }
 
-function CardTitle({ icon, label, color }: { icon: keyof typeof Feather.glyphMap; label: string; color: string }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-      <Feather name={icon} size={13} color={color} />
-      <T variant="label" style={{ color }}>
-        {label}
-      </T>
-    </View>
-  );
-}
-
-function IssueCard({ message }: Props) {
-  const { c } = useTheme();
-  const { t } = useTranslation();
-  const { users } = useChat();
-  const d = message.data ?? {};
-  const urgent = d.urgency === 'urgent';
-  const photos = (d.attachments as Attachment[] | undefined) ?? [];
-  const mentions = ((d.mentions as ID[] | undefined) ?? []).map((id) => users.get(id)).filter(Boolean);
-  const what = useProblemTypes().label(String(d.what ?? ''));
-  return (
-    <Card accent={c.danger} style={{ maxWidth: 340, marginTop: 2 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <CardTitle icon="alert-triangle" label={t('issue.card', 'Issue')} color={c.danger} />
-        {urgent ? <Pill label={t('issue.urgent', 'Urgent')} bg={c.dangerSoft} fg={c.danger} /> : null}
-      </View>
-      <T variant="heading">{what}</T>
-      {d.note ? <T variant="body">{String(d.note)}</T> : null}
-      {d.taskName ? (
-        <T variant="meta" color="textMuted" style={{ marginTop: 2 }}>
-          {t('issue.relatedTask', 'Task')}: {String(d.taskName)}
-        </T>
-      ) : null}
-      {photos.length ? (
-        <View style={{ marginTop: space.sm }}>
-          <PhotoGrid photos={photos} />
-        </View>
-      ) : null}
-      {mentions.length ? (
-        <T variant="meta" style={{ marginTop: space.sm, color: c.accent }}>
-          {mentions.map((u) => `@${firstName(u?.name)}`).join(' ')}
-        </T>
-      ) : null}
-    </Card>
-  );
-}
-
-function ReportLine({ label, text }: { label: string; text: string }) {
-  if (!text) return null;
-  return (
-    <View style={{ marginTop: space.sm }}>
-      <T variant="label" color="textMuted">
-        {label}
-      </T>
-      <T variant="body">{text}</T>
-    </View>
-  );
-}
-
-function DailyReportCard({ message }: Props) {
-  const { c } = useTheme();
-  const { t } = useTranslation();
-  const d = message.data ?? {};
-  const photos = (d.attachments as Attachment[] | undefined) ?? [];
-  return (
-    <Card accent={c.success} style={{ maxWidth: 340, marginTop: 2 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <CardTitle icon="clipboard" label={t('report.card', 'Daily report')} color={c.success} />
-        <T variant="meta" color="textMuted">
-          {format(parseISO(message.createdAt), 'd MMM')}
-        </T>
-      </View>
-      <T variant="body">{String(d.workDone ?? '')}</T>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.sm }}>
-        <Feather name="users" size={14} color={c.textMuted} />
-        <T variant="metaStrong">{t('report.workersCount', '{{count}} people working', { count: Number(d.workers ?? 0) })}</T>
-      </View>
-      <ReportLine label={t('report.problems', 'Problems')} text={String(d.problems ?? '')} />
-      <ReportLine label={t('report.tomorrow', "Tomorrow's plan")} text={String(d.tomorrow ?? '')} />
-      {photos.length ? (
-        <View style={{ marginTop: space.sm }}>
-          <PhotoGrid photos={photos} />
-        </View>
-      ) : null}
-    </Card>
-  );
-}
-
-/** A card from the PM app: answerable in the person's bot conversation, or a status card in a project channel. */
+/** A card from the PM app, answered in the person's bot conversation. */
 function CardMessage({ message }: Props) {
-  const { c } = useTheme();
-  if (message.data?.cardId) return <CardView message={message} />;
-  const card = (message.data?.content ?? { title: '' }) as ChannelCard;
-  const tone = ({ info: c.info, success: c.success, warning: c.warning, danger: c.danger } as Record<Tone, string>)[card.tone ?? 'info'];
-  const photos: Attachment[] = ((message.data?.photoUrls as string[] | undefined) ?? []).map((uri, i) => ({ id: `${message.id}-${i}`, kind: 'image', uri, uploadId: null }));
-  return (
-    <View style={{ maxWidth: 340, marginTop: 2 }}>
-      <Card accent={tone}>
-        <T variant="bodyStrong">{card.title}</T>
-        {(card.lines ?? []).map((line, i) => (
-          <T key={i} variant="body" color="textMuted" style={{ marginTop: 4 }}>
-            {line}
-          </T>
-        ))}
-        {photos.length ? (
-          <View style={{ marginTop: space.sm }}>
-            <PhotoGrid photos={photos} />
-          </View>
-        ) : null}
-      </Card>
-    </View>
-  );
+  return message.data?.cardId ? <CardView message={message} /> : <UnknownMessage />;
 }
 
 function SystemNotice({ message }: Props) {
@@ -305,8 +194,6 @@ export const renderers: Record<MessageType, ComponentType<{ message: Message }>>
   voice: VoiceMessage,
   file: FileMessage,
   card: CardMessage,
-  issue_card: IssueCard,
-  daily_report: DailyReportCard,
   system: SystemNotice,
 };
 

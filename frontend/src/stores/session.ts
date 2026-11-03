@@ -6,8 +6,6 @@ export interface Me {
   user: User;
   /** Company-level actions the server allows this user (e.g. 'project.create', 'user.invite'). */
   permissions: string[];
-  /** Big-button layout for job titles the company marked simple (decided by the server). */
-  simpleMode: boolean;
   /** The company this session is for. */
   company: CompanyRef;
   /** Every company the person can open (for the switcher). */
@@ -19,7 +17,6 @@ interface SessionState {
   company?: Me['company'];
   companies?: Me['companies'];
   permissions: string[];
-  simpleMode: boolean;
   /** A company session's token, or (signed in, company not picked yet) the account token for /auth routes. */
   accessToken: string | null;
   refreshToken: string | null;
@@ -32,11 +29,10 @@ interface SessionState {
 export const useSession = create<SessionState>((set) => ({
   user: null,
   permissions: [],
-  simpleMode: false,
   accessToken: null,
   refreshToken: null,
   setSession: (s) => set(s),
-  setMe: ({ user, permissions, simpleMode, company, companies }) => set({ user, permissions, simpleMode, company, companies }),
+  setMe: ({ user, permissions, company, companies }) => set({ user, permissions, company, companies }),
   setTokens: (accessToken, refreshToken) => set(refreshToken ? { accessToken, refreshToken } : { accessToken }),
-  clear: () => set({ user: null, permissions: [], simpleMode: false, accessToken: null, refreshToken: null, company: undefined, companies: undefined }),
+  clear: () => set({ user: null, permissions: [], accessToken: null, refreshToken: null, company: undefined, companies: undefined }),
 }));

@@ -40,7 +40,7 @@ beforeEach(async () => {
   mockMissing.clear();
   useOutbox.getState().set([]);
   await AsyncStorage.clear();
-  useSession.getState().setSession({ user: { id: 'u1' } as never, permissions: [], simpleMode: false, accessToken: 'a', refreshToken: 'r',
+  useSession.getState().setSession({ user: { id: 'u1' } as never, permissions: [], accessToken: 'a', refreshToken: 'r',
     company: { id: 'c1', name: 'Paliath Interiors' }, companies: [] });
 });
 afterEach(() => jest.useRealTimers());

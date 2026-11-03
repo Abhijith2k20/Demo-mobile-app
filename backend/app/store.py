@@ -34,11 +34,6 @@ def company() -> dict:
     return db.row("SELECT * FROM companies WHERE id = current_company()")
 
 
-def setup() -> dict:
-    """The company's own words and defaults: job titles, standard channels, problem types."""
-    return company()["setup"]
-
-
 # ---- People ----
 
 def person(user_id: str | None) -> dict | None:
@@ -82,26 +77,12 @@ def project_member(user_id: str, project_id: str) -> dict | None:
     return db.row("SELECT * FROM project_members WHERE user_id = %(u)s AND project_id = %(p)s", u=user_id, p=project_id)
 
 
-def project_role(user_id: str, project_id: str | None) -> str | None:
-    m = project_member(user_id, project_id) if project_id else None
-    return m["role"] if m else None
-
-
 def project_members(project_id: str) -> list[dict]:
     return db.rows("SELECT * FROM project_members WHERE project_id = %(p)s ORDER BY joined_at, user_id", p=project_id)
 
 
 def project_member_ids(project_id: str) -> set[str]:
     return {m["userId"] for m in project_members(project_id)}
-
-
-def project_managers(project_id: str) -> list[str]:
-    return [m["userId"] for m in project_members(project_id) if m["role"] == "manager"]
-
-
-def short_project(project_id: str | None) -> str:
-    p = project(project_id)
-    return p["name"].split(" – ")[0] if p else "the project"
 
 
 # ---- Channels ----

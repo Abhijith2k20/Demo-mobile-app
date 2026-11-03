@@ -653,3 +653,9 @@ conversations; the PM app's only part is the bot, which talks to one person at a
 - **Report issue, Daily report, Recent updates and the scripted teammates are removed.**
 - Old `issue_card`, `daily_report` and PM channel cards in existing chats show "Update the app to see this
   message"; there is no production data yet, so nothing is converted.
+- **As built:** Owner and Admins still see every project and channel without being listed as members (their
+  rows exist only for read markers), so a new project's `#general` shows no members until people are added.
+  `PATCH /projects/:id/members/:userId {channelIds}` sets someone's channels in a project in one call. The mock PM
+  app keeps its own copy of the seeded projects and its own "Problem" list; neither reaches Siteline.
+  Migration `006_chat_only.sql` drops the setup, the PM project link, project roles, job titles and the mock's
+  members table.

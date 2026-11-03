@@ -89,7 +89,7 @@ function YouScreen() {
             ) : memberships.length === 0 ? (
               <View style={{ padding: space.md }}>
                 <T variant="body" color="textMuted">
-                  {t('home.noProjects', "You're not on any project yet. A manager can add you.")}
+                  {t('home.noProjects', "You're not on any project yet. An admin can add you.")}
                 </T>
               </View>
             ) : (
@@ -101,14 +101,9 @@ function YouScreen() {
                     key={m.projectId}
                     onPress={() => router.push(`/project/${m.projectId}`)}
                     style={{ padding: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: c.border, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                    <View style={{ flex: 1 }}>
-                      <T variant="bodyStrong" numberOfLines={1}>
-                        {shortProjectName(p.name)}
-                      </T>
-                      <T variant="meta" color="textMuted">
-                        {labels.project(m.role)} · {labels.jobTitle(m.jobTitle)}
-                      </T>
-                    </View>
+                    <T variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
+                      {shortProjectName(p.name)}
+                    </T>
                     <Feather name="chevron-right" size={18} color={c.textFaint} />
                   </Pressable>
                 );

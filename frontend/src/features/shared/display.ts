@@ -1,18 +1,15 @@
 // Names and labels for showing things (no rules).
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OTHER_PROBLEM } from '@/contract/schemas';
-import type { CompanyRole, JobTitle, ProjectRole, User } from '@/types/models';
-import { useMeta } from './data';
+import type { CompanyRole, User } from '@/types/models';
 
 export const firstName = (name: string | undefined): string => name?.split(' ')[0] ?? '';
 
 export const shortProjectName = (name: string): string => name.split(' – ')[0];
 
-/** Names for company roles, project roles and the company's own job titles. */
+/** Names for company roles. */
 export function useRoleLabels() {
   const { t } = useTranslation();
-  const jobTitles = useMeta()?.jobTitles;
   return useMemo(
     () => ({
       company: (role: CompanyRole) =>
@@ -23,26 +20,9 @@ export function useRoleLabels() {
             : role === 'guest'
               ? t('you.guest', 'Guest')
               : t('you.member', 'Member'),
-      project: (role: ProjectRole) => (role === 'manager' ? t('you.manager', 'Manager') : t('you.member', 'Member')),
-      jobTitle: (name: JobTitle) => jobTitles?.find((jt) => jt.name === name)?.label ?? name,
     }),
-    [t, jobTitles],
+    [t],
   );
-}
-
-/** The company's problem types plus "Other", and a label for any saved reason. */
-export function useProblemTypes() {
-  const { t } = useTranslation();
-  const types = useMeta()?.problemTypes;
-  return useMemo(() => {
-    const other = { key: OTHER_PROBLEM, label: t('issue.other', 'Other'), inCheckins: true };
-    const all = [...(types ?? []), other];
-    return {
-      all,
-      forCheckins: all.filter((p) => p.inCheckins),
-      label: (key: string) => all.find((p) => p.key === key)?.label ?? key,
-    };
-  }, [t, types]);
 }
 
 export const BOT_EMAIL = 'bot@siteline.app';

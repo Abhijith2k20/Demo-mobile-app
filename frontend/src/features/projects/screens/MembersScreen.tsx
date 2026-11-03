@@ -5,7 +5,7 @@ import { MembersManager } from '@/features/projects/components/MembersManager';
 import { shortProjectName, useProject } from '@/features/shared';
 import { space } from '@/theme/spacing';
 
-/** Manage members (Managers). The same list also appears in the project's Members tab. */
+/** Manage members (Owner and Admins). The same list also appears in the project's Members tab. */
 function MembersScreen({ projectId: id }: { projectId: string }) {
   const insets = useSafeAreaInsets();
   const project = useProject(id);
