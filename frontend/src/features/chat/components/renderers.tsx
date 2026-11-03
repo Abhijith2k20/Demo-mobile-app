@@ -100,12 +100,8 @@ function VoiceBubble({ seconds, playing, onPress }: { seconds: number; playing?:
         flexDirection: 'row',
         alignItems: 'center',
         gap: space.md,
-        backgroundColor: c.surfaceAlt,
-        borderRadius: radius.card,
-        paddingHorizontal: space.md,
-        paddingVertical: space.sm,
         alignSelf: 'flex-start',
-        marginTop: 2,
+        paddingVertical: 2,
       }}>
       <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: onPress ? c.accent : c.textFaint, alignItems: 'center', justifyContent: 'center' }}>
         <Feather name={playing ? 'pause' : 'play'} size={15} color={c.onAccent} style={{ marginLeft: playing ? 0 : 2 }} />

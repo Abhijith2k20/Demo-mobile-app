@@ -33,6 +33,7 @@ function ThreadScreen({ messageId }: { messageId: string }) {
       mentionNames: new Set(info.members.map((u) => firstName(u.name).toLowerCase())),
       inThread: true,
       isBotChat: false,
+      isDm: false,
       onLongPress: setMenu,
       onOpenThread: noop,
     }),

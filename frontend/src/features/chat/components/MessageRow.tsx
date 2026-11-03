@@ -111,39 +111,56 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
     <Renderer message={m} />
   );
 
+  // WhatsApp-style: your messages sit on the right, everyone else's on the left (DECISIONS.md).
+  const others = !mine && !chat.isDm;
+  // Photos and files stretch to their container, so their bubble needs a width.
+  const wide = !m.deletedAt && (m.type === 'image' || m.type === 'file');
+  const tail = grouped ? radius.card : 4;
+
   return (
     <Animated.View entering={fresh ? FadeInDown.duration(motion.base).withInitialValues({ transform: [{ translateY: 8 }] }) : undefined}>
-      <Pressable
-        onLongPress={() => !m.deletedAt && chat.onLongPress(m)}
-        delayLongPress={280}
-        style={({ pressed }) => ({
+      <View
+        style={{
           flexDirection: 'row',
-          gap: space.md,
-          paddingHorizontal: space.lg,
-          paddingTop: grouped ? 2 : space.sm + 2,
+          justifyContent: mine ? 'flex-end' : 'flex-start',
+          gap: space.sm,
+          paddingHorizontal: space.md,
+          paddingTop: grouped ? 2 : space.sm,
           paddingBottom: 2,
-          backgroundColor: pressed ? c.surfaceAlt : 'transparent',
-        })}>
-        <View style={{ width: AVATAR }}>
-          {grouped ? null : <Avatar id={m.senderId} name={sender?.name ?? '?'} size={AVATAR} bot={bot} />}
-        </View>
-        <View style={{ flex: 1 }}>
-          {grouped ? null : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <T variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
-                {sender?.name ?? t('chat.someone', 'Someone')}
-              </T>
-              {chip ? (
-                <T variant="label" color="textFaint" style={{ letterSpacing: 0.4 }}>
-                  {chip}
+        }}>
+        {others ? <View style={{ width: AVATAR }}>{grouped ? null : <Avatar id={m.senderId} name={sender?.name ?? '?'} size={AVATAR} bot={bot} />}</View> : null}
+        <View style={{ maxWidth: '80%', flexShrink: 1, alignItems: mine ? 'flex-end' : 'flex-start' }}>
+          <Pressable
+            onLongPress={() => !m.deletedAt && chat.onLongPress(m)}
+            delayLongPress={280}
+            style={({ pressed }) => ({
+              width: wide ? 264 : undefined,
+              backgroundColor: mine ? c.accentSoft : c.surfaceAlt,
+              borderRadius: radius.card,
+              borderTopRightRadius: mine ? tail : radius.card,
+              borderTopLeftRadius: mine ? radius.card : tail,
+              paddingHorizontal: space.md,
+              paddingTop: space.sm,
+              paddingBottom: 6,
+              opacity: pressed ? 0.8 : 1,
+            })}>
+            {others && !grouped ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                <T variant="metaStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
+                  {sender?.name ?? t('chat.someone', 'Someone')}
                 </T>
-              ) : null}
-              <T variant="meta" color="textMuted">
-                {format(parseISO(m.createdAt), 'h:mm a')}
-              </T>
-            </View>
-          )}
-          {body}
+                {chip ? (
+                  <T variant="label" color="textFaint" style={{ letterSpacing: 0.4, fontSize: 10 }}>
+                    {chip}
+                  </T>
+                ) : null}
+              </View>
+            ) : null}
+            {body}
+            <T variant="meta" color="textMuted" style={{ alignSelf: 'flex-end', fontSize: 11, lineHeight: 14, marginTop: 2 }}>
+              {format(parseISO(m.createdAt), 'h:mm a')}
+            </T>
+          </Pressable>
           {m.status === 'pending' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 2 }} accessibilityLabel={t('chat.sending', 'Sending…')}>
               <Feather name="clock" size={12} color={c.textFaint} />
@@ -161,7 +178,7 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
           ) : null}
           {m.deletedAt ? null : <Reactions message={m} />}
           {replies > 0 && !chat.inThread ? (
-            <Pressable accessibilityRole="button" onPress={() => chat.onOpenThread(m)} hitSlop={6} style={{ paddingVertical: 6, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            <Pressable accessibilityRole="button" onPress={() => chat.onOpenThread(m)} hitSlop={6} style={{ paddingVertical: 6, flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <Feather name="message-square" size={14} color={c.accent} />
               <T variant="metaStrong" color="accent">
                 {replies === 1 ? t('chat.oneReply', '1 reply') : t('chat.replies', '{{count}} replies', { count: replies })}
@@ -174,7 +191,7 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
             </Pressable>
           ) : null}
         </View>
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }

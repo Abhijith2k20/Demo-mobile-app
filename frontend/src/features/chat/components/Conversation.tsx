@@ -49,10 +49,11 @@ export function Conversation({ channelId }: { channelId: ID }) {
       mentionNames: new Set(info.members.map((u) => firstName(u.name).toLowerCase())),
       inThread: false,
       isBotChat: info.isBot,
+      isDm: info.channel?.kind === 'dm',
       onLongPress: setMenu,
       onOpenThread,
     }),
-    [me, users.byId, info.members, info.isBot, onOpenThread],
+    [me, users.byId, info.members, info.isBot, info.channel?.kind, onOpenThread],
   );
 
   // The bot conversation shows one open card at a time.

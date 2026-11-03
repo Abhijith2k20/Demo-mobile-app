@@ -723,3 +723,7 @@ without a work email can't use Siteline; the company gives them one, or an addre
 - A NUL character in input is a 422, not a server error. Emails must look like ordinary addresses.
 - Reactions must be emoji (no text), at most 20 different ones per message.
 - A phone too slow for live updates is closed with code 4008, so it reconnects without refreshing its token.
+
+## Chat bubbles instead of Slack-style rows (spec §5, "not bubbles")
+- Messages are bubbles: your own on the right (accent-soft), everyone else's on the left (grey) with avatar and name. Asked for by the product owner ("like WhatsApp"); field teams know that layout.
+- DMs skip names and avatars (two people). Time sits at the bottom right of each bubble. The bot conversation keeps its full-width column for cards.

@@ -9,6 +9,8 @@ export interface ChatContextValue {
   inThread: boolean;
   /** The Siteline Bot conversation: everything is laid out in one full-width column. */
   isBotChat: boolean;
+  /** A direct message: two people, so bubbles skip names and avatars. */
+  isDm: boolean;
   onLongPress: (m: Message) => void;
   onOpenThread: (m: Message) => void;
 }
