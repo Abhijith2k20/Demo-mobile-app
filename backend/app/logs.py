@@ -23,11 +23,11 @@ class JsonFormatter(logging.Formatter):
 
 def setup_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JsonFormatter() if os.environ.get("SITELINE_ENV", "development") != "development"
+    handler.setFormatter(JsonFormatter() if os.environ.get("SITELINE_ENV") != "development"
                          else logging.Formatter("%(levelname)s %(name)s: %(message)s"))
     logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
     if dsn := os.environ.get("SENTRY_DSN"):
         import sentry_sdk
 
-        sentry_sdk.init(dsn=dsn, environment=os.environ.get("SITELINE_ENV", "development"), traces_sample_rate=0.1,
+        sentry_sdk.init(dsn=dsn, environment=os.environ.get("SITELINE_ENV"), traces_sample_rate=0.1,
                         send_default_pii=False)

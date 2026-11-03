@@ -77,7 +77,8 @@ def login(request: Request, email: str = Form(...)):
         return RedirectResponse("/platform?error=Too+many+tries.+Wait+an+hour.", status_code=303)
     db.run("INSERT INTO otp_requests (identifier, ip) VALUES (%(v)s, %(ip)s)", v="platform:" + email, ip=ip)
     if db.value("SELECT 1 FROM platform_admins WHERE email = %(e)s", e=email):
-        code = config.fixed_code_for(email) or f"{secrets.randbelow(1_000_000):06d}"
+        # The demo code never opens the panel outside local development (staging is on the internet).
+        code = (config.fixed_code_for(email) if config.DEVELOPMENT else None) or f"{secrets.randbelow(1_000_000):06d}"
         db.run("""INSERT INTO otp_codes (identifier, code_hash, expires_at) VALUES (%(v)s, %(h)s, now() + interval '10 minutes')
                   ON CONFLICT (identifier) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at,
                   attempts = 0""", v="platform:" + email, h=accounts._hash("platform:" + email + code))
@@ -96,7 +97,7 @@ def verify(email: str = Form(...), code: str = Form(...)):
     value = f"{email}|{exp}"
     response = RedirectResponse("/platform", status_code=303)
     response.set_cookie(COOKIE, f"{value}|{_sign(value)}", max_age=SESSION_SECONDS, httponly=True, samesite="strict",
-                        secure=config.PRODUCTION, path="/platform")
+                        secure=not config.DEVELOPMENT, path="/platform")
     accounts.audit(None, email, "platform.signed_in")
     return response
 

@@ -272,6 +272,7 @@ def test_production_refuses_to_start_without_safe_settings(monkeypatch):
     from app import config
 
     monkeypatch.setattr(config, "PRODUCTION", True)
+    monkeypatch.setattr(config, "DEVELOPMENT", False)
     monkeypatch.setattr(config, "FIXED_CODE", "")
     monkeypatch.setattr(config, "SECRET", "s" * 40)
     monkeypatch.setattr(config, "PLATFORM_KEY", "k" * 30)

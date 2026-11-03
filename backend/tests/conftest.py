@@ -2,6 +2,7 @@ import os
 
 # Tests use their own database and run jobs by hand (no worker thread, no scripted teammates).
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "postgresql://siteline:siteline@localhost:5433/siteline_test")
+os.environ["SITELINE_ENV"] = "development"
 os.environ["SITELINE_WORKER"] = "off"
 os.environ["SITELINE_SEED"] = "0"
 

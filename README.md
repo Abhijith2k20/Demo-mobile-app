@@ -16,13 +16,15 @@ Spec: `SITELINE_SPEC.md` (2.0, the MVP). Changes from it: `DECISIONS.md`. Projec
 cd backend
 docker compose up -d
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+cp .env.example .env      # settings (SITELINE_ENV=development); every key is listed and explained there
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --env-file .env
 #   An empty database is seeded: Paliath Interiors and Brightline Events. Every code is 123456.
 #   Platform panel: http://localhost:8000/platform (admin@siteline.app). API docs: /docs
 
 # 2. The app (another terminal)
 cd frontend
 npm install
+cp .env.example .env      # optional: EXPO_PUBLIC_API_URL to point the app at another API
 npx expo start            # a development build (npm run build:dev) for push; `--go` for a quick look in Expo Go
 ```
 

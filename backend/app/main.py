@@ -34,7 +34,7 @@ async def lifespan(_: FastAPI):
     stop = asyncio.Event()
     listener = asyncio.create_task(listen(stop))
     worker_stop = None
-    if os.environ.get("SITELINE_WORKER", "inline" if config.ENV == "development" else "") == "inline":
+    if os.environ.get("SITELINE_WORKER", "inline" if config.DEVELOPMENT else "") == "inline":
         from .worker import start_inline
 
         worker_stop = start_inline()

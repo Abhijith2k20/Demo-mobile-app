@@ -59,6 +59,7 @@ def test_codes_are_stored_hashed():
 
 def test_production_refuses_a_fixed_code(monkeypatch):
     monkeypatch.setattr(config, "PRODUCTION", True)
+    monkeypatch.setattr(config, "DEVELOPMENT", False)
     monkeypatch.setattr(config, "SECRET", "x" * 40)
     monkeypatch.setattr(config, "PLATFORM_KEY", "y" * 30)
     monkeypatch.setattr(config, "FIXED_CODE", "123456")
