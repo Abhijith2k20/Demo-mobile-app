@@ -5,6 +5,7 @@ import { Avatar } from "@/components/basics";
 import { Field } from "@/components/form";
 import { SheetInput } from "@/components/Sheet";
 import { T } from "@/components/T";
+import i18n from "@/lib/i18n";
 import { space, touch } from "@/theme/spacing";
 import { useTheme } from "@/theme/useTheme";
 import type { Channel, ID } from "@/types/models";
@@ -87,7 +88,7 @@ export function ChannelEditor({
             onValueChange={(isPrivate) => onChange({ ...draft, isPrivate })}
             trackColor={{ true: c.accent, false: c.border }}
             thumbColor={c.surface}
-            accessibilityLabel="Private channel"
+            accessibilityLabel={i18n.t('channel.privateLabel', 'Private channel')}
           />
         </View>
         <T variant="meta" color="textMuted">

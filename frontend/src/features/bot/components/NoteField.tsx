@@ -107,7 +107,7 @@ export function NoteField({ value, onChange, voice }: { value: NoteValue; onChan
           <T variant="metaStrong" style={{ flex: 1 }}>
             {t('chat.recording', 'Recording…')} {clock(recording ?? 0)}
           </T>
-          <Pressable onPress={() => void stop(false)} hitSlop={10} style={{ minHeight: touch.min, justifyContent: 'center' }}>
+          <Pressable accessibilityRole="button" onPress={() => void stop(false)} hitSlop={10} style={{ minHeight: touch.min, justifyContent: 'center' }}>
             <T variant="metaStrong" color="textMuted">
               {t('common.cancel', 'Cancel')}
             </T>

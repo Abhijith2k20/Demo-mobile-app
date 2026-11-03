@@ -45,7 +45,7 @@ export function Header({
         ) : (
           <View style={{ width: space.md }} />
         )}
-        <Pressable onPress={onTitlePress} disabled={!onTitlePress} style={{ flex: 1, paddingVertical: space.xs }}>
+        <Pressable onPress={onTitlePress} disabled={!onTitlePress} accessibilityRole={onTitlePress ? 'button' : undefined} style={{ flex: 1, paddingVertical: space.xs }}>
           <T variant="heading" numberOfLines={2}>
             {title}
           </T>

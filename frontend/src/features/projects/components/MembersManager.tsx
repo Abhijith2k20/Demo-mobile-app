@@ -49,8 +49,8 @@ function MemberEditor({ draft, channels, onChange }: { draft: Draft; channels: C
               onPress={() => onChange({ ...draft, channelIds: on ? draft.channelIds.filter((x) => x !== ch.id) : [...draft.channelIds, ch.id] })}
               style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
               <Feather name={on ? 'check-square' : 'square'} size={20} color={on ? c.accent : c.textFaint} />
+              <Feather name={ch.isPrivate ? 'lock' : 'hash'} size={16} color={c.textMuted} />
               <T variant="body" style={{ flex: 1 }}>
-                {ch.isPrivate ? '🔒 ' : '# '}
                 {ch.name}
               </T>
             </Pressable>

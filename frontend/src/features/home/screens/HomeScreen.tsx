@@ -159,7 +159,7 @@ function HomeScreen() {
             style={[type.body, { flex: 1, color: c.onHeader, paddingVertical: 8 }]}
           />
           {query ? (
-            <Pressable hitSlop={10} onPress={() => setQuery('')} accessibilityLabel={t('common.clear', 'Clear')}>
+            <Pressable accessibilityRole="button" hitSlop={10} onPress={() => setQuery('')} accessibilityLabel={t('common.clear', 'Clear')}>
               <Feather name="x" size={16} color={c.onHeader} />
             </Pressable>
           ) : null}

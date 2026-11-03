@@ -97,7 +97,7 @@ function YouScreen() {
                 const p = projects.byId.get(m.projectId);
                 if (!p) return null;
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     key={m.projectId}
                     onPress={() => router.push(`/project/${m.projectId}`)}
                     style={{ padding: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: c.border, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
@@ -220,7 +220,7 @@ function YouScreen() {
         </Card>
 
         <Button kind="secondary" icon="log-out" label={t('you.logout', 'Log out')} onPress={() => (total > 0 ? setConfirmLogout(true) : void logOut())} />
-        <Button kind="ghost" icon="trash-2" label={t('you.deleteAccount', 'Delete my account')} onPress={() => setConfirmDelete(true)} />
+        <Button kind="destructive" icon="trash-2" label={t('you.deleteAccount', 'Delete my account')} onPress={() => setConfirmDelete(true)} />
       </ScrollView>
 
       <Sheet visible={confirmLogout} onClose={() => setConfirmLogout(false)} title={t('you.logoutTitle', 'Log out?')}>

@@ -178,7 +178,7 @@ export function CardView({ message }: { message: Message }) {
   if (message.data?.nudge) {
     if (!card || card.state !== 'open') return null;
     return (
-      <Pressable onPress={() => cardId && queue?.open(cardId)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2, paddingHorizontal: space.md }}>
+      <Pressable accessibilityRole="button" onPress={() => cardId && queue?.open(cardId)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2, paddingHorizontal: space.md }}>
         <Feather name="bell" size={13} color={c.textMuted} />
         <T variant="meta" color="textMuted" numberOfLines={lines} style={{ flex: 1 }}>
           {t('card.reminderLine', 'Reminder: {{title}} still needs an answer', { title })}

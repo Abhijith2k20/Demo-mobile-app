@@ -8,6 +8,7 @@ import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, TextInput
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import i18n from '@/lib/i18n';
 import { motion, radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { T } from './T';
@@ -86,7 +87,7 @@ export function Sheet({ visible, onClose, title, subtitle, full, headerRight, ch
     <Modal transparent visible animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.scrim }, scrimStyle]}>
-          <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
+          <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel={i18n.t('common.close', 'Close')} />
         </Animated.View>
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
           <Animated.View

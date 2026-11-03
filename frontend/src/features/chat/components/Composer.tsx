@@ -180,7 +180,7 @@ export function Composer(props: Props) {
           <T variant="metaStrong" color="accent" style={{ flex: 1 }}>
             {t('chat.editing', 'Editing message')}
           </T>
-          <Pressable
+          <Pressable accessibilityRole="button"
             hitSlop={10}
             onPress={() => {
               setDraft(draftKey, '');
@@ -211,7 +211,7 @@ export function Composer(props: Props) {
           <T variant="bodyStrong" style={{ flex: 1 }}>
             {t('chat.recording', 'Recording…')} {Math.floor(recording / 60)}:{String(recording % 60).padStart(2, '0')}
           </T>
-          <Pressable hitSlop={10} onPress={cancelVoice} style={{ paddingHorizontal: space.sm, minHeight: touch.min, justifyContent: 'center' }}>
+          <Pressable accessibilityRole="button" hitSlop={10} onPress={cancelVoice} style={{ paddingHorizontal: space.sm, minHeight: touch.min, justifyContent: 'center' }}>
             <T variant="metaStrong" color="textMuted">
               {t('common.cancel', 'Cancel')}
             </T>

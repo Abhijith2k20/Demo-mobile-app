@@ -133,7 +133,7 @@ function DmsScreen() {
             style={[type.body, { flex: 1, color: c.text, paddingVertical: 8 }]}
           />
           {query ? (
-            <Pressable hitSlop={10} onPress={() => setQuery('')} accessibilityLabel={t('common.clear', 'Clear')}>
+            <Pressable accessibilityRole="button" hitSlop={10} onPress={() => setQuery('')} accessibilityLabel={t('common.clear', 'Clear')}>
               <Feather name="x" size={16} color={c.textMuted} />
             </Pressable>
           ) : null}

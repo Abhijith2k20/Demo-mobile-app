@@ -161,7 +161,7 @@ function MessageRowInner({ item }: { item: Extract<ListItem, { kind: 'message' }
           ) : null}
           {m.deletedAt ? null : <Reactions message={m} />}
           {replies > 0 && !chat.inThread ? (
-            <Pressable onPress={() => chat.onOpenThread(m)} hitSlop={6} style={{ paddingVertical: 6, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            <Pressable accessibilityRole="button" onPress={() => chat.onOpenThread(m)} hitSlop={6} style={{ paddingVertical: 6, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
               <Feather name="message-square" size={14} color={c.accent} />
               <T variant="metaStrong" color="accent">
                 {replies === 1 ? t('chat.oneReply', '1 reply') : t('chat.replies', '{{count}} replies', { count: replies })}

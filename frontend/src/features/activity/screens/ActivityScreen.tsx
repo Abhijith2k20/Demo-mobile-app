@@ -110,7 +110,7 @@ function ActivityScreen() {
                         • {line}
                       </T>
                     ))}
-                    <Pressable onPress={() => open(a)} hitSlop={8} style={{ paddingTop: space.sm }}>
+                    <Pressable accessibilityRole="button" onPress={() => open(a)} hitSlop={8} style={{ paddingTop: space.sm }}>
                       <T variant="metaStrong" color="accent">
                         {t('activity.openProject', 'Open the schedule')}
                       </T>

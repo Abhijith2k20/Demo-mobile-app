@@ -91,6 +91,7 @@
     "pinned": "Pinned",
     "pinnedCard": "Card",
     "privateHint": "Private: only the people listed here can see this channel.",
+    "privateLabel": "Private channel",
     "publicHint": "Public: anyone on the project can find and join this channel.",
     "settings": "Channel settings"
   },
@@ -151,6 +152,7 @@
     "back": "Back",
     "cancel": "Cancel",
     "clear": "Clear",
+    "close": "Close",
     "goBack": "Go back",
     "save": "Save",
     "search": "Search",

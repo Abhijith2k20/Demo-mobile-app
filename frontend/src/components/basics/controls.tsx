@@ -10,7 +10,7 @@ import { type IconName } from './identity';
 interface ButtonProps {
   label: string;
   onPress: () => void;
-  kind?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  kind?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'destructive';
   icon?: IconName;
   disabled?: boolean;
   loading?: boolean;
@@ -21,8 +21,8 @@ interface ButtonProps {
 
 export function Button({ label, onPress, kind = 'primary', icon, disabled, loading, full = true, small, style }: ButtonProps) {
   const { c } = useTheme();
-  const bg = { primary: c.accent, secondary: c.surfaceAlt, ghost: 'transparent', danger: c.dangerSoft }[kind];
-  const fg = { primary: c.onAccent, secondary: c.text, ghost: c.accent, danger: c.danger }[kind];
+  const bg = { primary: c.accent, secondary: c.surfaceAlt, ghost: 'transparent', danger: c.dangerSoft, destructive: 'transparent' }[kind];
+  const fg = { primary: c.onAccent, secondary: c.text, ghost: c.accent, danger: c.danger, destructive: c.danger }[kind];
   const height = small ? 36 : touch.min + 2;
   return (
     <Pressable
