@@ -37,7 +37,7 @@ function IntegrationScreen() {
               </T>
             ) : null}
             <T variant="meta" color="textFaint" style={{ marginTop: space.sm }}>
-              {t('pm.hint', 'The PM app talks to people one at a time through the Siteline Bot: it sends cards and gets the answers back. It has no access to projects, channels or messages.')}
+              {t('pm.hint', 'The PM app sends cards to anyone in the company, any time, through the Siteline Bot, and gets the answers back. Each card goes to one person. It has no access to projects, channels or messages.')}
             </T>
           </Card>
         ) : null}

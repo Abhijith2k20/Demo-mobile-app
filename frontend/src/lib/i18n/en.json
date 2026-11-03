@@ -273,7 +273,7 @@
     "gallery": "Gallery"
   },
   "pm": {
-    "hint": "The PM app talks to people one at a time through the Siteline Bot: it sends cards and gets the answers back. It has no access to projects, channels or messages.",
+    "hint": "The PM app sends cards to anyone in the company, any time, through the Siteline Bot, and gets the answers back. Each card goes to one person. It has no access to projects, channels or messages.",
     "lastCall": "Last heard from {{when}}",
     "live": "Your PM app",
     "mock": "Test PM app (stand-in)",
