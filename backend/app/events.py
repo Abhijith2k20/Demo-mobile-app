@@ -12,7 +12,7 @@ from typing import Callable
 
 from fastapi import WebSocket
 
-from . import db
+from . import config, db
 
 log = logging.getLogger("siteline.events")
 
@@ -73,7 +73,8 @@ def publish(event: dict, user_ids: list[str]) -> None:
     if not company_id:
         raise RuntimeError("publish() needs a company")
     targets = sorted(set(user_ids))
-    hub.recent.append((targets, json.loads(json.dumps(event))))
+    if config.DEV_TOOLS:  # the dev panel's event log and the tests; production keeps no copy of messages in memory
+        hub.recent.append((targets, json.loads(json.dumps(event))))
     event_id = db.value("INSERT INTO events (company_id, audience, event) VALUES (%(c)s, %(a)s, %(e)s) RETURNING id",
                         c=company_id, a=db.Json(targets), e=event)
     db.run("SELECT pg_notify('events', %(id)s)", id=str(event_id))

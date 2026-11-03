@@ -9,8 +9,16 @@ PRODUCTION = ENV == "production"
 # Signs code hashes and encrypts PM keys. Must be set (and secret) outside development.
 SECRET = os.environ.get("SITELINE_SECRET", "dev-only-secret-change-me")
 
-# Staging and development: every sign-in code is this, so seeded accounts can sign in. Never in production.
+# Staging and development: the seeded test accounts sign in with this code. Never in production, and never for
+# anyone else (staging is on the internet: a real invited person still gets a real code).
 FIXED_CODE = os.environ.get("SITELINE_FIXED_CODE", "" if PRODUCTION else "123456")
+TEST_ACCOUNTS = ("@paliath.in", "@brightline.events", "@siteline.app", "+9198000000")
+
+
+def fixed_code_for(identifier: str) -> str | None:
+    """The fixed code when this is a seeded test account (outside production), else None."""
+    seeded = identifier.endswith(TEST_ACCOUNTS[:3]) or identifier.startswith(TEST_ACCOUNTS[3])
+    return FIXED_CODE if FIXED_CODE and seeded else None
 
 # Protects POST /platform/companies (the PM app or a script calls it).
 PLATFORM_KEY = os.environ.get("SITELINE_PLATFORM_KEY", "" if PRODUCTION else "dev-platform-key")

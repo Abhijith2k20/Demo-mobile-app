@@ -44,12 +44,6 @@ export interface Channel {
   updatedAt: string;
 }
 
-export interface ChannelMember {
-  channelId: ID;
-  userId: ID;
-  lastReadMessageId: ID | null;
-}
-
 export type MessageType =
   | 'text'
   | 'image'
@@ -254,11 +248,6 @@ export interface UserView extends User {
 
 export interface ActivityView extends Activity {
   read: boolean;
-}
-
-export interface Meta {
-  editWindowMs: number;
-  deleteWindowMs: number;
 }
 
 export type ServerEvent =

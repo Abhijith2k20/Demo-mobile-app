@@ -72,11 +72,15 @@ def create(*, ext_id: str, to: str, content: dict, ref: dict | None = None,
     if not ch:
         raise ApiError("NOT_A_MEMBER", f"{to} has no Siteline Bot conversation.")
     cid = uuid7()
-    message = post_message(ch, BOT_ID, type="card", body=None, data={"cardId": cid})
+    # The card first: a repeat sent at the same moment waits on the unique id and then gets this card back,
+    # instead of an error (and nothing is posted twice).
     c = db.insert("cards", {"id": cid, "companyId": db.company_id(), "extId": ext_id, "userId": person["id"],
-                            "messageId": message["id"],
                             "content": {k: content[k] for k in CONTENT_KEYS if content.get(k) is not None},
-                            "ref": ref or {}, "expiresAt": expires_at})
+                            "ref": ref or {}, "expiresAt": expires_at}, on_conflict_nothing=True)
+    if not c:
+        return by_ext_id(ext_id), False
+    message = post_message(ch, BOT_ID, type="card", body=None, data={"cardId": cid})
+    c = db.update("cards", {"id": cid}, {"messageId": message["id"]})
     _publish(c, "card.new")
     note = content.get("push") or {}
     push([person["id"]], note.get("title") or "Siteline Bot", note.get("body") or content["title"], {"url": "/dm/bot"},

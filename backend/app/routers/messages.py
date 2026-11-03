@@ -19,6 +19,28 @@ router = APIRouter(tags=["messages"])
 CLIENT_TYPES = {"text", "image", "voice", "file"}
 
 
+def _clean_data(raw: dict | None) -> dict | None:
+    """Only what the app sends; anything else (`pinned`, `edited`, …) is the server's to set."""
+    if not raw:
+        return None
+    data: dict = {}
+    if isinstance(raw.get("mentions"), list):
+        data["mentions"] = [str(u) for u in raw["mentions"][:50]]
+    if raw.get("alsoToChannel") is True:
+        data["alsoToChannel"] = True
+    if isinstance(raw.get("durationSec"), (int, float)):
+        data["durationSec"] = max(0, min(int(raw["durationSec"]), 600))
+    if isinstance(raw.get("attachments"), list):
+        if len(raw["attachments"]) > 10:
+            raise invalid({"attachments": "Up to 10 photos"})
+        data["attachments"] = [{"id": str(a.get("id", ""))[:64], "kind": "image", "uploadId": a.get("uploadId")}
+                               for a in raw["attachments"] if isinstance(a, dict)]
+    for k in ("uploadId", "name"):
+        if isinstance(raw.get(k), str):
+            data[k] = raw[k][:200]
+    return data or None
+
+
 def _save(m: dict, changes: dict, kind: str, channel: dict) -> dict:
     m = db.update("messages", {"id": m["id"]}, {**changes, "updatedAt": now_iso()})
     m = message(m["id"])
@@ -85,14 +107,14 @@ def create_message(channel_id: str, body: MessageCreate, user: dict = Depends(cu
         parent = message(body.threadParentId)
         if not parent or parent["channelId"] != ch["id"]:
             raise not_found("Message")
-    data = dict(body.data) if body.data else None
+    data = _clean_data(body.data)
     # Files are referred to by this server's own upload records; links are signed when shown (views.py).
     for a in (data or {}).get("attachments", []) or []:
         _own_upload(user, a.get("uploadId"))
         a["uri"] = None
     if body.type in ("voice", "file"):
         upload = _own_upload(user, (data or {}).get("uploadId"))
-        data = {**data, "uri": None, "name": upload["name"] or (data or {}).get("name"), "size": upload["size"]}
+        data = {**(data or {}), "uri": None, "name": upload["name"] or (data or {}).get("name"), "size": upload["size"]}
     m = post_message(ch, user["id"], type=body.type, body=body.body, data=data,
                      thread_parent_id=body.threadParentId, id=body.id)
     return message_view(m, user, ch)

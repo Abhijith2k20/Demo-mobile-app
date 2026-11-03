@@ -667,3 +667,17 @@ The owner changed the joining rule: adding someone to a project puts them in all
 public channel gets everyone on the project. Private channels have only the people picked. The Owner and Admins
 still add or remove people per channel. Guests get only the channels they're given. Making an existing channel
 public later adds no one (people join it from Browse channels, or are added by hand).
+
+## Audit fixes (2026-11-03)
+
+- Sign-in codes: every try is counted in the database before the code is compared (parallel guesses can't pass
+  the 5-try limit). The fixed test code works only for the seeded test accounts, in staging and development.
+- `/internal/*` needs a signed-in person (staging is on the internet).
+- Message `data` keeps only the keys the app sends; `pinned` and `edited` are set by the server only.
+- An Owner or Admin changed to Member or Guest leaves every project channel (they were in them only as admin).
+- Pushes go only to active members of the company.
+- The channel list is built in a fixed number of queries and no longer writes on read; Owner/Admin read-marker
+  rows are made when they read a channel.
+- The worker takes one job at a time, sign-in codes, invites and pushes first.
+- A card is saved before its bot message, so the same card id sent twice at once returns the card.
+- Removed `GET /meta` and `GET /company` (the app used neither); the production event log in memory is dev-only.

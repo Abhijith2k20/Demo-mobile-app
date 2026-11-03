@@ -73,7 +73,7 @@ def request_code(identifier: str, ip: str) -> None:
     db.run("INSERT INTO otp_requests (identifier, ip) VALUES (%(v)s, %(ip)s)", v=identifier, ip=ip)
     if not user_by_identifier(identifier) and not pending_invites(identifier):
         return
-    code = config.FIXED_CODE or f"{secrets.randbelow(1_000_000):06d}"
+    code = config.fixed_code_for(identifier) or f"{secrets.randbelow(1_000_000):06d}"
     db.run(f"""INSERT INTO otp_codes (identifier, code_hash, expires_at, attempts) VALUES (%(v)s, %(h)s, now() + interval '{CODE_TTL}', 0)
                ON CONFLICT (identifier) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at,
                attempts = 0, created_at = now()""", v=identifier, h=_hash(identifier + code))
@@ -81,19 +81,20 @@ def request_code(identifier: str, ip: str) -> None:
 
 
 def check_code(identifier: str, code: str) -> None:
-    row = db.row("SELECT * FROM otp_codes WHERE identifier = %(v)s", v=identifier)
+    """Every try is counted in the database before the code is compared, so guesses sent at the same moment
+    can't get past the limit."""
+    row = db.row("""UPDATE otp_codes SET attempts = attempts + 1 WHERE identifier = %(v)s
+                    RETURNING code_hash, attempts, expires_at < now() AS expired""", v=identifier)
     if not row:
         raise ApiError("OTP_INVALID", "That code is not right.", {"attemptsLeft": MAX_ATTEMPTS})
-    if row["attempts"] >= MAX_ATTEMPTS:
+    if row["attempts"] > MAX_ATTEMPTS:
         raise ApiError("OTP_TOO_MANY_ATTEMPTS", "Too many wrong codes. Request a new code.")
-    if db.value("SELECT expires_at < now() FROM otp_codes WHERE identifier = %(v)s", v=identifier):
+    if row["expired"]:
         raise ApiError("OTP_EXPIRED", "That code has expired. Request a new one.")
     if not hmac.compare_digest(row["codeHash"], _hash(identifier + code)):
-        attempts = row["attempts"] + 1
-        db.run("UPDATE otp_codes SET attempts = %(a)s WHERE identifier = %(v)s", a=attempts, v=identifier)
-        if attempts >= MAX_ATTEMPTS:
+        if row["attempts"] >= MAX_ATTEMPTS:
             raise ApiError("OTP_TOO_MANY_ATTEMPTS", "Too many wrong codes. Request a new code.")
-        raise ApiError("OTP_INVALID", "That code is not right.", {"attemptsLeft": MAX_ATTEMPTS - attempts})
+        raise ApiError("OTP_INVALID", "That code is not right.", {"attemptsLeft": MAX_ATTEMPTS - row["attempts"]})
     db.run("DELETE FROM otp_codes WHERE identifier = %(v)s", v=identifier)
 
 

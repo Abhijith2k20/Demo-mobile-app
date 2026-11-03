@@ -1,7 +1,7 @@
 """Chat, channels, projects and files inside one company."""
 from app import db
 from app.core import uuid7
-from conftest import channel_named, events_for, in_company, project_id
+from conftest import channel_named, events_for, in_company, project_id, sent_code
 
 
 def test_validation_errors_use_the_standard_format(login):
@@ -235,8 +235,7 @@ def test_the_same_app_for_every_company(client, login):
             "company": "Paliath Interiors"} in accounts
     assert any(a["identifier"] == "+919800000005" for a in accounts)  # a phone-only person in Brightline
     amit = login("amit@paliath.in")
-    assert amit.get("/company").json()["name"] == "Paliath Interiors"
-    assert amit.get("/meta").json() == {"editWindowMs": 15 * 60 * 1000, "deleteWindowMs": 60 * 60 * 1000}
+    assert amit.get("/me").json()["company"]["name"] == "Paliath Interiors"
     assert "simpleMode" not in amit.get("/me").json()
 
 def test_channels_come_in_display_order(login):
@@ -255,7 +254,7 @@ def test_a_new_company_starts_empty_and_makes_its_own_projects(client):
                     headers={"X-Platform-Key": "dev-platform-key"})
     assert r.status_code == 200, r.text
     client.post("/auth/otp/request", json={"identifier": "sam@solo.example"})
-    v = client.post("/auth/otp/verify", json={"identifier": "sam@solo.example", "code": "123456"}).json()
+    v = client.post("/auth/otp/verify", json={"identifier": "sam@solo.example", "code": sent_code("sam@solo.example")}).json()
     h = {"Authorization": f"Bearer {v['accessToken']}"}
     client.post(f"/auth/invites/{v['invites'][0]['id']}/accept", headers=h)
     s = client.post("/auth/session", json={"companyId": v["invites"][0]["companyId"]}, headers=h).json()

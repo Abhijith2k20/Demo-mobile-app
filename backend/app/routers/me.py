@@ -8,10 +8,9 @@ from ..core import now_iso
 from ..deps import current_user
 from ..events import publish
 from ..notify import public_activity
-from ..rules import DELETE_WINDOW_MS, EDIT_WINDOW_MS
 from ..schemas import MePatch, PushToken
 from ..services import accounts
-from ..store import company, human_ids, person
+from ..store import human_ids, person
 from ..views import me_view, public_user
 
 router = APIRouter(tags=["me"])
@@ -51,18 +50,6 @@ def add_push_token(body: PushToken, user: dict = Depends(current_user)):
 def remove_push_token(token: str, user: dict = Depends(current_user)):
     db.run("DELETE FROM push_tokens WHERE token = %(t)s AND user_id = %(u)s", t=token, u=user["id"])
     return {"removed": True}
-
-
-@router.get("/company")
-def get_company(user: dict = Depends(current_user)):
-    c = company()
-    return {"id": c["id"], "name": c["name"]}
-
-
-@router.get("/meta")
-def meta(user: dict = Depends(current_user)):
-    """Fixed rules the app shows (it never decides them itself)."""
-    return {"editWindowMs": EDIT_WINDOW_MS, "deleteWindowMs": DELETE_WINDOW_MS}
 
 
 @router.get("/activity")

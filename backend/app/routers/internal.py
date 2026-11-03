@@ -14,14 +14,16 @@ from ..services import accounts
 router = APIRouter(prefix="/internal", tags=["dev"])
 
 
+# Every route here needs a signed-in person: staging is on the internet, and these change or wipe its data.
+
 @router.get("/state")
-def state():
+def state(user: dict = Depends(current_user)):
     return {"network": netsim.state(),
             "connections": {k: len(v) for k, v in hub.conns.items()}}
 
 
 @router.post("/reset")
-def reset():
+def reset(user: dict = Depends(current_user)):
     from ..seed import reset_everything
 
     reset_everything()
@@ -29,7 +31,7 @@ def reset():
 
 
 @router.post("/network")
-def network(body: NetworkConfig):
+def network(body: NetworkConfig, user: dict = Depends(current_user)):
     netsim.configure(body.mode, body.inject)
     return netsim.state()
 

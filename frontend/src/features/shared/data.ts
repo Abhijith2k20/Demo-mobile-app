@@ -2,13 +2,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { api } from '@/lib/api/client';
-import { get, keys, refreshAll } from '@/lib/queries';
+import { keys, refreshAll } from '@/lib/queries';
 import { useSession } from '@/stores/session';
-import type { ChannelView, CompanyRef, ID, Meta, ProjectMember, ProjectView, User, UserView } from '@/types/models';
-
-export function useMeta(): Meta | undefined {
-  return useQuery({ queryKey: keys.meta, queryFn: get<Meta>('/meta'), staleTime: Infinity }).data;
-}
+import type { ChannelView, CompanyRef, ID, ProjectMember, ProjectView, User, UserView } from '@/types/models';
 
 /** The company of the current session (it comes with the session; switching company starts a new one). */
 export function useCompany(): CompanyRef | undefined {

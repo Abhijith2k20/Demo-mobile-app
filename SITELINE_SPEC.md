@@ -392,7 +392,6 @@ Unknown type → "Update the app to see this message."
 | `CardView` | the card's content, `state`, `answer`, `delivery` (sending to the PM app / saved / not saved + reason), `queuePosition` |
 | `UserView` | `role`, `canDeactivate`, `canChangeRole` |
 | `GET /me` | user, current company, `companies[]` (with unread counts), `permissions[]` |
-| `GET /meta` | edit and delete windows |
 
 ---
 
@@ -635,7 +634,6 @@ Secrets come only from the environment.
 | `POST /auth/refresh` / `POST /auth/logout` | Rotating refresh; logout revokes the session |
 | `GET /me` / `PATCH /me` `{name?, notify?}` / `DELETE /me` | Profile, companies, permissions |
 | `PUT /me/push-tokens` `{token, platform}` / `DELETE` | |
-| `GET /meta` | Edit and delete windows |
 | `GET /users` | Company directory (not for guests) |
 | `PATCH /members/:userId` `{role}` / `POST /members/:userId/deactivate` | |
 | `GET /invites` / `POST /invites` `{id, identifier, name, role, channelIds?}` / `POST /invites/:id/resend` / `DELETE /invites/:id` | Owner/Admin |

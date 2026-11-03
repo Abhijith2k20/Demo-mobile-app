@@ -12,14 +12,18 @@ def can_see_project(user: dict, project_id: str) -> bool:
     return is_company_admin(user) or project_member(user["id"], project_id) is not None
 
 
-def can_see_channel(user: dict, ch: dict) -> bool:
+def can_see_channel(user: dict, ch: dict, member: bool | None = None) -> bool:
+    """`member`: whether the person is in the channel, when the caller already knows (saves a query per channel)."""
+    def mine() -> bool:
+        return member if member is not None else is_channel_member(user["id"], ch["id"])
+
     if ch["kind"] in ("dm", "bot"):
-        return is_channel_member(user["id"], ch["id"])
+        return mine()
     if ch["kind"] == "company":
         return not is_guest(user)
     if is_guest(user):  # guests see only the channels they were given
-        return is_channel_member(user["id"], ch["id"])
-    return is_company_admin(user) or is_channel_member(user["id"], ch["id"])
+        return mine()
+    return is_company_admin(user) or mine()
 
 
 def channel_audience(ch: dict) -> list[str]:

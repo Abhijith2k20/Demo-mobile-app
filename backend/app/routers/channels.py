@@ -10,9 +10,9 @@ from ..events import publish
 from ..rules import HOME_CHANNEL, can, is_company_admin, is_guest
 from ..schemas import ChannelCreate, ChannelPatch
 from ..access import can_see_channel, channel_audience, project_audience, visible_channel, visible_project
-from ..store import BOT_ID, channel, ensure_channel_member, first_name, is_channel_member, person, project_member_ids
+from ..store import BOT_ID, channel, first_name, is_channel_member, person
 from ..services import projects as spaces
-from ..views import channel_stats, channel_view
+from ..views import channel_view, channel_views
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["channels"])
@@ -65,15 +65,15 @@ def _set_members(ch: dict, ids: list[str]) -> None:
 @router.get("/channels")
 def list_channels(user: dict = Depends(current_user)):
     """Every channel the user can read, with unread count, last message and members."""
-    candidates = db.rows("""SELECT c.* FROM channels c
-                            WHERE c.kind <> 'dm' OR EXISTS (SELECT 1 FROM messages m WHERE m.channel_id = c.id)""")
-    # A DM opened but never written in stays invisible, for both people.
-    visible = [c for c in candidates if can_see_channel(user, c)]
-    for c in visible:
-        if c["kind"] not in ("dm", "bot"):
-            ensure_channel_member(user["id"], c["id"])  # read markers for Owner/Admin
-    stats = channel_stats(user, [c["id"] for c in visible])
-    return {"channels": _in_display_order([channel_view(c, user, stats) for c in visible])}
+    candidates = db.rows("""SELECT c.*, EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id
+                                                AND cm.user_id = %(u)s) AS mine
+                            FROM channels c
+                            WHERE c.kind <> 'dm' OR EXISTS (SELECT 1 FROM messages m WHERE m.channel_id = c.id)""",
+                         u=user["id"])
+    # A DM opened but never written in stays invisible, for both people. Read-marker rows for Owner/Admin are
+    # made when they read (POST /channels/:id/read), not here: a read must not write.
+    visible = [{k: v for k, v in c.items() if k != "mine"} for c in candidates if can_see_channel(user, c, c["mine"])]
+    return {"channels": _in_display_order(channel_views(visible, user))}
 
 
 def _in_display_order(views: list[dict]) -> list[dict]:
@@ -101,16 +101,9 @@ def browse_channels(project_id: str, user: dict = Depends(current_user)):
     Guests only see the channels they're in."""
     project = visible_project(user, project_id)
     manager = _manager(user)
-    on_project = project_member_ids(project["id"])
-    out = []
-    for c in db.rows("SELECT * FROM channels WHERE project_id = %(p)s", p=project["id"]):
-        joined = is_channel_member(user["id"], c["id"])
-        if (c["isPrivate"] or is_guest(user)) and not manager and not joined:
-            continue
-        count = sum(1 for uid in db.rows("SELECT user_id FROM channel_members WHERE channel_id = %(c)s", c=c["id"])
-                    if uid["userId"] in on_project)
-        out.append({**channel_view(c, user), "memberCount": count})
-    return {"channels": sorted(out, key=_rank)}
+    shown = [c for c in db.rows("SELECT * FROM channels WHERE project_id = %(p)s", p=project["id"])
+             if not (c["isPrivate"] or is_guest(user)) or manager or is_channel_member(user["id"], c["id"])]
+    return {"channels": sorted(({**v, "memberCount": len(v["memberIds"])} for v in channel_views(shown, user)), key=_rank)}
 
 
 @router.post("/projects/{project_id}/channels")

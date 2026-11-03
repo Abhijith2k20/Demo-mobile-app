@@ -30,8 +30,9 @@ def run_job(job: dict) -> None:
                 on_gave_up(job)
 
 
-def run_due(limit: int = 20) -> int:
-    """Runs the jobs that are due now; returns how many ran."""
+def run_due(limit: int = 1) -> int:
+    """Runs the jobs that are due now; returns how many ran. One at a time by default, so each pick is the most
+    urgent due job (a batch of slow webhooks would otherwise hold up a sign-in code that arrives meanwhile)."""
     with db.transaction():
         jobs = queue.claim(limit)
         db.run("""INSERT INTO worker_heartbeat (id, seen_at) VALUES (1, now())

@@ -15,6 +15,8 @@ BACKOFF = {
     "default": [30, 120, 600],
 }
 LOCK_SECONDS = 120
+# A person is waiting on these: they go before anything else that is due (a slow PM app can't hold up sign-in).
+URGENT = ["send_code", "send_invite", "send_push"]
 
 
 def enqueue(kind: str, payload: dict | None = None, *, run_at: datetime | None = None, company_id: str | None = None,
@@ -40,8 +42,8 @@ def claim(limit: int = 10) -> list[dict]:
                   updated_at = now()
            WHERE id IN (SELECT id FROM jobs
                         WHERE run_at <= now() AND (status = 'pending' OR (status = 'running' AND locked_until < now()))
-                        ORDER BY run_at LIMIT %(limit)s FOR UPDATE SKIP LOCKED)
-           RETURNING *""", lock=LOCK_SECONDS, limit=limit)
+                        ORDER BY kind = ANY(%(urgent)s) DESC, run_at LIMIT %(limit)s FOR UPDATE SKIP LOCKED)
+           RETURNING *""", lock=LOCK_SECONDS, limit=limit, urgent=URGENT)
 
 
 def finish(job: dict) -> None:

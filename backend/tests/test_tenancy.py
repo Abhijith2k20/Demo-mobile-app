@@ -4,7 +4,7 @@ import pytest
 
 from app import db
 from app.core import uuid7
-from conftest import events_for, in_company, run_jobs
+from conftest import events_for, in_company, run_jobs, sent_code
 
 
 def test_row_level_security_hides_other_companies(client):
@@ -91,7 +91,7 @@ def test_platform_creates_a_company_with_its_owner(client):
     assert c["slug"] == "acme-fitouts"
     run_jobs({"send_invite"})
     client.post("/auth/otp/request", json={"identifier": "asha@acme.example"})
-    v = client.post("/auth/otp/verify", json={"identifier": "asha@acme.example", "code": "123456"}).json()
+    v = client.post("/auth/otp/verify", json={"identifier": "asha@acme.example", "code": sent_code("asha@acme.example")}).json()
     h = {"Authorization": f"Bearer {v['accessToken']}"}
     client.post(f"/auth/invites/{v['invites'][0]['id']}/accept", headers=h)
     s = client.post("/auth/session", json={"companyId": c["id"]}, headers=h).json()

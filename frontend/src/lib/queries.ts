@@ -7,7 +7,6 @@ import type { ServerEvent } from '@/types/models';
 
 export const keys = {
   me: ['me'] as const,
-  meta: ['meta'] as const,
   invites: ['invites'] as const,
   integration: ['integration'] as const,
   demoAccounts: ['demo-accounts'] as const,

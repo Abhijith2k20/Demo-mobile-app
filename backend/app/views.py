@@ -17,7 +17,7 @@ from .rules import (
     project_permissions,
 )
 from .services import accounts, files
-from .store import MESSAGE_COLUMNS, company, project, project_members
+from .store import MESSAGE_COLUMNS, company, project_members
 
 
 def public_user(u: dict, viewer: dict | None = None) -> dict:
@@ -70,31 +70,48 @@ def channel_stats(viewer: dict, channel_ids: list[str]) -> dict[str, tuple[int, 
                              {"id": r["lastReadMessageId"], "at": r["readAt"]} if r["readAt"] else None) for r in counts}
 
 
-def channel_view(ch: dict, viewer: dict, stats: dict | None = None) -> dict:
-    member_rows = db.rows("""SELECT cm.user_id, u.name FROM channel_members cm JOIN users u ON u.id = cm.user_id
-                             WHERE cm.channel_id = %(c)s ORDER BY u.name""", c=ch["id"])
-    member_ids = [r["userId"] for r in member_rows]
-    if ch["kind"] == "project" and ch["projectId"]:
+def channel_views(chs: list[dict], viewer: dict) -> list[dict]:
+    """Many channels in a fixed number of queries (Home loads every channel the person can read)."""
+    ids = [c["id"] for c in chs]
+    if not ids:
+        return []
+    stats = channel_stats(viewer, ids)
+    members: dict[str, list[str]] = {}
+    for r in db.rows("""SELECT cm.channel_id, cm.user_id FROM channel_members cm JOIN users u ON u.id = cm.user_id
+                        WHERE cm.channel_id = ANY(%(ids)s) ORDER BY u.name""", ids=ids):
+        members.setdefault(r["channelId"], []).append(r["userId"])
+    project_ids = list({c["projectId"] for c in chs if c["projectId"]})
+    on_project: dict[str, set[str]] = {}
+    for r in db.rows("SELECT project_id, user_id FROM project_members WHERE project_id = ANY(%(p)s)", p=project_ids):
+        on_project.setdefault(r["projectId"], set()).add(r["userId"])
+    archived = {r["id"] for r in db.rows("SELECT id FROM projects WHERE id = ANY(%(p)s) AND archived_at IS NOT NULL",
+                                         p=project_ids)}
+    replies = reply_info([s[1] for s in stats.values() if s[1]])
+    admin = is_company_admin(viewer)
+    out = []
+    for ch in chs:
+        member_ids = members.get(ch["id"], [])
+        project_channel = ch["kind"] == "project" and bool(ch["projectId"])
         # Owner/Admin can read every project channel but aren't listed as its members.
-        on_project = {m["userId"] for m in project_members(ch["projectId"])}
-        listed = [uid for uid in member_ids if uid in on_project]
-    else:
-        listed = member_ids
-    peer_id = next((uid for uid in member_ids if uid != viewer["id"]), None) if ch["kind"] == "dm" else None
-    unread, last, marker = (stats if stats is not None else channel_stats(viewer, [ch["id"]])).get(ch["id"], (0, None, None))
-    archived = bool(ch["projectId"]) and bool((project(ch["projectId"]) or {}).get("archivedAt"))
-    return {
-        **ch,
-        "memberIds": listed,
-        "peerId": peer_id,
-        "joined": viewer["id"] in member_ids,
-        "unreadCount": unread,
-        "lastReadMessageId": marker["id"] if marker else None,
-        # The "new" divider starts after this time (server clock).
-        "lastReadAt": marker["at"] if marker else None,
-        "lastMessage": message_view(last, viewer, ch) if last else None,
-        "canPost": can_post(viewer, ch) and not archived,
-    }
+        listed = [u for u in member_ids if u in on_project.get(ch["projectId"], set())] if project_channel else member_ids
+        unread, last, marker = stats.get(ch["id"], (0, None, None))
+        out.append({
+            **ch,
+            "memberIds": listed,
+            "peerId": next((u for u in member_ids if u != viewer["id"]), None) if ch["kind"] == "dm" else None,
+            "joined": viewer["id"] in member_ids or (admin and project_channel),
+            "unreadCount": unread,
+            "lastReadMessageId": marker["id"] if marker else None,
+            # The "new" divider starts after this time (server clock).
+            "lastReadAt": marker["at"] if marker else None,
+            "lastMessage": message_view(last, viewer, ch, replies) if last else None,
+            "canPost": can_post(viewer, ch) and ch["projectId"] not in archived,
+        })
+    return out
+
+
+def channel_view(ch: dict, viewer: dict) -> dict:
+    return channel_views([ch], viewer)[0]
 
 
 def message_view(m: dict, viewer: dict, ch: dict, replies: dict[str, tuple[int, str]] | None = None) -> dict:

@@ -48,9 +48,10 @@ def _admin(cookie: str | None) -> str | None:
     """The signed-in platform admin's email, or None."""
     try:
         email, exp, sig = (cookie or "").split("|")
-    except ValueError:
+        expires = int(exp)
+    except ValueError:  # a damaged or hand-made cookie is simply "not signed in"
         return None
-    if int(exp) < time.time() or not hmac.compare_digest(sig, _sign(f"{email}|{exp}")):
+    if expires < time.time() or not hmac.compare_digest(sig, _sign(f"{email}|{exp}")):
         return None
     return email if db.value("SELECT 1 FROM platform_admins WHERE email = %(e)s", e=email) else None
 
@@ -108,7 +109,7 @@ def login(request: Request, email: str = Form(...)):
         return RedirectResponse("/platform?error=Too+many+tries.+Wait+an+hour.", status_code=303)
     db.run("INSERT INTO otp_requests (identifier, ip) VALUES (%(v)s, %(ip)s)", v="platform:" + email, ip=ip)
     if db.value("SELECT 1 FROM platform_admins WHERE email = %(e)s", e=email):
-        code = config.FIXED_CODE or f"{secrets.randbelow(1_000_000):06d}"
+        code = config.fixed_code_for(email) or f"{secrets.randbelow(1_000_000):06d}"
         db.run("""INSERT INTO otp_codes (identifier, code_hash, expires_at) VALUES (%(v)s, %(h)s, now() + interval '10 minutes')
                   ON CONFLICT (identifier) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at,
                   attempts = 0""", v="platform:" + email, h=accounts._hash("platform:" + email + code))

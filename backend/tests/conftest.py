@@ -130,6 +130,13 @@ def run_jobs(kinds: set[str] | None = None, *, due_in_seconds: float = 0) -> int
     return len(jobs)
 
 
+def sent_code(identifier: str) -> str:
+    """The code last queued for this address (what the person gets by SMS or email); "" when none was sent."""
+    with db.transaction():
+        return db.value("""SELECT payload->>'code' FROM jobs WHERE kind = 'send_code' AND payload->>'identifier' = %(v)s
+                           ORDER BY created_at DESC LIMIT 1""", v=identifier) or ""
+
+
 def events_for(user_id: str, kind: str | None = None) -> list[dict]:
     return [e for targets, e in hub.recent if user_id in targets and (kind is None or e["type"] == kind)]
 

@@ -105,14 +105,13 @@ function DemoPanel() {
     else void run(fn, done);
   };
 
-  const reset = () =>
-    run(async () => {
+  const reset = needUser(async () => {
       await demo.reset();
       await wipeEverything();
       clearLogs();
       router.replace('/login');
       toast('Reset. All data is back to the seed.', 'success');
-    });
+  });
 
   return (
     <Screen>
@@ -290,7 +289,7 @@ function DemoPanel() {
         </Section>
 
         <Section title="7 · Reset" hint="Server data goes back to the seed and you sign in again.">
-          <Button kind="danger" icon="rotate-ccw" label="Reset demo" onPress={() => void reset()} />
+          <Button kind="danger" icon="rotate-ccw" label="Reset demo" onPress={reset} />
         </Section>
       </ScrollView>
     </Screen>

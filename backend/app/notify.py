@@ -27,11 +27,14 @@ def add_activity(**a) -> None:
 
 
 def push(user_ids: list[str], title: str, body: str, data: dict, *, kind: str) -> None:
-    """Queues a push to each person who wants this kind (their notification level)."""
+    """Queues a push to each active member of this company who wants this kind (their notification level).
+    Someone deactivated here gets nothing from this company, whatever lists they're still on."""
     ids = [u for u in dict.fromkeys(user_ids) if u != BOT_ID]
     if not ids:
         return
-    for r in db.rows("SELECT id, notify FROM users WHERE id = ANY(%(ids)s) AND deleted_at IS NULL", ids=ids):
+    for r in db.rows("""SELECT u.id, u.notify FROM users u
+                        JOIN memberships m ON m.user_id = u.id AND m.company_id = current_company() AND m.status = 'active'
+                        WHERE u.id = ANY(%(ids)s) AND u.deleted_at IS NULL""", ids=ids):
         prefs = r["notify"] or {}
         if kind not in LEVELS.get(prefs.get("level", "all"), LEVELS["all"]):
             continue

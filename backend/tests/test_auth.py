@@ -3,11 +3,19 @@ import pytest
 
 from app import config, db
 from app.core import uuid7
+from conftest import sent_code
 
 
-def code(client, identifier, value="123456"):
+def code(client, identifier, value=None):
+    """Asks for a code and signs in with it (or with `value`, to try a wrong one)."""
     client.post("/auth/otp/request", json={"identifier": identifier})
-    return client.post("/auth/otp/verify", json={"identifier": identifier, "code": value})
+    from app.services.accounts import normalize_identifier
+
+    try:
+        sent = sent_code(normalize_identifier(identifier))
+    except Exception:
+        sent = ""
+    return client.post("/auth/otp/verify", json={"identifier": identifier, "code": value or sent or "000000"})
 
 
 def bearer(token):

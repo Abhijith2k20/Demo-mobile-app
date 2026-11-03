@@ -120,6 +120,11 @@ def change_role(user_id: str, body: RoleChange, user: dict = Depends(current_use
         raise forbidden("You can't change this person's role.")
     db.run("UPDATE memberships SET role = %(r)s, updated_at = now() WHERE company_id = current_company() AND user_id = %(u)s",
            r=body.role, u=user_id)
+    if is_company_admin(target) and body.role in ("member", "guest"):
+        # As Owner/Admin they saw every project channel (with rows kept only for read markers); now they're in
+        # none until someone adds them, like anyone else.
+        db.run("""DELETE FROM channel_members WHERE user_id = %(u)s
+                  AND channel_id IN (SELECT id FROM channels WHERE kind = 'project')""", u=user_id)
     if body.role == "guest":  # guests leave the company channels
         db.run("""DELETE FROM channel_members WHERE user_id = %(u)s
                   AND channel_id IN (SELECT id FROM channels WHERE kind = 'company')""", u=user_id)
