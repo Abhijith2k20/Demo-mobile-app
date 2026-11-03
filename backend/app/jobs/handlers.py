@@ -72,7 +72,6 @@ HANDLERS = {
     "mock_summary": lambda p: mock.morning_summary(p["ref"]),
     "mock_checkins": lambda p: mock.evening_checkins(p["ref"]),
     "mock_remind": lambda p: mock.remind(p["card"]),
-    "mock_escalate": lambda p: mock.escalate(p["card"]),
     "cleanup": cleanup,
 }
 

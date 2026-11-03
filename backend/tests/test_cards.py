@@ -110,16 +110,15 @@ def test_open_cards_follow_the_task_in_the_pm_app(login):
 
 # ---- The mock PM app's timers ----
 
-def test_a_checkin_is_reminded_then_escalated_to_the_managers(login):
-    ravi, amit = login("ravi@paliath.in"), login("amit@paliath.in")
+def test_an_unanswered_checkin_gets_one_reminder(login):
+    ravi = login("ravi@paliath.in")
     ravi.post("/internal/bot/evening-checkin")
     run_jobs({"mock_remind"}, due_in_seconds=3 * 3600)
     bot_dm = next(ch for ch in ravi.get("/channels").json()["channels"] if ch["kind"] == "bot")
-    assert any((m["data"] or {}).get("nudge") for m in ravi.get(f"/channels/{bot_dm['id']}/messages").json()["messages"])
-    run_jobs({"mock_escalate"}, due_in_seconds=3 * 3600)
-    sw = channel_named(amit, "Villa 99", "site-work")
-    last = amit.get(f"/channels/{sw['id']}/messages").json()["messages"][0]
-    assert last["data"]["content"]["title"].startswith("Ravi hasn't updated")
+    nudges = [m for m in ravi.get(f"/channels/{bot_dm['id']}/messages").json()["messages"] if (m["data"] or {}).get("nudge")]
+    assert len(nudges) == 1
+    with in_company("Paliath Interiors"):
+        assert not db.value("SELECT 1 FROM jobs WHERE kind LIKE '%%escalat%%'")
 
 
 def test_the_daily_plan_queues_summaries_and_checkins_once(client):

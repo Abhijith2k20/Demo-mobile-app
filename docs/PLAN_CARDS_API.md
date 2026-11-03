@@ -34,12 +34,12 @@
 
 ## 4. The mock PM app takes over the bot
 
-- `mockpm/`: today's planner, check-ins, reminders, escalations and morning summaries, rewritten to call the
+- `mockpm/`: today's planner, check-ins, reminders and morning summaries, rewritten to call the
   Cards API functions (the same ones the HTTP API uses) and to take `card.answered` through the same webhook
   delivery (an in-process target for kind `mock`). Its tasks and projects stay in `pm_mock_*` and the platform
   panel. It sends projects and members with `PUT /projects`.
 - Seed: Paliath and Brightline linked to the mock PM app.
-- Checked on the emulator: Ravi's card, answer, the mock PM app's status card, nudge and escalation.
+- Checked on the emulator: Ravi's card, answer, the mock PM app's status card and nudge.
 
 ## 5. Remove the 2.0 bot from Siteline
 

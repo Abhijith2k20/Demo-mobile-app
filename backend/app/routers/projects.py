@@ -170,7 +170,7 @@ def project_tasks(project_id: str, user: dict = Depends(current_user)):
 
 @router.get("/projects/{project_id}/updates")
 def project_updates(project_id: str, user: dict = Depends(current_user)):
-    """The last few cards the PM app posted (status updates, escalations) across the project's channels."""
+    """The last few cards the PM app posted (status updates) across the project's channels."""
     project = visible_project(user, project_id)
     channels = {c["id"]: c for c in project_channels(project["id"])}
     cards = db.rows(f"""SELECT {MESSAGE_COLUMNS} FROM messages m WHERE channel_id = ANY(%(ids)s) AND type = 'card'

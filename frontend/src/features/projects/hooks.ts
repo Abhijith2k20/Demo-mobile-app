@@ -30,7 +30,7 @@ export function useBrowseChannels(projectId: ID, enabled = true) {
   });
 }
 
-/** Last few status cards (check-in results, escalations) across the project's channels. */
+/** Last few status cards from the PM app across the project's channels. */
 export function useRecentUpdates(projectId: ID | null | undefined): MessageView[] {
   const q = useQuery({
     queryKey: keys.updates(projectId ?? ''),

@@ -88,10 +88,7 @@ class MePatch(Body):
             return v
         if v.get("level") not in ("all", "important", "off"):
             raise ValueError("Pick a notification level")
-        for k in ("quietFrom", "quietTo"):
-            if v.get(k) is not None and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(v[k])):
-                raise ValueError("Use a time like 21:00")
-        return {k: v.get(k) for k in ("level", "quietFrom", "quietTo")}
+        return {"level": v["level"]}
 
 
 class PushToken(Body):

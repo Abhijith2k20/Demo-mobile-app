@@ -152,7 +152,7 @@ export interface Card {
   sending?: boolean;
 }
 
-/** A card the PM app posted in a project channel (status updates, escalations). */
+/** A card the PM app posted in a project channel (status updates). */
 export interface ChannelCard {
   title: string;
   lines?: string[];

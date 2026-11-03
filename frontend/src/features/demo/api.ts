@@ -18,7 +18,6 @@ export const demo = {
   deactivate: () => api('POST', '/internal/deactivate'),
   morningSummary: () => api('POST', '/internal/bot/morning-summary'),
   eveningCheckin: () => api('POST', '/internal/bot/evening-checkin'),
-  escalate: () => api<{ escalated: boolean }>('POST', '/internal/bot/escalate'),
   pmPublish: () => api('POST', '/internal/pm/publish'),
   pmDown: (down: boolean) => api('POST', '/internal/pm/down', { down }),
   reset: () => api('POST', '/internal/reset'),

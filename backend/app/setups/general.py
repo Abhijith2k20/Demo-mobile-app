@@ -2,7 +2,7 @@
 
 SETUP = {
     "projectChannels": [{"name": "general"}, {"name": "field"}, {"name": "managers", "private": True}],
-    # The bot's status cards and escalations go here.
+    # The PM app's status cards go here.
     "workChannel": "field",
     "jobTitles": [
         {"name": "Manager", "managersOnly": True, "channels": ["general", "field", "managers"]},

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Badge, Button, Card, Pill, Segmented, type IconName } from '@/components/basics';
 import { appScreen, OfflineBanner, Screen } from '@/components/chrome';
@@ -188,37 +188,20 @@ function YouScreen() {
           </T>
           <Segmented<NotifyPrefs['level']>
             value={notify?.level ?? 'all'}
-            onChange={(level) => void saveNotifyPrefs({ level, quietFrom: notify?.quietFrom ?? null, quietTo: notify?.quietTo ?? null })}
+            onChange={(level) => void saveNotifyPrefs({ level })}
             options={[
               { value: 'all', label: t('you.notifyAll', 'All') },
               { value: 'important', label: t('you.notifyImportant', 'Important') },
               { value: 'off', label: t('you.notifyOff', 'Off') },
             ]}
           />
-          <T variant="meta" color="textMuted" style={{ marginTop: space.xs, marginBottom: space.sm }}>
+          <T variant="meta" color="textMuted" style={{ marginTop: space.xs }}>
             {notify?.level === 'off'
               ? t('you.notifyOffHint', 'No notifications. Open the app to see what changed.')
               : notify?.level === 'important'
-                ? t('you.notifyImportantHint', 'Direct messages, mentions, check-ins and escalations.')
+                ? t('you.notifyImportantHint', 'Direct messages, mentions and cards.')
                 : t('you.notifyAllHint', 'Also replies in threads you are part of.')}
           </T>
-          <Card style={{ padding: 0 }}>
-            <SettingRow
-              icon="moon"
-              label={t('you.quietHours', 'Quiet hours, 21:00 to 07:00')}
-              right={
-                <Switch
-                  value={!!notify?.quietFrom}
-                  onValueChange={(on) =>
-                    void saveNotifyPrefs({ level: notify?.level ?? 'all', quietFrom: on ? '21:00' : null, quietTo: on ? '07:00' : null })
-                  }
-                  trackColor={{ true: c.accent, false: c.border }}
-                  thumbColor={c.surface}
-                  accessibilityLabel={t('you.quietHours', 'Quiet hours, 21:00 to 07:00')}
-                />
-              }
-            />
-          </Card>
         </View>
 
         <Card style={{ padding: 0 }}>

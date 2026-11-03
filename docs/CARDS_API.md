@@ -2,7 +2,7 @@
 
 > **Version 1 (draft, 2026-11-02).** How a company's PM app uses Siteline to reach its people, the way a
 > business system uses the WhatsApp Business API. **The PM app decides; Siteline delivers.** The PM app owns
-> projects, tasks and every rule about chasing them: what to ask, when, reminders and escalation. Siteline
+> projects, tasks and every rule about chasing them: what to ask, when, and reminders. Siteline
 > shows the cards in its app, sends pushes, keeps answers made without signal, and sends every answer back to
 > the PM app by webhook. Siteline has no copy of the PM app's tasks.
 
@@ -101,8 +101,7 @@ A **card** is a message to one person in their Siteline Bot conversation, with b
     `noteRequired` makes the person write a note first.
   - `note`: lets the person add text, a voice note (up to 2 min) or a photo to their answer.
 - `ref`: anything the PM app wants back in the webhook (for example the task id). Siteline doesn't read it.
-- `push`: the notification. Left out = a push with the title. Siteline holds it during the person's quiet hours
-  (the card itself shows at once).
+- `push`: the notification. Left out = a push with the title.
 - `expiresAt`: after this the card can't be answered and shows "Expired".
 - Reply `201` (or `200` for a repeat): `{"card": {"id": "...", "state": "open"}}`.
 - Refusals: `NOT_A_MEMBER` (unknown or deactivated ref), `NOT_FOUND` (unknown project), `VALIDATION_FAILED`.
@@ -133,7 +132,7 @@ push. At most one nudge per card per hour (`429`).
 
 ### `POST /messages`
 
-Posts a card or a line in a project channel, for status updates and escalations.
+Posts a card or a line in a project channel, for status updates.
 
 ```json
 {
@@ -210,7 +209,7 @@ so the PM app knows who it can send cards to.
 ## 6. What stays with the PM app
 
 - Which tasks to ask about, when (working days, time zones, holidays), how often.
-- Reminders (`nudge`) and escalation (`POST /messages` with `notify.managers`).
+- Reminders (`nudge`).
 - What an answer means for the task (75% → in progress, Problem → blocked), and any status card it wants posted.
 - Morning summaries: an information card (no answer parts) with one `fields` row per task.
 
@@ -219,5 +218,5 @@ so the PM app knows who it can send cards to.
 - A card reaches only an active member of that company, in their Siteline Bot conversation.
 - Answers made without signal are kept on the phone and delivered when it's back, in order, once.
 - Every answer is delivered to the PM app at least once (check `X-Siteline-Id` to ignore repeats).
-- Pushes respect each person's notification level and quiet hours.
+- Pushes respect each person's notification level.
 - Nothing from one company is ever shown in another.

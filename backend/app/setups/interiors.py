@@ -4,7 +4,7 @@ SETUP = {
     "projectChannels": [
         {"name": "general"}, {"name": "design"}, {"name": "site-work"}, {"name": "qs", "private": True},
     ],
-    # The bot's status cards and escalations go here.
+    # The PM app's status cards go here.
     "workChannel": "site-work",
     "jobTitles": [
         {"name": "Project Manager", "managersOnly": True, "channels": ["general", "design", "site-work"]},

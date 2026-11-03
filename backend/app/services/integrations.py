@@ -181,7 +181,7 @@ def gave_up(payload: dict) -> None:
 
 def post_channel_message(*, ext_id: str, project_ref: str, channel: str | None, card: dict,
                          notify: dict | None = None) -> dict:
-    """A status or escalation card in a project channel, with Activity and pushes when asked. The same id again
+    """A status card in a project channel, with Activity and pushes when asked. The same id again
     is the same message."""
     if existing := db.row("SELECT * FROM messages WHERE data->>'extId' = %(e)s AND type = 'card'", e=ext_id):
         return existing

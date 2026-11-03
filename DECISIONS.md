@@ -622,9 +622,19 @@ The owner removed Kannada and Hindi for now.
   processes.
 - **`card.seen`** is sent when the app first shows a card open, if the company turned it on (platform panel).
 - **Channel cards push only when the PM app gives `notify.push`**; without it the Managers get an Activity item
-  only (status updates would otherwise push on every answer). The mock pushes for problems and escalations.
+  only (status updates would otherwise push on every answer). The mock pushes for problems.
 - **Check-in cards ask once per task per day** (card id `checkin-<task>-<date>`). Opening the bot conversation
   no longer asks about every open task (`POST /bot/checkins` is gone): what to ask and when is the PM app's call.
 - **Answers carry their files**: voice notes (now recorded for real) and photos upload through the send queue
   first; the webhook gives the PM app 7-day links and the upload ids.
 - **Old queued check-in answers are dropped** when the app loads its send queue: their route is gone.
+
+## No escalation, no quiet hours (2026-11-03)
+
+The owner removed both.
+- **Escalation:** the mock PM app no longer posts "X hasn't updated Y" to the project's managers after two hours,
+  and the dev panel's "Trigger escalation now" is gone. An unanswered card still gets one reminder (nudge) after an
+  hour. The Cards API keeps `POST /messages` with `notify.managers` (a general tool for the PM app, not an
+  escalation feature).
+- **Quiet hours:** pushes go out at once, following only the person's level (All, Important, Off). The switch on
+  You is gone; migration `005_no_quiet_hours.sql` strips the saved times.

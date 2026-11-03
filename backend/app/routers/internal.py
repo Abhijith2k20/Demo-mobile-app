@@ -71,11 +71,6 @@ def evening(user: dict = Depends(current_user)):
     return {"asked": bot.checkin_now(bot.ref_of(user["id"]))}
 
 
-@router.post("/bot/escalate")
-def escalate(user: dict = Depends(current_user)):
-    return {"escalated": bot.escalate_first(bot.ref_of(user["id"]))}
-
-
 @router.post("/pm/publish")
 def pm_publish(user: dict = Depends(current_user)):
     bot.publish_projects()

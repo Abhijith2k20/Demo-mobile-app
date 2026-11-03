@@ -249,16 +249,6 @@ function DemoPanel() {
         <Section title="4 · Bot" hint="The mock PM app sends these cards to the current user's Siteline Bot DM, through the Cards API.">
           <Button small kind="secondary" icon="sun" label="Send morning summary now" onPress={needUser(demo.morningSummary)} />
           <Button small kind="secondary" icon="moon" label="Send evening check-in now" onPress={needUser(demo.eveningCheckin)} />
-          <Button
-            small
-            kind="secondary"
-            icon="bell"
-            label="Trigger escalation now"
-            onPress={needUser(async () => {
-              const r = await demo.escalate();
-              toast(r.escalated ? 'Escalated to the project managers.' : 'No open check-in card to escalate. Send a check-in first.');
-            })}
-          />
         </Section>
 
         <Section title="PM app (mock)" hint="Stands in for the company's PM app: it decides what to ask. Edit its tasks in the platform panel (/platform).">

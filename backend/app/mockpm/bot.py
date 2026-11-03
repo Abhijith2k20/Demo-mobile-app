@@ -1,5 +1,5 @@
 """The mock PM app's chasing (what a real PM app does on its side, docs/CARDS_API.md §6): which tasks to ask
-about and when, check-in cards, reminders, escalations, morning summaries, and what an answer means for the
+about and when, check-in cards, reminders, morning summaries, and what an answer means for the
 task. It talks to Siteline only through the Cards API functions (the same ones the HTTP API calls) and gets
 answers through the same webhook delivery, so it behaves like a real PM app."""
 from __future__ import annotations
@@ -18,7 +18,7 @@ from . import data
 from .data import OPEN, Refused
 
 SETTINGS = {"workingDays": [0, 1, 2, 3, 4, 5], "morningSummaryAt": "08:30", "checkinAt": "17:30",
-            "reminderAfterMin": 60, "escalateAfterMin": 120}
+            "reminderAfterMin": 60}
 SCALE = [{"id": "25", "label": "25%"}, {"id": "50", "label": "50%"}, {"id": "75", "label": "75%"},
          {"id": "90", "label": "90%"}, {"id": "done", "label": "Done"}]
 
@@ -107,7 +107,7 @@ def checkin_content(t: dict) -> dict:
 # ---- Sending ----
 
 def ask(t: dict, *, timers: bool) -> dict | None:
-    """One check-in card for a task (one per task per day). With `timers`, a reminder and an escalation follow."""
+    """One check-in card for a task (one per task per day). With `timers`, a reminder follows if it's unanswered."""
     card_id = f"checkin-{t['id']}-{today().isoformat()}"
     try:
         card, created = cards.create(ext_id=card_id, to=t["ownerRef"], project_ref=t["projectId"],
@@ -119,8 +119,6 @@ def ask(t: dict, *, timers: bool) -> dict | None:
                                     "sentOn": today().isoformat()})
         if timers:
             enqueue("mock_remind", {"card": card_id}, run_at=_after(SETTINGS["reminderAfterMin"]), dedupe_key=f"mock_remind:{card_id}")
-            enqueue("mock_escalate", {"card": card_id}, run_at=_after(SETTINGS["escalateAfterMin"]),
-                    dedupe_key=f"mock_escalate:{card_id}")
     return card if created else None
 
 
@@ -129,7 +127,7 @@ def evening_checkins(ref: str) -> int:
 
 
 def checkin_now(ref: str) -> bool:
-    """Dev panel: the next task not asked today, with its reminder and escalation."""
+    """Dev panel: the next task not asked today, with its reminder."""
     return any(ask(t, timers=True) for t in open_tasks_for(ref))
 
 
@@ -157,29 +155,6 @@ def remind(card_id: str) -> None:
             cards.nudge(card_id)
         except ApiError:
             pass
-
-
-def escalate(card_id: str) -> bool:
-    c = _open_card(card_id)
-    task_id = db.value("SELECT task_id FROM pm_mock_cards WHERE card_id = %(c)s", c=card_id)
-    t = _row(task_id) if task_id else None
-    if not c or not t:
-        return False
-    who = db.value("SELECT name FROM users WHERE id = %(u)s", u=c["userId"]).split(" ")[0]
-    text = f"{who} hasn't updated {t['name']}."
-    integrations.post_channel_message(ext_id=f"escalate-{card_id}", project_ref=t["projectId"], channel=None,
-                                      card={"title": text, "lines": [f"Due {_due(t)} · {t['percent'] or 0}%"], "tone": "warning"},
-                                      notify={"managers": True, "push": text})
-    return True
-
-
-def escalate_first(ref: str) -> bool:
-    """Dev panel: escalate this person's oldest open check-in now."""
-    for r in db.rows("""SELECT c.card_id FROM pm_mock_cards c JOIN pm_mock_tasks t ON t.id = c.task_id
-                        WHERE c.kind = 'checkin' AND lower(t.owner_ref) = lower(%(r)s) ORDER BY c.sent_on, c.card_id""", r=ref):
-        if escalate(r["cardId"]):
-            return True
-    return False
 
 
 def plan_day(p: dict) -> None:

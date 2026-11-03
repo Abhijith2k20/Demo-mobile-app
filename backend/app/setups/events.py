@@ -2,7 +2,7 @@
 
 SETUP = {
     "projectChannels": [{"name": "general"}, {"name": "vendors"}, {"name": "on-the-day"}, {"name": "budget", "private": True}],
-    # The bot's status cards and escalations go here.
+    # The PM app's status cards go here.
     "workChannel": "on-the-day",
     "jobTitles": [
         {"name": "Event Lead", "managersOnly": True, "channels": ["general", "vendors", "on-the-day"]},

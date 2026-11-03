@@ -5,11 +5,8 @@ import { endSession } from '@/lib/session';
 import { forgetPushToken } from '@/lib/push';
 
 export interface NotifyPrefs {
-  /** all: every push; important: DMs, mentions, check-ins and escalations; off: none. */
+  /** all: every push; important: DMs, mentions, cards and the PM app's notices; off: none. */
   level: 'all' | 'important' | 'off';
-  /** Check-ins wait until this quiet time ends (company time zone). Null: no quiet hours. */
-  quietFrom: string | null;
-  quietTo: string | null;
 }
 
 /** Signs out on the server (this session) and clears this phone. */

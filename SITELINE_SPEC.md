@@ -20,7 +20,7 @@
 1. **Work chat for field teams:** a Slack-style workspace per company: project channels, company channels, DMs,
    threads, photos, voice notes, files, simple enough for site workers. English only for now (§2).
 2. **Cards from the PM app:** the PM app sends a person a **card** (for example "How far is False ceiling?"
-   with a one-tap scale), reminds, and posts status and escalation cards in project channels, all through the
+   with a one-tap scale), reminds, and posts status cards in project channels, all through the
    **Cards API**. Siteline delivers them in the person's Siteline Bot conversation, with push, and sends each
    answer back to the PM app. The PM app owns every rule about what to ask and when.
 3. **Many companies, fully separated:** each company is a tenant. Nothing from one company is ever visible to
@@ -281,7 +281,7 @@ The PM app's cards (§8).
 
 ### 5.8 Activity
 
-Mentions, thread replies and the PM app's notifications (status and escalation cards it flags for someone),
+Mentions, thread replies and the PM app's notifications (status cards it flags for someone),
 newest first; unread items have an accent rule.
 
 ### 5.9 You
@@ -289,8 +289,7 @@ newest first; unread items have an accent rule.
 - Avatar, name (editable), email, phone, theme.
 - **Company:** current company with **Switch company** (when more than one); **People**; for Owner/Admin
   **Invites** and **PM link** (status, §9.3).
-- **Notifications:** All · Important (DMs, mentions, cards) · Off. Plus quiet hours (21:00–07:00, company
-  time zone); card pushes wait until they end.
+- **Notifications:** All · Important (DMs, mentions, cards) · Off.
 - **Unsent items**, **Log out** (warns if the queue has items), **Delete my account** (asks first, §9.8).
 
 ### 5.10 People (`people.tsx`)
@@ -350,7 +349,7 @@ IDs are UUIDv7. Times are `timestamptz`.
 | Table | Key columns | Notes |
 |---|---|---|
 | **Global** | | |
-| `users` | id, name, email (unique, lower case, nullable), phone (unique, E.164, nullable), avatar_color, notify (level, quiet hours), deleted_at | A person. At least one of email/phone. No company here. |
+| `users` | id, name, email (unique, lower case, nullable), phone (unique, E.164, nullable), avatar_color, notify (level), deleted_at | A person. At least one of email/phone. No company here. |
 | `companies` | id, name, slug, time_zone, setup (jsonb), pm_company_id, status (active / suspended / deleted), created_at | Created only by the platform (§9.2) |
 | `integrations` | company_id, kind (mock / http), api_key_hash (the key the PM app calls with), webhook_url, webhook_secret (encrypted), last_call_at, last_error, options | One per company (§9.3) |
 | `otp_codes` | id, identifier, code_hash, expires_at, attempts, created_at | Codes stored hashed |
@@ -393,8 +392,7 @@ Unknown type → "Update the app to see this message."
 ## 8. The bot (Siteline Bot)
 
 One `bot` DM per person per company. A full-width column, no avatars. **Siteline decides nothing here:** every
-card comes from the PM app through the Cards API (`docs/CARDS_API.md`), which also decides reminders and
-escalations. Siteline draws the cards, delivers answers, and keeps its guarantees (§8.4).
+card comes from the PM app through the Cards API (`docs/CARDS_API.md`), which also decides reminders. Siteline draws the cards, delivers answers, and keeps its guarantees (§8.4).
 
 ### 8.1 Where cards come from
 
@@ -432,7 +430,7 @@ As in 2.0, now drawn from the card's content:
 ### 8.4 What Siteline guarantees
 
 - A card only reaches an active member of that company; an unknown ref is refused (`NOT_A_MEMBER`).
-- Card pushes follow each person's notification level and wait for their quiet hours.
+- Card pushes follow each person's notification level.
 - Answers made without signal are kept on the phone and delivered later, once, in order.
 - Every answer reaches the PM app at least once; each webhook has an id so the PM app can drop repeats.
 - Cards stay inside their company (§9.7); the PM app's key works for its company only.
@@ -685,7 +683,7 @@ baseline, task defaults, stages.
   `message.*`, `channel.*`, `project.updated|deleted`, `card.new|updated`, `activity.new|read`,
   `user.updated`, `membership.removed`. The app treats every event as "this changed" and refetches.
 - **Push** for DMs, mentions, thread replies to you, cards, the PM app's notifications and urgent issues, following each
-  person's notification setting and quiet hours. Push text names the sender and channel and shows a short
+  person's notification setting. Push text names the sender and channel and shows a short
   preview.
 
 ### 10.6 Jobs
@@ -694,7 +692,7 @@ baseline, task defaults, stages.
 - Failures retry with backoff up to a limit per kind, then the job is marked failed and reported to Sentry.
 - `dedupe_key` (unique) stops doubles: for example `webhook:<card>`.
 - **Kinds:** `webhook` (deliver to the PM app, with retries), `send_push`, `send_code`, `send_invite`, `cleanup`;
-  in development and staging also the mock PM app's own jobs (its daily plan, check-ins, reminders, escalations).
+  in development and staging also the mock PM app's own jobs (its daily plan, check-ins, reminders).
 - Jobs are queued in the same transaction as the change that causes them, so a crash never loses one.
 - `shortcut:` one worker process; add more workers when job lag passes 1 minute (claiming already allows it).
 
@@ -827,7 +825,7 @@ As in the demo:
 The demo's Demo panel, renamed:
 - switch between seeded accounts;
 - network modes and error injection;
-- ask the mock PM app to send a morning summary, a card or an escalation now;
+- ask the mock PM app to send a morning summary or a card now;
 - pause teammates;
 - API and event log;
 - reset staging seed.
@@ -851,8 +849,8 @@ production.
    Ravi gets a push and the card; taps 75% → the mock PM app receives `card.answered` and shows 75%, then posts
    a status card in `#site-work` with an Activity item for the Manager.
 6. **Information cards:** the mock PM app's 08:30 morning summary shows as a card with one row per task.
-7. **Nudge and escalation:** the mock PM app nudges an unanswered card (one reminder line and a push), then posts
-   an escalation card with `notify.managers`; each happens once, even if the worker restarts.
+7. **Nudge:** the mock PM app nudges an unanswered card once (one reminder line and a push), even if the worker
+   restarts.
 8. **Offline answer:** phone offline, answer a card and send a photo → both wait; back online → both arrive once,
    in order, and the PM app gets the answer once.
 9. **PM app down:** the webhook URL fails → the card shows "Sending to <PM app>…", the answer is delivered when it
@@ -868,7 +866,7 @@ production.
     companies still work.
 14. **Files and voice:** photo, voice note and PDF upload to R2 and open for channel members only; a signed link
     stops working after 5 minutes.
-15. **Push:** DMs, mentions, cards and the PM app's notifications arrive; quiet hours hold card pushes.
+15. **Push:** DMs, mentions, cards and the PM app's notifications arrive, following each person's level.
 16. **Account deletion** removes the person's details; their messages show "Former member".
 17. **Dark mode** looks intentional on every screen.
 18. **Restore:** a backup restores into a fresh database and the app works against it.
@@ -897,7 +895,7 @@ Each step ends with tests passing and the app working against it.
    escalations, PM writes with retries, LISTEN/NOTIFY events.
 7. **Files, voice, push:**
    - R2 uploads and signed links, voice notes, files;
-   - push tokens and sending, quiet hours;
+   - push tokens and sending;
    - EAS development, preview and production profiles; Sentry.
 8. **The Cards API (version 2.1):** the API for the PM app (`/api/v1`, keys, projects, cards, nudges, channel
    messages, webhooks with retries); cards in the app drawn from their content; the 2.0 bot (planner, PM sync,
@@ -943,7 +941,7 @@ Before calling any step done: `npm run typecheck`, `npm run lint`, `npm test` in
 ## 18. Open questions for the PM team
 
 1. Can the PM app call the Cards API (`docs/CARDS_API.md`) and take its webhooks? Who builds its scheduler
-   (what to ask, when, reminders, escalation)?
+   (what to ask, when, reminders)?
 2. How are people identified in the PM app: email, phone, or both? They must match how they sign in to Siteline.
 3. Files in answers: are 7-day links enough, or should the PM app copy the files when the webhook arrives?
 
