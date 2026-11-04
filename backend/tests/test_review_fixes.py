@@ -180,3 +180,17 @@ def test_the_platform_panel_lists_deliveries_and_sends_a_failed_one_again(client
     with in_company("Paliath Interiors"):
         assert db.value("SELECT status FROM jobs WHERE id = %(id)s", id=job["id"]) == "pending"
         assert db.value("SELECT count(*) FROM audit_log WHERE action = 'webhook.retried' AND target = %(id)s", id=job["id"]) == 1
+
+
+def test_deleting_or_leaving_another_companys_things_is_not_found(login):
+    """Found by the live sweep: these said 200 ("already gone") for another company's ids. Nothing changed, but every
+    other route says 404, so these do too."""
+    arjun, nisha = login("arjun@paliath.in"), login("nisha@brightline.events")
+    theirs = next(c for c in nisha.get("/channels").json()["channels"] if c["kind"] == "project" and c["name"] != "general")
+    project = nisha.get("/projects").json()["projects"][0]
+    invite = nisha.post("/invites", {"id": uuid7(), "identifier": "decline.me@crew.example", "name": "Decline Me", "role": "member"}).json()["invite"]
+    assert arjun.delete(f"/channels/{theirs['id']}").status_code == 404
+    assert arjun.post(f"/channels/{theirs['id']}/leave").status_code == 404
+    assert arjun.delete(f"/projects/{project['id']}").status_code == 404
+    assert arjun.post(f"/auth/invites/{invite['id']}/decline").status_code == 404
+    assert nisha.get(f"/channels/{theirs['id']}").status_code == 200 and nisha.get(f"/projects/{project['id']}").status_code == 200

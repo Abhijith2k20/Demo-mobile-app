@@ -153,8 +153,7 @@ def patch_channel(channel_id: str, body: ChannelPatch, user: dict = Depends(curr
 
 @router.delete("/channels/{channel_id}")
 def delete_channel(channel_id: str, user: dict = Depends(current_user)):
-    if not channel(channel_id):
-        return {"deleted": True}  # already gone: safe to repeat
+    # Unknown, already deleted or another company's: all "not found" (row-level security makes them look the same).
     ch, project = _project_channel(user, channel_id)
     _require_manage(user)
     if ch["name"] == HOME_CHANNEL:
@@ -182,8 +181,10 @@ def join_channel(channel_id: str, user: dict = Depends(current_user)):
 @router.post("/channels/{channel_id}/leave")
 def leave_channel(channel_id: str, user: dict = Depends(current_user)):
     ch = channel(channel_id)
-    if not ch or ch["kind"] != "project":
-        return {"left": True}
+    if not ch or not can_see_channel(user, ch):
+        raise not_found("Channel")
+    if ch["kind"] != "project":
+        raise invalid({"channel": "Only project channels can be left"})
     if ch["name"] == HOME_CHANNEL:
         raise invalid({"name": "Everyone stays in #general"})
     spaces.remove_from_channel(ch, user["id"])

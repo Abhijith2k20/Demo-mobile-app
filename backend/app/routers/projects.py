@@ -71,9 +71,7 @@ def patch_project(project_id: str, body: ProjectPatch, user: dict = Depends(curr
 @router.delete("/projects/{project_id}")
 def delete_project(project_id: str, user: dict = Depends(current_user)):
     project = db.row("SELECT * FROM projects WHERE id = %(id)s", id=project_id)
-    if not project:
-        return {"deleted": True}  # already gone: safe to repeat
-    if not can_see_project(user, project["id"]):
+    if not project or not can_see_project(user, project["id"]):  # unknown, gone, or another company's
         raise not_found("Project")
     if not is_company_admin(user):
         raise forbidden("Only the owner or an admin can delete a project.")

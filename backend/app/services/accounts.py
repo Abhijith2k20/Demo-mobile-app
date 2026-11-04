@@ -239,8 +239,10 @@ def accept_invite(user: dict, invite_id: str) -> dict:
 
 
 def decline_invite(user: dict, invite_id: str) -> None:
-    db.run("""UPDATE invites SET status = 'declined' WHERE id = %(id)s AND status = 'pending'
-              AND identifier = ANY(%(ids)s)""", id=invite_id, ids=identifiers_of(user))
+    """Only an invite sent to this person; anything else is "not found"."""
+    if not db.row("""UPDATE invites SET status = 'declined' WHERE id = %(id)s AND status = 'pending'
+                     AND identifier = ANY(%(ids)s) RETURNING id""", id=invite_id, ids=identifiers_of(user)):
+        raise ApiError("NOT_FOUND", "This invite isn't available.")
 
 
 def deactivate_member(user_id: str) -> None:
