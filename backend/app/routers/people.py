@@ -10,7 +10,7 @@ from ..events import publish
 from ..jobs.queue import enqueue
 from ..rules import can_change_role, can_deactivate, can_invite_as, is_company_admin, is_guest
 from ..schemas import InviteCreate, RoleChange
-from ..services import accounts, integrations
+from ..services import accounts, integrations, limits
 from ..store import company, human_ids, people, person
 from ..views import public_user
 
@@ -51,6 +51,7 @@ def list_invites(user: dict = Depends(current_user)):
 
 @router.post("/invites")
 def invite(body: InviteCreate, user: dict = Depends(current_user)):
+    limits.hit(user["id"], "invite")
     if not can_invite_as(user, body.role):
         raise forbidden("Only the owner can add an admin." if body.role == "admin"
                         else "Only the owner or an admin can invite people.")
@@ -90,6 +91,7 @@ def _pending(invite_id: str) -> dict:
 
 @router.post("/invites/{invite_id}/resend")
 def resend_invite(invite_id: str, user: dict = Depends(current_user)):
+    limits.hit(user["id"], "invite")
     if not is_company_admin(user):
         raise forbidden("Only the owner or an admin can resend invites.")
     i = db.update("invites", {"id": _pending(invite_id)["id"]}, {"expiresAt": _expiry()})

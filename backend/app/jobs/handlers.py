@@ -48,6 +48,7 @@ def cleanup(p: dict) -> None:
     db.run("DELETE FROM events WHERE created_at < now() - interval '10 minutes'")
     db.run("DELETE FROM jobs WHERE status IN ('done', 'cancelled') AND updated_at < now() - interval '7 days'")
     db.run("DELETE FROM api_calls WHERE minute < now() - interval '1 hour'")
+    db.run("DELETE FROM user_calls WHERE window_start < now() - interval '2 hours'")
     db.run("DELETE FROM otp_requests WHERE at < now() - interval '1 hour'")
     db.run("DELETE FROM otp_codes WHERE expires_at < now() - interval '1 day'")
     db.run("UPDATE invites SET status = 'cancelled' WHERE status = 'pending' AND expires_at < now() - interval '30 days'")

@@ -6,7 +6,7 @@ from fastapi import Header, Request
 
 from . import db
 from .core import ApiError
-from .services import accounts
+from .services import accounts, limits
 from .store import person
 
 
@@ -49,8 +49,11 @@ def user_for_token(token: str) -> dict:
     return user_for_session(session_for(token))
 
 
-def current_user(authorization: str = Header(default="")) -> dict:
-    return user_for_token(bearer(authorization))
+def current_user(request: Request, authorization: str = Header(default="")) -> dict:
+    user = user_for_token(bearer(authorization))
+    if request.method != "GET":  # every change counts towards the person's write limit
+        limits.hit(user["id"], "write")
+    return user
 
 
 def current_account(authorization: str = Header(default="")) -> dict:

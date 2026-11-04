@@ -8,13 +8,14 @@ from fastapi.responses import FileResponse, RedirectResponse
 from .. import config, db
 from ..core import ApiError, invalid, not_found, uuid7
 from ..deps import current_user
-from ..services import files
+from ..services import files, limits
 
 router = APIRouter(tags=["uploads"])
 
 
 @router.post("/uploads")
 def upload(file: UploadFile = File(...), kind: str = Form("image"), user: dict = Depends(current_user)):
+    limits.hit(user["id"], "upload")
     rule = files.KINDS.get(kind)
     if not rule:
         raise invalid({"kind": "Unknown kind"})

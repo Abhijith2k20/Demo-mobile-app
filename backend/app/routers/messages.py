@@ -12,6 +12,7 @@ from ..schemas import DmOpen, MessageCreate, MessagePatch, Reaction, ReadMarker
 from ..access import assert_project_active, channel_audience, visible_channel
 from ..store import BOT_ID, MESSAGE_COLUMNS, add_channel_member, ensure_channel_member, message, person
 from ..views import channel_view, message_view, order_key, reply_info
+from ..services import limits
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["messages"])
@@ -83,6 +84,7 @@ def list_pins(channel_id: str, user: dict = Depends(current_user)):
 @router.get("/channels/{channel_id}/messages/search")
 def search_messages(channel_id: str, q: str = Query(..., min_length=2, max_length=100), user: dict = Depends(current_user)):
     """Newest first, the whole history of one channel the person can see, thread replies included."""
+    limits.hit(user["id"], "search")
     ch = visible_channel(user, channel_id)
     pattern = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     # shortcut: ILIKE scans the channel's messages; add a trigram index when channels reach ~100k messages.

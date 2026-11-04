@@ -276,7 +276,7 @@ PER_COMPANY_TABLES = [
     "activities", "cards", "messages", "channel_members", "channels", "project_members", "projects",
 ]
 GLOBAL_TABLES = [
-    "api_calls", "events", "jobs", "audit_log", "platform_admins", "push_tokens", "sessions", "otp_requests", "otp_codes",
+    "api_calls", "user_calls", "events", "jobs", "audit_log", "platform_admins", "push_tokens", "sessions", "otp_requests", "otp_codes",
     "invites", "memberships", "integrations", "companies", "users", "worker_heartbeat",
 ]
 
