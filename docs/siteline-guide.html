@@ -524,7 +524,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
     <div class="card"><div class="stat">99</div><div>app source files</div></div>
     <div class="card"><div class="stat">48</div><div>server source files</div></div>
     <div class="card"><div class="stat">109</div><div>server tests</div></div>
-    <div class="card"><div class="stat">8</div><div>database migrations</div></div>
+    <div class="card"><div class="stat">9</div><div>database migrations</div></div>
   </div>
 </section>
 
@@ -623,7 +623,7 @@ X-Siteline-Signature-Previous: … (24 h after a new secret)
 PM app replies: {"result": "accepted"}
    or {"result": "refused", "message": "Task is closed"}</pre></div>
   </div>
-  <div class="callout info"><div><b>Safe to repeat:</b> sending the same card id twice returns the same card (no second push). <b>Limits:</b> 120 calls a minute per company, one nudge per card per hour. <b>Retries:</b> after 1, 5 and 15 minutes, then hourly for 24 hours. Full reference: <code>docs/CARDS_API.md</code>.</div></div>
+  <div class="callout info"><div><b>Safe to repeat:</b> sending the same card id twice returns the same card (no second push). <b>Limits:</b> 120 calls a minute per company, one nudge per card per hour. <b>Retries:</b> after 1, 5 and 15 minutes, then hourly for 24 hours; a failed one can be sent again from the delivery history. <b>Webhook address:</b> public https only. Full reference: <code>docs/CARDS_API.md</code>.</div></div>
 
   <h2>Errors</h2>
   <p class="muted small">Every error has the same shape, and the app turns each code into a friendly message:</p>
@@ -707,6 +707,7 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
     <div class="t"><small>Version 2.1 · 2 Nov</small><div>The PM app owns the bot's logic. Siteline offers the Cards API and only delivers.</div></div>
     <div class="t"><small>Version 2.2 · 3 Nov</small><div>Chat only. Projects and channels are just conversations made in Siteline; the PM app's only part is sending cards to people.</div></div>
     <div class="t"><small>3–4 Nov</small><div>Email-only sign-in, audits, WhatsApp-style bubbles, message search, rate limits, Expo SDK 58.</div></div>
+    <div class="t"><small>4 Nov</small><div>Design review fixes: per-conversation mute, webhook delivery history with "Send again", safe webhook addresses, a 24-hour overlap when the webhook secret changes, and a fix so delivery errors are actually recorded.</div></div>
   </div>
 </section>
 
@@ -729,6 +730,8 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
       <li>Sign-in, company picker, every role's permissions, company separation on every route</li>
       <li>Chat: channels, DMs, threads, reactions, mentions, search, bubbles</li>
       <li>Bot cards: sending, answering, offline answers, webhooks with retries</li>
+      <li>Webhook safety: public https addresses only, both signatures during a secret change, delivery history and Send again</li>
+      <li>Mute: no pushes except @mentions; grey rows; tab badges leave muted conversations out (on the emulator too)</li>
       <li>Production mode on an empty database; the platform panel</li>
       <li>Android emulator, including text at 200%</li>
     </ul></div>
@@ -817,6 +820,7 @@ const glossary = [
   ['Card', 'A question from the PM app, like "How far is the false ceiling?", with one-tap answers (a scale, buttons, a note).'],
   ['Cards API', 'The small API the PM app uses to send cards. It can\'t read Siteline\'s channels or messages.'],
   ['Webhook', 'A message Siteline sends to the PM app\'s server, for example "Ravi answered 75%". Signed so the PM app knows it\'s real.'],
+  ['Delivery history', 'The list of webhooks sent to the PM app, with their status, tries and last error. A failed one can be sent again.'],
   ['Mute', 'Turning off notifications for one conversation. You still get a push when someone @mentions you.'],
   ['Nudge', 'A reminder the PM app can send for an unanswered card: a quiet line and a push, at most once an hour.'],
   ['Mock PM app', 'A stand-in PM app built into Siteline for development and demos. It uses the same Cards API as the real one will.'],
@@ -891,13 +895,13 @@ const tabs = (on) => `<div class="tabs">${['Home', 'DMs', 'Activity', 'You'].map
 const screens = [
   { k: 'login', e: '', t: 'Sign in', d: 'Type your work email, get a 6-digit code by email, type it in. No passwords. If you\'ve been invited, you see "Paliath Interiors invited you" with Join.',
     p: `<div class="bar">Siteline<small>Work chat for field teams</small></div><div class="body"><b style="font-size:16px">Sign in</b><span class="muted">Enter your work email to get a 6-digit code.</span><div style="border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--faint)">name@company.com</div><div style="background:var(--accent);color:var(--onAccent);border-radius:10px;padding:10px;text-align:center;font-weight:650">Continue</div><span class="muted small" style="margin-top:auto;text-align:center">Can't sign in? Ask your company admin to invite you.</span></div>` },
-  { k: 'home', e: '', t: 'Home', d: 'Your company\'s workspace: projects (each with its channels), then company channels. Bold rows and blue badges mean unread. "Jump to…" finds any channel, person or project. Owners and Admins see a New project button.',
+  { k: 'home', e: '', t: 'Home', d: 'Your company\'s workspace: projects (each with its channels), then company channels. Bold rows and blue badges mean unread; a muted channel is grey with a bell-off mark. "Jump to…" finds any channel, person or project. Owners and Admins see a New project button.',
     p: `<div class="bar">Paliath Interiors<small>Jump to…</small></div><div class="body"><span class="muted small" style="font-weight:650;letter-spacing:.06em">PROJECTS</span><div class="row bold">▾ Villa 99</div><div class="row"><span class="h">#</span>general</div><div class="row bold"><span class="h">#</span>site-work<span class="badge">3</span></div><div class="row"><span class="h">#</span>qs (private)</div><span class="muted small" style="font-weight:650;letter-spacing:.06em;margin-top:6px">COMPANY</span><div class="row"><span class="h">#</span>announcements</div></div>${tabs('Home')}` },
   { k: 'channel', e: '#', t: 'A channel', d: 'Messages as bubbles: yours on the right, others on the left with name and avatar. Long-press for React, Reply in thread, Copy, Edit (15 min), Delete (1 hour), Pin. "+" adds a photo, voice note or file. The magnifier searches the whole history. The details (i) can mute the conversation.',
     p: `<div class="bar"># site-work<small>Villa 99 · 6 members</small></div><div class="body"><div class="bub them"><b>Suresh Gowda</b>Boards arrived. 24 nos.<small>1:30 PM</small></div><div class="bub them"><b>Amit Kulkarni</b>Thanks for chasing, @Suresh<small>1:48 PM</small></div><div class="bub me">Starting the ceiling tomorrow<small>2:10 PM</small></div><div style="margin-top:auto;border:1px solid var(--border);border-radius:20px;padding:8px 12px;color:var(--faint)">Message # site-work</div></div>` },
   { k: 'bot', e: '', t: 'Siteline Bot', d: 'Where the PM app\'s cards arrive. One question at a time: the oldest open card is expanded, others wait as one-line rows. Tap a step on the scale, or a button. Answers made offline go out later.',
     p: `<div class="bar">Siteline Bot<small>Check-ins and reminders</small></div><div class="body"><span class="muted small">2 cards need an answer · 0 of 2 done</span><div class="botcard"><b>False ceiling – living room</b><div class="muted small">Villa 99 · due Wed 4 Nov</div><div class="scale"><span class="r">25%</span><span class="r">50%</span><span>75%</span><span>90%</span><span>Done</span></div><div style="display:flex;gap:6px;margin-top:6px"><span class="pill">Problem</span><span class="pill">Not started</span><span class="pill">Note</span></div></div><div class="botcard muted small">Kitchen carcass · <span style="color:var(--accent)">Update</span></div></div>` },
-  { k: 'dms', e: '', t: 'DMs', d: 'The Siteline Bot first, then people by latest message. "Find a conversation" filters; the pencil starts a new message.',
+  { k: 'dms', e: '', t: 'DMs', d: 'The Siteline Bot first, then people by latest message. "Find a conversation" filters; the pencil starts a new message. Muted conversations show a bell-off mark.',
     p: `<div class="bar" style="background:var(--surface);color:var(--text)">Direct messages</div><div class="body"><div class="row bold">Siteline Bot<span class="muted small" style="margin-left:auto;font-weight:400">26 Oct</span></div><div class="row">Nibin<span class="muted small" style="margin-left:auto">2:49 PM</span></div><div class="row">Amit Kulkarni<span class="muted small" style="margin-left:auto">12:40 PM</span></div></div>${tabs('DMs')}` },
   { k: 'activity', e: '', t: 'Activity', d: 'Mentions and replies to your threads, newest first. Unread ones have a blue rule.',
     p: `<div class="bar" style="background:var(--surface);color:var(--text)">Activity</div><div class="body"><div class="botcard" style="border-left:3px solid var(--accent)"><b class="small">Amit mentioned you in #site-work</b><div class="muted small">Thanks for chasing, @Suresh</div></div><div class="botcard"><b class="small">Meera replied in a thread</b><div class="muted small">Approved, go ahead</div></div></div>${tabs('Activity')}` },
@@ -905,6 +909,8 @@ const screens = [
     p: `<div class="bar" style="background:var(--surface);color:var(--text)">Arjun Rao<small style="opacity:1;color:var(--muted)">arjun@paliath.in · Owner</small></div><div class="body"><div class="botcard">People</div><div class="botcard">Invite person</div><div class="botcard">PM app link</div><div class="botcard muted small">Notifications: All · <b>Important</b> · Off</div><span style="color:var(--danger);text-align:center;margin-top:auto">Delete my account</span></div>${tabs('You')}` },
   { k: 'project', e: '', t: 'Project info and settings', d: 'Info (client, address, channels), Members, and Files (every photo and file from the project). Owners and Admins manage people, channels, archive and delete here.',
     p: `<div class="bar" style="background:var(--surface);color:var(--text)">Villa 99<small style="opacity:1;color:var(--muted)">Villa 99 owners · Whitefield</small></div><div class="body"><div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;text-align:center"><span style="flex:1;padding:6px;background:var(--alt);font-weight:650">Info</span><span style="flex:1;padding:6px">Members</span><span style="flex:1;padding:6px">Files</span></div><div class="botcard"># general · # site-work · qs (private)</div><div class="botcard">Project settings</div></div>` },
+  { k: 'pmlink', e: '', t: 'PM link (Owners and Admins)', d: 'Whether the PM app is connected and when it last called; the last 7 days (cards sent, answered, answers waiting, answers that couldn\'t be delivered); and recent deliveries, with Send again on failed ones.',
+    p: `<div class="bar" style="background:var(--surface);color:var(--text)">PM app link</div><div class="body"><div class="botcard"><b>Your PM app</b><div class="muted small">Last heard from 5 minutes ago</div></div><div class="botcard"><span class="muted small" style="font-weight:650">LAST 7 DAYS</span><div style="display:flex;gap:14px;margin-top:6px"><span><b>42</b><div class="muted small">Cards sent</div></span><span><b>38</b><div class="muted small">Answered</div></span><span><b style="color:var(--danger)">1</b><div class="muted small">Not delivered</div></span></div></div><div class="botcard"><b class="small">Pendant lights</b><div class="small" style="color:var(--danger)">Couldn\'t deliver · 2 hours ago</div><div class="muted small">The PM app answered 503</div><span class="pill" style="margin-top:6px">Send again</span></div></div>` },
 ];
 function renderScreen(k) {
   const s = screens.find((x) => x.k === k);
@@ -940,8 +946,9 @@ const flows = {
     ['worker,out', 'Ravi gets a push', '"How is False ceiling going?" The push opens the bot conversation.', 'job: send_push'],
     ['phone', 'Ravi taps 75%', 'The answer goes into the send queue like a message, so it works with no signal and is sent once.', 'POST /cards/:id/answer'],
     ['api,db', 'Siteline saves the answer', 'In the same transaction it queues a webhook to the PM app. The card shows "Sending to PM app…".', 'cards.answer + job: webhook'],
-    ['worker,pm', 'The webhook is delivered', 'Signed with the company\'s secret. If the PM app is down, it retries after 1, 5 and 15 minutes, then hourly for 24 hours.', 'POST <webhook URL> card.answered'],
+    ['worker,pm', 'The webhook is delivered', 'Signed with the company\'s secret (and, for 24 hours after a new secret, the previous one too). It only goes to a public https address. If the PM app is down, it retries after 1, 5 and 15 minutes, then hourly for 24 hours.', 'POST <webhook URL> card.answered'],
     ['pm,phone', 'The PM app accepts or refuses', '"Accepted" shows as saved. A refusal shows the reason on the card, like "This task is already closed". What happens next (a follow-up card or nothing) is the PM app\'s choice.', '{"result": "accepted"}'],
+    ['worker,phone', 'If it still can\'t get through', 'After 24 hours the card shows "Couldn\'t reach the PM app" and the company\'s admins get a notice. An Owner, an Admin or the Siteline team can see it in the delivery history and tap Send again; it goes as the same event, so the PM app can drop a repeat.', 'POST /integration/deliveries/:id/retry'],
   ] },
   company: { n: 'A new company', steps: [
     ['api', 'The Siteline team fills in the form', 'On the platform panel: company name, time zone, owner\'s name and email, and the PM link (mock, real PM app, or none).', '/platform → New company'],
@@ -955,6 +962,12 @@ const flows = {
     ['api,db', 'The server checks and saves', 'Only the Owner can invite an Admin. An address already in the company gets "Already in Paliath Interiors". 30 invites an hour per person.', 'invites'],
     ['worker,out', 'The invite email goes out', 'Invites last 14 days. Resend restarts the timer; Cancel stops it.', 'job: send_invite'],
     ['phone,api', 'They sign in with that email', 'They see "Paliath Interiors invited you" and tap Join. A Member starts in both company channels and their bot conversation; a Guest only in their channels.', 'POST /auth/invites/:id/accept'],
+  ] },
+  mute: { n: 'Muting a conversation', steps: [
+    ['phone', 'You open the conversation\'s details', 'Tap (i) at the top of any channel, DM or the Siteline Bot, and turn on Mute.', 'Details → Mute'],
+    ['phone,api,db', 'The server saves it for you', 'Mute is yours only: everyone else in the conversation is unchanged.', 'PUT /channels/:id/mute {muted: true}'],
+    ['api,worker,out', 'New messages send no push', 'DMs, thread replies and bot cards from it stop pushing. An @mention of you still does.', 'push skipped unless kind = mention'],
+    ['phone', 'It stays quiet on screen too', 'The row turns grey with a bell-off mark and a grey badge, and it no longer counts in the Home or DMs tab badge.', 'muted: true in the channel list'],
   ] },
   offline: { n: 'No signal on site', steps: [
     ['phone', 'The phone loses signal', 'An offline banner appears. The last loaded screens still show.', 'cached screens'],
@@ -1058,7 +1071,7 @@ const ents = [
         'A new DM exists only on the phone until its first message.',
         'Deleting a channel removes its messages for everyone.'] },
   { k: 'channelMember', e: '', n: 'Channel member', s: 'Who is in a channel', d: 'Puts a person in a channel and remembers how far they\'ve read.',
-    f: ['channel_id', 'user_id', 'last_read_message_id'], rel: [['channel', 'belongs to'], ['person', 'is']],
+    f: ['channel_id', 'user_id', 'last_read_message_id', 'muted'], rel: [['channel', 'belongs to'], ['person', 'is']],
     st: ['in', 'left'],
     r: ['Messages are marked read only while the channel is on screen and the app is open.',
         'Unread counts and the "New" divider come from the read marker.',
@@ -1079,7 +1092,7 @@ const ents = [
         'Can\'t post in read-only channels (CHANNEL_READ_ONLY) or archived projects (PROJECT_ARCHIVED).'] },
   { g: 'The bot' },
   { k: 'integration', e: '', n: 'PM link', s: 'integrations · one per company', d: 'How a company\'s PM app connects: its API key, webhook URL and secret.',
-    f: ['kind (mock / http / none)', 'api_key_hash', 'webhook_url', 'webhook_secret (encrypted)', 'last_call_at', 'last_error'], rel: [['company', 'belongs to'], ['card', 'sends']],
+    f: ['kind (mock / http / none)', 'api_key_hash', 'webhook_url', 'webhook_secret (encrypted)', 'previous_webhook_secret (24 h)', 'last_call_at', 'last_error'], rel: [['company', 'belongs to'], ['card', 'sends']],
     st: ['not linked', 'mock PM app', 'real PM app'],
     r: ['Set up by the Siteline team on the platform panel.',
         'The API key is shown once, stored only as a fingerprint, and decides the company of every call.',
@@ -1186,8 +1199,8 @@ const arch = [
   { k: 'mock', e: '', n: 'Mock PM app', s: 'Built in, for testing', d: 'Stands in for a real PM app in development and staging. Uses the same Cards API code and the same webhook delivery.', tech: 'Python, inside the server', where: 'backend/app/mockpm/', to: ['api'] },
   { z: 'Siteline servers (Render, Singapore)' },
   { k: 'api', e: '', n: 'API server', s: 'FastAPI', d: 'Answers every request: the app API, the Cards API, the platform panel, and live WebSocket updates. Checks sign-in, permissions and rate limits.', tech: 'Python 3.13, FastAPI, Pydantic, uvicorn', where: 'backend/app/main.py, routers/, services/', to: ['db', 'r2', 'phone'] },
-  { k: 'worker', e: '', n: 'Worker', s: 'Background jobs', d: 'Runs one job at a time from the jobs table: emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
-  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 8 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
+  { k: 'worker', e: '', n: 'Worker', s: 'Background jobs', d: 'Runs one job at a time from the jobs table: emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff; after a failed webhook it records the error on the company\'s PM link. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
+  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 9 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
   { k: 'r2', e: '', n: 'File storage', s: 'Cloudflare R2', d: 'Photos, voice notes and files, in a private bucket. Each file is under its company; links are signed and expire.', tech: 'S3 API (boto3)', where: 'backend/app/services/files.py', to: ['api'] },
   { z: 'Hosted services' },
   { k: 'email', e: '', n: 'Email', s: 'Resend', d: 'Sign-in codes and invites.', tech: 'Resend HTTP API', where: 'backend/app/senders/email.py', to: ['worker'] },
@@ -1221,7 +1234,7 @@ const trees = {
     ]],
     ['src/features/', 'One folder per area: screens/, components/, hooks.ts (reads), api.ts (writes)', [
       ['auth/', 'Sign in, code, company picker'], ['home/', 'Workspace home, Jump to…'], ['chat/', 'Channels, DMs, threads, composer, bubbles, search, mentions'],
-      ['bot/', 'The bot conversation and cards'], ['projects/', 'Project info, members, channels, settings'], ['people/', 'Directory, invites, PM link status'],
+      ['bot/', 'The bot conversation and cards'], ['projects/', 'Project info, members, channels, settings'], ['people/', 'Directory, invites, PM link status and webhook deliveries'],
       ['activity/', 'Mentions and replies'], ['profile/', 'The You tab'], ['unsent/', 'Items the send queue couldn\'t send'], ['demo/', 'Dev panel (dev and preview builds only)'],
       ['shared/', 'Pieces two features need: session, display helpers, sending messages. Imports no feature'],
     ]],
@@ -1252,14 +1265,14 @@ const trees = {
     ]],
     ['app/services/', 'Business actions', [
       ['accounts.py', 'Codes, sessions, account deletion'], ['companies.py', 'Create, suspend, transfer ownership'], ['messaging.py', 'Posting messages'],
-      ['cards.py', 'Cards and their answers'], ['integrations.py', 'PM link: keys, signed webhooks'], ['files.py', 'File type checks, storage, signed links'],
+      ['cards.py', 'Cards and their answers'], ['integrations.py', 'PM link: keys, signed webhooks, webhook URL checks, delivery history and resend'], ['files.py', 'File type checks, storage, signed links'],
       ['limits.py', 'Per-person rate limits'], ['secrets.py', 'Encrypts PM webhook secrets'],
     ]],
     ['app/jobs/', 'queue.py (add, claim, retry) and handlers.py (what each job does)'],
     ['app/senders/', 'email.py (Resend), push.py (Expo)'],
     ['app/mockpm/', 'The stand-in PM app: decides what to ask and when'],
     ['app/templates/platform/', 'The platform panel\'s pages (Jinja2)'],
-    ['db/migrations/', '001–008, numbered SQL files, applied at start-up, never edited once run'],
+    ['db/migrations/', '001–009, numbered SQL files, applied at start-up, never edited once run'],
     ['tests/', '109 tests: rules, every route, company separation, jobs, security'],
     ['.env.example · requirements.txt · Dockerfile', 'Settings list, pinned packages, the server image'],
   ]],
@@ -1294,15 +1307,15 @@ const tables = [
   ['sessions', 'global', 'Sign-ins, one per company per device; tokens stored as fingerprints.'],
   ['otp_codes · otp_requests', 'global', 'Sign-in codes (as fingerprints) and the counts behind the code limits.'],
   ['invites', 'global', 'Pending, accepted or cancelled invites, with role and channels for guests.'],
-  ['integrations', 'global', 'Each company\'s PM link: API key fingerprint, webhook URL, encrypted secret.'],
-  ['jobs', 'global', 'The background work queue: kind, when to run, attempts, last error.'],
+  ['integrations', 'global', 'Each company\'s PM link: API key fingerprint, webhook URL, encrypted secret (and the previous one for 24 hours).'],
+  ['jobs', 'global', 'The background work queue: kind, when to run, attempts, last error. Webhook jobs are also the delivery history.'],
   ['events', 'global', 'Short-lived live-update events, deleted after 10 minutes.'],
   ['push_tokens', 'global', 'One per phone, for notifications.'],
   ['platform_admins · audit_log', 'global', 'Siteline staff, and the permanent record of admin actions.'],
   ['api_calls · user_calls', 'global', 'Counters behind the Cards API and per-person rate limits.'],
   ['projects', 'company', 'A group of channels for one job. Name, client, address, archived or not.'],
   ['project_members', 'company', 'Who is on each project (and whether they\'re a guest).'],
-  ['channels · channel_members', 'company', 'Conversations: project, company, DM or bot; who\'s in them; read markers.'],
+  ['channels · channel_members', 'company', 'Conversations: project, company, DM or bot; who\'s in them; read markers; who muted them.'],
   ['messages', 'company', 'Every message: type, text, extra data, reactions, thread parent.'],
   ['cards', 'company', 'The PM app\'s cards: content, state, answer, delivery to the PM app.'],
   ['activities', 'company', 'Mentions and thread replies for the Activity tab.'],
@@ -1329,13 +1342,15 @@ const routes = [
   ['People', 'GET', '/users', 'Company directory (not for guests)'],
   ['People', 'PATCH · POST', '/users/:id · /users/:id/deactivate', 'Change role · deactivate'],
   ['People', 'GET/POST/DELETE', '/invites · /invites/:id/resend', 'Invites (Owner/Admin; 30 an hour)'],
-  ['People', 'GET', '/integration', 'PM link status (Owner/Admin)'],
+  ['People', 'GET', '/integration', 'PM link status, 7-day counts and recent webhook deliveries (Owner/Admin)'],
+  ['People', 'POST', '/integration/deliveries/:id/retry', 'Send a failed webhook again as the same event (Owner/Admin)'],
   ['Projects', 'GET/POST/PATCH/DELETE', '/projects · /projects/:id', 'Projects (create and manage: Owner/Admin)'],
   ['Projects', 'POST/PATCH/DELETE', '/projects/:id/members', 'People on a project and their channels'],
   ['Projects', 'GET', '/projects/:id/files', 'Every file in the project you can see'],
   ['Chat', 'GET/POST', '/projects/:id/channels', 'List or add a project\'s channels'],
   ['Chat', 'GET/PATCH/DELETE', '/channels · /channels/:id', 'Your channels · edit or delete one'],
   ['Chat', 'POST', '/channels/:id/join · leave · read', 'Join, leave, mark read'],
+  ['Chat', 'PUT', '/channels/:id/mute', 'Mute or unmute a conversation for you'],
   ['Chat', 'GET/POST', '/channels/:id/messages', 'Read history (paged) · send (safe to repeat)'],
   ['Chat', 'GET', '/channels/:id/messages/search?q=', 'Search the whole history (30 a minute)'],
   ['Chat', 'GET', '/channels/:id/pins · /messages/:id/thread', 'Pinned messages · a thread'],
@@ -1352,7 +1367,7 @@ const routes = [
   ['Cards API', 'POST', '/api/v1/cards/:id/nudge', 'PM app: a reminder (once an hour)'],
   ['Cards API', 'GET', '/api/v1/cards/:id', 'PM app: check a card\'s state and answer'],
   ['Platform', 'POST', '/platform/companies', 'Create a company (platform key)'],
-  ['Platform', 'GET/POST', '/platform/…', 'The panel: companies, PM link, mock PM app, audit log'],
+  ['Platform', 'GET/POST', '/platform/…', 'The panel: companies, PM link, webhook deliveries (Send again), mock PM app, audit log'],
   ['Dev', 'GET/POST', '/internal/…', 'Dev panel: state, reset, network, bot (never in production)'],
   ['Health', 'GET', '/health', 'Database and worker heartbeat'],
 ];
@@ -1423,6 +1438,9 @@ const decisions = [
   ['Security', 'Settings must name their environment', 'The server refuses to start without SITELINE_ENV; dev defaults only in development; staging needs real secrets.', 'A forgotten setting must stop the server, not quietly open it up.', 'Local runs need a .env file (copy the example).'],
   ['Security', 'Per-person rate limits', 'Counted in Postgres: 120 changes, 30 uploads, 30 searches a minute; 30 invites an hour.', 'Stops scripts and cost spikes without hurting real use.', 'A phone flushing a big offline queue slows down (but never fails).'],
   ['Security', 'Message search on the server', 'Each conversation\'s whole history is searchable, using the same access check as reading.', 'Search can\'t leak messages from channels you can\'t open.', 'Simple text matching; add an index when channels reach ~100k messages.'],
+  ['Product', 'Per-conversation mute', 'Each person can mute any channel, DM or the bot: no pushes from it except @mentions, a grey row, and no count in the tab badges.', 'The first thing people look for in a busy chat; mentions still reach you so nothing urgent is missed.', 'Mute is all or nothing per conversation (no "mute for 1 hour" yet).'],
+  ['Security', 'Webhook addresses and secret changes', 'Webhook URLs must be public https (checked when saved and before each delivery). After a new webhook secret, webhooks carry both signatures for 24 hours.', 'Siteline can\'t be pointed at its own network (SSRF), and changing a secret never breaks deliveries.', 'A PM app on a private network needs a public https address.'],
+  ['Tech', 'Delivery history from the jobs table', 'Webhooks are jobs, so the history is the jobs table\'s webhook rows. Send again resets a failed job as the same event, and is audited.', 'No second table to keep in step; the same id means the PM app can drop repeats.', 'History covers 7 days for delivered webhooks (finished jobs are cleaned up).'],
 ];
 const decGroups = ['All', ...new Set(decisions.map((d) => d[0]))];
 let decGroup = 'All';
