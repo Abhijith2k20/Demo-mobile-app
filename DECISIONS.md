@@ -762,3 +762,16 @@ An outside review of the guide raised eight points; all are fixed and tested (`b
   `integrations` now name their company (an unfiltered update touched every company's PM link).
 - **Guide:** the API examples are real JSON, and the status page separates built, tested, real services verified
   and production-ready.
+
+## Verified against the running system (2026-11-04)
+
+Beyond the automated tests, three end-to-end checks against the running server, its worker and the Android emulator:
+- **Company separation:** 77 routes tried with another company's real ids, by an owner and by a person who belongs to
+  both companies, plus the lists, the Cards API with another company's key, and live events; 99/99 passed after a fix
+  (deleting or leaving another company's channel or project, and declining someone else's invite, said 200; now 404).
+- **Webhooks, with a real PM app over HTTP that checks signatures:** PM app down (500), slower than the 10 s limit,
+  back up, a refusal, giving up after the last try, Send again, and a secret change while the PM app has only the old
+  secret; 27/27 passed. One event id across every retry and resend; no request ever had a bad signature.
+- **Offline on the phone:** three messages and a card answer made in airplane mode, the app force-quit, the access
+  token expired, then reconnected: the token refreshed by itself, each message arrived once and in order, and the
+  answer reached the PM app. Note: a queued message's time is when the server received it, not when it was typed.
