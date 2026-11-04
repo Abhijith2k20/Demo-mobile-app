@@ -50,7 +50,7 @@ def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, 
     url = f"/thread/{thread_parent_id}" if thread_parent_id else f"/channel/{channel['id']}"
     push(mentions, f"{who} in {channel_label(channel)}", preview, {"url": url}, kind="mention")
     if channel["kind"] == "dm":
-        push([uid for uid in audience if uid != sender_id], who, preview, {"url": url}, kind="dm")
+        push([uid for uid in audience if uid != sender_id], who, preview, {"url": url}, kind="dm", channel_id=channel["id"])
     if thread_parent_id:
         parent = message(thread_parent_id)
         participants = {parent["senderId"]} if parent else set()
@@ -63,5 +63,6 @@ def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, 
                 channelId=channel["id"], messageId=thread_parent_id, taskIds=[],
                 text=f"{who} replied in a thread in {channel_label(channel)}", lines=[body or ""],
             )
-        push(list(repliers), f"{who} replied in {channel_label(channel)}", preview, {"url": url}, kind="thread")
+        push(list(repliers), f"{who} replied in {channel_label(channel)}", preview, {"url": url}, kind="thread",
+             channel_id=channel["id"])
     return m

@@ -103,8 +103,9 @@ def resend_invite(invite_id: str, user: dict = Depends(current_user)):
 def cancel_invite(invite_id: str, user: dict = Depends(current_user)):
     if not is_company_admin(user):
         raise forbidden("Only the owner or an admin can cancel invites.")
-    db.run("UPDATE invites SET status = 'cancelled' WHERE id = %(id)s AND company_id = current_company() AND status = 'pending'",
-           id=invite_id)
+    if not db.row("""UPDATE invites SET status = 'cancelled' WHERE id = %(id)s AND company_id = current_company()
+                     AND status = 'pending' RETURNING id""", id=invite_id):
+        raise not_found("Invite")  # unknown, already used, or another company's
     return {"cancelled": True}
 
 
@@ -160,4 +161,14 @@ def integration(user: dict = Depends(current_user)):
     lk = integrations.current()
     if not lk:
         return {"connected": False}
-    return {"connected": True, "kind": lk["kind"], "lastCallAt": lk["lastCallAt"], "lastError": lk["lastError"]}
+    return {"connected": True, "kind": lk["kind"], "lastCallAt": lk["lastCallAt"], "lastError": lk["lastError"],
+            "stats": integrations.delivery_stats(), "deliveries": integrations.deliveries(20)}
+
+
+@router.post("/integration/deliveries/{delivery_id}/retry")
+def retry_delivery(delivery_id: str, user: dict = Depends(current_user)):
+    """Owner/Admin: send a webhook that gave up again."""
+    if not is_company_admin(user):
+        raise forbidden()
+    integrations.retry_delivery(delivery_id, user["id"])
+    return {"deliveries": integrations.deliveries(20), "stats": integrations.delivery_stats()}

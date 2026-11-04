@@ -188,7 +188,7 @@ def test_the_mock_stays_quiet_once_the_real_pm_app_is_linked(login):
     ravi = login("ravi@paliath.in")
     before = len(ravi.get("/me/cards").json()["cards"])
     with in_company("Paliath Interiors"):
-        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks'")
+        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks' WHERE company_id = current_company()")
         db.run("DELETE FROM jobs WHERE kind LIKE 'mock_%%'")
         mock.plan_day({})
         assert mock.evening_checkins("ravi@paliath.in") == 0

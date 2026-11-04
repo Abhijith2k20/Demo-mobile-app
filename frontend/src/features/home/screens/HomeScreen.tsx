@@ -14,7 +14,7 @@ import { isBotUser, shortProjectName, useCan, useCompany, useMe, useRefresh, use
 import { useUi } from '@/stores/ui';
 import { radius, space, touch } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
-import type { Channel } from '@/types/models';
+import type { Channel, ChannelView } from '@/types/models';
 import { NewProjectSheet } from '@/features/home/components/NewProjectSheet';
 import { CompanySwitcher } from '@/features/shared/CompanySwitcher';
 import { useSession } from '@/stores/session';
@@ -34,16 +34,24 @@ function ChannelGlyph({ channel, strong }: { channel: Channel; strong: boolean }
   );
 }
 
-function ChannelRow({ channel, unread, indent = 0, subtitle }: { channel: Channel; unread: number; indent?: number; subtitle?: string }) {
+function ChannelRow({ channel, unread, indent = 0, subtitle }: { channel: ChannelView; unread: number; indent?: number; subtitle?: string }) {
+  const { c } = useTheme();
+  // A muted channel never shouts: no bold, a grey badge, and a bell-off mark.
+  const loud = unread > 0 && !channel.muted;
   return (
     <Row
       indent={indent}
-      left={<ChannelGlyph channel={channel} strong={unread > 0} />}
+      left={<ChannelGlyph channel={channel} strong={loud} />}
       title={channel.name}
       subtitle={subtitle}
-      strong={unread > 0}
+      strong={loud}
       muted
-      right={<Badge count={unread} />}
+      right={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          {channel.muted ? <Feather name="bell-off" size={14} color={c.textFaint} /> : null}
+          <Badge count={unread} muted={channel.muted} />
+        </View>
+      }
       onPress={() => router.push(`/channel/${channel.id}`)}
     />
   );

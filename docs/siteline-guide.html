@@ -523,7 +523,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <div class="grid g4" style="margin-top:14px">
     <div class="card"><div class="stat">99</div><div>app source files</div></div>
     <div class="card"><div class="stat">48</div><div>server source files</div></div>
-    <div class="card"><div class="stat">102</div><div>server tests</div></div>
+    <div class="card"><div class="stat">109</div><div>server tests</div></div>
     <div class="card"><div class="stat">8</div><div>database migrations</div></div>
   </div>
 </section>
@@ -580,26 +580,48 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <div class="grid g2">
     <div class="card"><b>The PM app sends a card</b><pre class="mono small" style="white-space:pre-wrap;margin:10px 0 0;color:var(--muted)">POST /api/v1/cards
 Authorization: Bearer sk_live_…
+Content-Type: application/json
+
 {
   "id": "checkin-4411-2026-11-02",
   "to": "ravi@paliath.in",
   "title": "False ceiling – living room",
   "subtitle": "Villa 99 · due Wed 4 Nov",
-  "scale": [25%, 50%, 75%, 90%, Done],
-  "buttons": [Problem, Not started],
-  "note": {text, voice, photo},
-  "ref": {"task": "4411"}
+  "scale": [
+    {"id": "25", "label": "25%"}, {"id": "50", "label": "50%"},
+    {"id": "75", "label": "75%"}, {"id": "90", "label": "90%"},
+    {"id": "done", "label": "Done"}
+  ],
+  "scaleReached": "50",
+  "buttons": [
+    {"id": "problem", "label": "Problem", "choices": [
+      {"id": "material", "label": "Material not arrived"}
+    ]},
+    {"id": "not_started", "label": "Not started"}
+  ],
+  "note": {"text": true, "voice": true, "photo": true},
+  "ref": {"task": "4411"},
+  "expiresAt": "2026-11-03T18:30:00Z"
 }</pre></div>
     <div class="card"><b>Siteline sends the answer back</b><pre class="mono small" style="white-space:pre-wrap;margin:10px 0 0;color:var(--muted)">POST &lt;PM app's webhook URL&gt;
 X-Siteline-Event: card.answered
-X-Siteline-Id: evt_…        (same on every retry)
-X-Siteline-Signature: HMAC-SHA256
+X-Siteline-Id: evt_…            (same on every retry)
+X-Siteline-Timestamp: 1793612345
+X-Siteline-Signature: hex(HMAC-SHA256(secret, "&lt;timestamp&gt;.&lt;body&gt;"))
+X-Siteline-Signature-Previous: … (24 h after a new secret)
+
 {
   "card": "checkin-4411-2026-11-02",
+  "ref": {"task": "4411"},
+  "person": "ravi@paliath.in",
   "answer": {"scale": "75"},
-  "ref": {"task": "4411"}
+  "note": {"text": "Boards arrived late"},
+  "answeredAt": "2026-11-02T12:34:56Z",
+  "receivedAt": "2026-11-02T12:35:02Z"
 }
-→ PM app replies "accepted" or "refused" + reason</pre></div>
+
+PM app replies: {"result": "accepted"}
+   or {"result": "refused", "message": "Task is closed"}</pre></div>
   </div>
   <div class="callout info"><div><b>Safe to repeat:</b> sending the same card id twice returns the same card (no second push). <b>Limits:</b> 120 calls a minute per company, one nudge per card per hour. <b>Retries:</b> after 1, 5 and 15 minutes, then hourly for 24 hours. Full reference: <code>docs/CARDS_API.md</code>.</div></div>
 
@@ -615,7 +637,7 @@ X-Siteline-Signature: HMAC-SHA256
 <section class="page" id="security" data-title="Security">
   <div class="eyebrow">How it's built</div>
   <h1>Security</h1>
-  <p class="lead">How Siteline protects people's data. All of these are built and covered by tests; the last full audit checked 20 common mistakes and fixed every finding.</p>
+  <p class="lead">How Siteline protects people's data. All of these are built and covered by automated tests, and an audit of 20 common mistakes fixed every finding. They have not yet had an outside security review.</p>
   <div class="chips" id="secTabs"></div>
   <div class="grid g2" id="secList"></div>
   <h2>What is and isn't secret</h2>
@@ -663,7 +685,7 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
 
   <h2>Checks before anything ships</h2>
   <div class="grid g3">
-    <div class="card"><b>On every push (GitHub Actions)</b><ul class="clean small"><li>Server: pyflakes, 102 tests on a real Postgres</li><li>App: typecheck, lint, tests</li><li>Known vulnerabilities: <code>pip-audit</code>, <code>npm audit</code></li></ul></div>
+    <div class="card"><b>On every push (GitHub Actions)</b><ul class="clean small"><li>Server: pyflakes, 109 tests on a real Postgres</li><li>App: typecheck, lint, tests</li><li>Known vulnerabilities: <code>pip-audit</code>, <code>npm audit</code></li></ul></div>
     <div class="card"><b>Every Monday</b><p class="muted small">The same checks run again, so a newly published vulnerability fails the build. Dependabot opens update pull requests weekly.</p></div>
     <div class="card"><b>In production</b><ul class="clean small"><li>Sentry for errors</li><li><code>GET /health</code> checks the database and worker</li><li>JSON logs with no secrets or message text</li><li>Daily backups kept 14 days</li></ul></div>
   </div>
@@ -692,13 +714,14 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
 <section class="page" id="status" data-title="Status and launch">
   <div class="eyebrow">Running it</div>
   <h1>Status and launch</h1>
-  <p class="lead">What's built, what's been tested, what still needs a real device, and the steps to go live.</p>
+  <p class="lead">Where Siteline stands, in four honest levels: built, tested, connected to the real services, and ready for customers.</p>
   <div class="grid g4">
-    <div class="card"><div class="stat" style="color:var(--success)">✓</div><div>All MVP build steps done (1–9 of the spec)</div></div>
-    <div class="card"><div class="stat">102</div><div>server tests passing</div></div>
-    <div class="card"><div class="stat">140</div><div>black-box checks against the running server</div></div>
-    <div class="card"><div class="stat">0</div><div>high or critical dependency warnings</div></div>
+    <div class="card"><span class="pill ok">Done</span><h3>1 · Development complete</h3><p class="muted small">Every MVP feature in the spec is built (build steps 1–9).</p></div>
+    <div class="card"><span class="pill ok">Done</span><h3>2 · Functionally tested</h3><p class="muted small">109 server tests, 19 app tests, 140 black-box checks against a running server, and the Android emulator.</p></div>
+    <div class="card"><span class="pill warn">Not yet</span><h3>3 · Real services verified</h3><p class="muted small">Push, email (Resend), file storage (R2), Render's proxy and iOS still need a staging deploy and real phones.</p></div>
+    <div class="card"><span class="pill warn">Not yet</span><h3>4 · Production readiness verified</h3><p class="muted small">Needs the load test, a tested database restore, and an outside security review.</p></div>
   </div>
+  <div class="callout warn"><div><b>Not production-ready yet.</b> Levels 1 and 2 are done; 3 and 4 need the launch checklist below. Capacity targets (50 companies, 300 online) are design goals until the load test proves them.</div></div>
 
   <h2>Tested so far</h2>
   <div class="grid g2">
@@ -794,6 +817,7 @@ const glossary = [
   ['Card', 'A question from the PM app, like "How far is the false ceiling?", with one-tap answers (a scale, buttons, a note).'],
   ['Cards API', 'The small API the PM app uses to send cards. It can\'t read Siteline\'s channels or messages.'],
   ['Webhook', 'A message Siteline sends to the PM app\'s server, for example "Ravi answered 75%". Signed so the PM app knows it\'s real.'],
+  ['Mute', 'Turning off notifications for one conversation. You still get a push when someone @mentions you.'],
   ['Nudge', 'A reminder the PM app can send for an unanswered card: a quiet line and a push, at most once an hour.'],
   ['Mock PM app', 'A stand-in PM app built into Siteline for development and demos. It uses the same Cards API as the real one will.'],
   ['Send queue (outbox)', 'Where the phone keeps messages and answers made without signal, sending them later, once and in order.'],
@@ -869,7 +893,7 @@ const screens = [
     p: `<div class="bar">Siteline<small>Work chat for field teams</small></div><div class="body"><b style="font-size:16px">Sign in</b><span class="muted">Enter your work email to get a 6-digit code.</span><div style="border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--faint)">name@company.com</div><div style="background:var(--accent);color:var(--onAccent);border-radius:10px;padding:10px;text-align:center;font-weight:650">Continue</div><span class="muted small" style="margin-top:auto;text-align:center">Can't sign in? Ask your company admin to invite you.</span></div>` },
   { k: 'home', e: '', t: 'Home', d: 'Your company\'s workspace: projects (each with its channels), then company channels. Bold rows and blue badges mean unread. "Jump to…" finds any channel, person or project. Owners and Admins see a New project button.',
     p: `<div class="bar">Paliath Interiors<small>Jump to…</small></div><div class="body"><span class="muted small" style="font-weight:650;letter-spacing:.06em">PROJECTS</span><div class="row bold">▾ Villa 99</div><div class="row"><span class="h">#</span>general</div><div class="row bold"><span class="h">#</span>site-work<span class="badge">3</span></div><div class="row"><span class="h">#</span>qs (private)</div><span class="muted small" style="font-weight:650;letter-spacing:.06em;margin-top:6px">COMPANY</span><div class="row"><span class="h">#</span>announcements</div></div>${tabs('Home')}` },
-  { k: 'channel', e: '#', t: 'A channel', d: 'Messages as bubbles: yours on the right, others on the left with name and avatar. Long-press for React, Reply in thread, Copy, Edit (15 min), Delete (1 hour), Pin. "+" adds a photo, voice note or file. The magnifier searches the whole history.',
+  { k: 'channel', e: '#', t: 'A channel', d: 'Messages as bubbles: yours on the right, others on the left with name and avatar. Long-press for React, Reply in thread, Copy, Edit (15 min), Delete (1 hour), Pin. "+" adds a photo, voice note or file. The magnifier searches the whole history. The details (i) can mute the conversation.',
     p: `<div class="bar"># site-work<small>Villa 99 · 6 members</small></div><div class="body"><div class="bub them"><b>Suresh Gowda</b>Boards arrived. 24 nos.<small>1:30 PM</small></div><div class="bub them"><b>Amit Kulkarni</b>Thanks for chasing, @Suresh<small>1:48 PM</small></div><div class="bub me">Starting the ceiling tomorrow<small>2:10 PM</small></div><div style="margin-top:auto;border:1px solid var(--border);border-radius:20px;padding:8px 12px;color:var(--faint)">Message # site-work</div></div>` },
   { k: 'bot', e: '', t: 'Siteline Bot', d: 'Where the PM app\'s cards arrive. One question at a time: the oldest open card is expanded, others wait as one-line rows. Tap a step on the scale, or a button. Answers made offline go out later.',
     p: `<div class="bar">Siteline Bot<small>Check-ins and reminders</small></div><div class="body"><span class="muted small">2 cards need an answer · 0 of 2 done</span><div class="botcard"><b>False ceiling – living room</b><div class="muted small">Villa 99 · due Wed 4 Nov</div><div class="scale"><span class="r">25%</span><span class="r">50%</span><span>75%</span><span>90%</span><span>Done</span></div><div style="display:flex;gap:6px;margin-top:6px"><span class="pill">Problem</span><span class="pill">Not started</span><span class="pill">Note</span></div></div><div class="botcard muted small">Kitchen carcass · <span style="color:var(--accent)">Update</span></div></div>` },
@@ -1037,7 +1061,8 @@ const ents = [
     f: ['channel_id', 'user_id', 'last_read_message_id'], rel: [['channel', 'belongs to'], ['person', 'is']],
     st: ['in', 'left'],
     r: ['Messages are marked read only while the channel is on screen and the app is open.',
-        'Unread counts and the "New" divider come from the read marker.'] },
+        'Unread counts and the "New" divider come from the read marker.',
+        'Mute is per person: no pushes from that conversation except an @mention of you, and it doesn\'t count in the tab badges.'] },
   { k: 'message', e: '', n: 'Message', s: 'Something said', d: 'One message in a channel: text, photos, a voice note, a file, a card, or a system line.',
     f: ['type', 'body', 'data', 'reactions', 'thread_parent_id', 'deleted_at'], rel: [['channel', 'belongs to'], ['person', 'written by'], ['upload', 'may carry'], ['message', 'may be a reply to (thread)']],
     st: ['sending', 'sent', 'edited', 'deleted'],
@@ -1061,7 +1086,10 @@ const ents = [
         'A new key can be made; the old one keeps working for 24 hours.',
         'The webhook secret is stored encrypted and signs every webhook (HMAC-SHA256).',
         '120 Cards API calls a minute per company.',
-        'The PM app can reach only cards: never projects, channels or messages.'] },
+        'The PM app can reach only cards: never projects, channels or messages.',
+        'The webhook URL must be https and a public address (outside local development), checked when saved and before each delivery.',
+        'After a new webhook secret, webhooks also carry the previous signature for 24 hours.',
+        'Every webhook is listed with its status, tries and last error; Owners, Admins and the Siteline team can send a failed one again as the same event.'] },
   { k: 'card', e: '', n: 'Card', s: 'A question from the PM app', d: 'A question the PM app sends to one person, shown in their bot conversation, with one-tap answers.',
     f: ['ext_id (PM app\'s id)', 'user_id', 'content', 'ref', 'state', 'answer', 'delivery', 'seen_at', 'nudged_at', 'expires_at'], rel: [['integration', 'sent by'], ['person', 'to one'], ['message', 'shown as'], ['upload', 'answer may carry']],
     st: ['open', 'answered', 'closed', 'expired'],
@@ -1085,6 +1113,7 @@ const ents = [
         'Photos: JPEG, PNG, WebP, HEIC, up to 10 MB. Voice: M4A, AAC, MP3, up to 5 MB. Files: PDF or images, up to 25 MB.',
         'Stored under the company\'s id; links are signed and expire.',
         'At most 30 uploads a minute per person.',
+        'A file link works until the end of the next hour; someone removed meanwhile can still open a link they already had until then, but gets no new ones.',
         'Uploaded files are never run.'] },
   { k: 'activity', e: '', n: 'Activity', s: 'Mentions and replies', d: 'An item in someone\'s Activity tab: a mention or a reply to their thread.',
     f: ['user_id', 'kind', 'message_id', 'read'], rel: [['person', 'for'], ['message', 'about']],
@@ -1231,7 +1260,7 @@ const trees = {
     ['app/mockpm/', 'The stand-in PM app: decides what to ask and when'],
     ['app/templates/platform/', 'The platform panel\'s pages (Jinja2)'],
     ['db/migrations/', '001–008, numbered SQL files, applied at start-up, never edited once run'],
-    ['tests/', '102 tests: rules, every route, company separation, jobs, security'],
+    ['tests/', '109 tests: rules, every route, company separation, jobs, security'],
     ['.env.example · requirements.txt · Dockerfile', 'Settings list, pinned packages, the server image'],
   ]],
   root: ['Demo paliath/', 'The repository', [
@@ -1354,6 +1383,9 @@ const sec = [
   ['Input', '', 'No HTML injection', 'The app shows text as text. The platform panel\'s templates escape every value automatically.'],
   ['Abuse', '', 'Rate limits', 'Per person: 120 changes a minute, 30 uploads, 30 searches, 30 invites an hour. Cards API: 120 calls a minute per company. The phone\'s queue waits and retries, so nothing is lost.'],
   ['Abuse', '', 'Signed webhooks', 'Every webhook to the PM app is signed (HMAC-SHA256) with a timestamp and an id, so the PM app can check it\'s real and drop repeats.'],
+  ['Abuse', '', 'Webhook addresses checked', 'Outside local development a webhook URL must be https and point to a public address, checked when it\'s saved and again before every delivery, so Siteline can\'t be aimed at its own network (SSRF).'],
+  ['Abuse', '', 'Secret changes without breaking', 'For 24 hours after a new webhook secret is made, webhooks carry both the new signature and the previous one (X-Siteline-Signature-Previous). The old API key also works for 24 hours.'],
+  ['Input', '', 'File links expire', 'File links are signed and work until the end of the next hour. Someone removed from a channel can still open a link they already had until it expires (at most about 2 hours), but gets no new ones.'],
   ['Running', '', 'Safe defaults', 'The server won\'t start without SITELINE_ENV, and refuses weak secrets, the demo code, local file storage or http in production. Dev routes are never mounted in production.'],
   ['Running', '', 'No secrets in logs', 'Logs and Sentry never contain codes, tokens, API keys or message text. Users see generic errors; details stay in the logs.'],
   ['Running', '', 'Dependencies watched', 'Dependabot weekly; pip-audit and npm audit on every push and every Monday. Currently 0 high or critical warnings.'],

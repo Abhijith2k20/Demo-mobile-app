@@ -186,6 +186,8 @@ export interface ChannelView extends Channel {
   peerId: ID | null;
   joined: boolean;
   unreadCount: number;
+  /** This person muted it: no pushes except @mentions, and it doesn't count in the tab badges. */
+  muted: boolean;
   lastReadMessageId: ID | null;
   /** Server time of the last read message: the "new" divider starts after it. */
   lastReadAt: string | null;

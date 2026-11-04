@@ -33,6 +33,11 @@ export function setPinned(message: Message, pinned: boolean): Promise<Message | 
   return attempt(() => api<Message>('PATCH', `/messages/${message.id}`, { pinned }), [...channelKeys(message.channelId), keys.pins(message.channelId)]);
 }
 
+/** Mute or unmute a conversation for me: no pushes from it except @mentions. */
+export function setMuted(channelId: ID, muted: boolean): Promise<unknown> {
+  return attempt(() => api('PUT', `/channels/${channelId}/mute`, { muted }), [keys.channels, keys.channel(channelId)]);
+}
+
 const lastMarked = new Map<string, ID>();
 
 /** Read marker; sent once per new newest message, quietly (housekeeping never shows an error). */

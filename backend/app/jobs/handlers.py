@@ -75,6 +75,12 @@ HANDLERS = {
 COMPANY_JOBS = set(HANDLERS) - {"send_code", "cleanup", "webhook"}
 
 
+def on_failed(job: dict, error: str) -> None:
+    """After any failed attempt. A webhook's error is kept on the PM link, so the status screens show it."""
+    if job["kind"] == "webhook" and job["companyId"]:
+        integrations.record_failure(error)
+
+
 def on_gave_up(job: dict) -> None:
     """After the last retry."""
     if job["kind"] == "webhook":

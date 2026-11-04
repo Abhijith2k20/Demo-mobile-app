@@ -47,9 +47,13 @@ def claim(limit: int = 10) -> list[dict]:
 
 
 def finish(job: dict) -> None:
-    # Codes and other secrets in the payload aren't kept once the job is done.
-    db.run("UPDATE jobs SET status = 'done', payload = '{}', locked_until = NULL, updated_at = now() WHERE id = %(id)s",
-           id=job["id"])
+    # Codes and other secrets in the payload aren't kept once the job is done. A webhook keeps only what it was about
+    # (event and card), for the delivery history.
+    db.run("""UPDATE jobs SET status = 'done', locked_until = NULL, updated_at = now(),
+                payload = CASE WHEN kind = 'webhook' THEN jsonb_strip_nulls(jsonb_build_object('event', payload->'event',
+                                                                                              'cardId', payload->'cardId'))
+                               ELSE '{}' END
+              WHERE id = %(id)s""", id=job["id"])
 
 
 def fail(job: dict, error: str, *, retry: bool = True) -> bool:

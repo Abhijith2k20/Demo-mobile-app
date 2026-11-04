@@ -8,7 +8,7 @@ from ..core import ApiError, forbidden, invalid, not_found, now_iso, now_ms, par
 from ..deps import current_user
 from ..events import publish
 from ..rules import DELETE_WINDOW_MS, EDIT_WINDOW_MS, can, can_post, is_company_admin, is_guest
-from ..schemas import DmOpen, MessageCreate, MessagePatch, Reaction, ReadMarker
+from ..schemas import DmOpen, MessageCreate, MessagePatch, MuteSetting, Reaction, ReadMarker
 from ..access import assert_project_active, channel_audience, visible_channel
 from ..store import BOT_ID, MESSAGE_COLUMNS, add_channel_member, ensure_channel_member, message, person
 from ..views import channel_view, message_view, order_key, reply_info
@@ -196,6 +196,18 @@ def set_reaction(message_id: str, emoji: str, body: Reaction, user: dict = Depen
             raise invalid({"emoji": "This message has enough different reactions"})
         reactions[emoji] = sorted(people)
     return message_view(_save(m, {"reactions": reactions}, "message.updated", ch), user, ch)
+
+
+@router.put("/channels/{channel_id}/mute")
+def set_mute(channel_id: str, body: MuteSetting, user: dict = Depends(current_user)):
+    """Mutes or unmutes a conversation for this person: no pushes from it, except when someone @mentions them."""
+    ch = visible_channel(user, channel_id)
+    ensure_channel_member(user["id"], ch["id"])
+    db.run("UPDATE channel_members SET muted = %(m)s WHERE channel_id = %(c)s AND user_id = %(u)s",
+           m=body.muted, c=ch["id"], u=user["id"])
+    view = channel_view(ch, user)
+    publish({"type": "channel.read", "channelId": ch["id"], "userId": user["id"]}, [user["id"]])  # their other phones refresh
+    return {"channel": view}
 
 
 @router.post("/channels/{channel_id}/read")

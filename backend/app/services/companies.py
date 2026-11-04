@@ -8,6 +8,7 @@ from .. import config, db
 from ..core import ApiError, invalid, uuid7
 from ..jobs.queue import enqueue
 from . import accounts
+from .integrations import check_webhook_url
 
 
 def _slug(name: str) -> str:
@@ -24,6 +25,7 @@ def create(*, name: str, time_zone: str, owner_name: str, owner_identifier: str,
            company_id: str | None = None) -> dict:
     """The company with both company channels, the owner's invite and the PM link. The PM app's API
     key is made on the platform panel (shown once)."""
+    check_webhook_url(webhook_url)
     identifier = accounts.normalize_identifier(owner_identifier)
     cid = company_id or uuid7()
     c = db.insert("companies", {"id": cid, "name": name, "slug": _slug(name), "timeZone": time_zone,
@@ -91,6 +93,7 @@ def update_pm_link(company_id: str, *, kind: str, webhook_url: str | None, pm_co
                    card_seen: bool = False) -> None:
     if kind not in ("mock", "http"):
         raise invalid({"kind": "Pick mock or http"})
+    check_webhook_url(webhook_url)
     db.run("""INSERT INTO integrations (company_id, kind, webhook_url, send_card_seen, options)
               VALUES (%(c)s, %(k)s, %(u)s, %(s)s, '{}')
               ON CONFLICT (company_id) DO UPDATE SET kind = excluded.kind, webhook_url = excluded.webhook_url,

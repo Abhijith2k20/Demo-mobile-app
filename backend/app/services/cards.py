@@ -79,7 +79,7 @@ def create(*, ext_id: str, to: str, content: dict, ref: dict | None = None,
     _publish(c, "card.new")
     note = content.get("push") or {}
     push([person["id"]], note.get("title") or "Siteline Bot", note.get("body") or content["title"], {"url": "/dm/bot"},
-         kind="card")
+         kind="card", channel_id=ch["id"])
     return c, True
 
 
@@ -117,7 +117,7 @@ def nudge(ext_id: str) -> dict:
     if ch:
         post_message(ch, BOT_ID, type="card", body=None, data={"cardId": c["id"], "nudge": True})
     push([c["userId"]], "Siteline Bot", f"Reminder: {c['content']['title']} still needs an answer", {"url": "/dm/bot"},
-         kind="card")
+         kind="card", channel_id=ch["id"] if ch else None)
     _publish(c)
     return c
 

@@ -98,6 +98,29 @@
 </div>
 {% endcall %}
 
+{% if link %}
+{% call ui.card("Webhook deliveries", "Answers and other events sent to the PM app, newest first. A failed one can be sent again as the same event.") %}
+<div class="scroll"><table class="dense">
+  <thead><tr><th>Event</th><th>Card</th><th>Status</th><th class="num">Tries</th><th>Last error</th><th>When</th><th></th></tr></thead>
+  <tbody>
+  {% for d in deliveries %}
+    <tr>
+      <td class="mono">{{ d.event or "—" }}</td>
+      <td class="trunc">{{ d.cardTitle or "—" }}</td>
+      <td>{% if d.refused %}{{ ui.pill("pending", "Refused") }}{% elif d.status == "done" %}{{ ui.pill("active", "Delivered") }}{% elif d.status == "failed" %}{{ ui.pill("suspended", "Failed") }}{% else %}{{ ui.pill("pending", "Retrying" if d.attempts else "Waiting") }}{% endif %}</td>
+      <td class="num">{{ d.attempts }}</td>
+      <td><div class="trunc small" style="color:var(--danger)" title="{{ d.error or '' }}">{{ d.error or "" }}</div></td>
+      <td class="muted small" style="white-space:nowrap">{{ d.updatedAt | when }}</td>
+      <td>{% if d.canRetry %}<form class="inline" method="post" action="{{ base }}/deliveries/{{ d.id }}/retry"><button class="btn small secondary">Send again</button></form>{% endif %}</td>
+    </tr>
+  {% else %}
+    {{ ui.empty("Nothing sent yet.", 7) }}
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endcall %}
+{% endif %}
+
 {% if mock %}
 {% macro status_select(form, current="not_started") -%}
 <select class="sm" name="status" form="{{ form }}" style="min-width:115px">

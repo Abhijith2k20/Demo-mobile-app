@@ -3,18 +3,21 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import secrets
+import socket
 import time
+from urllib.parse import urlparse
 
 import httpx
 
 from .. import config, db
-from ..core import ApiError
+from ..core import ApiError, invalid, not_found
 from ..jobs.queue import enqueue
 from ..notify import add_activity
 from ..store import admins
-from . import files
+from . import accounts, files
 from .cards import set_delivery
 from .secrets import decrypt, encrypt
 
@@ -23,6 +26,26 @@ WEBHOOK_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
 
 class Unreachable(Exception):
     """The PM app didn't take the webhook; try again later."""
+
+
+def check_webhook_url(url: str | None) -> None:
+    """Refuses a webhook URL that could point Siteline at its own network (SSRF): outside local development it must be
+    https and every address its name resolves to must be public. Checked when saved and again before each delivery."""
+    if not url:
+        return
+    u = urlparse(url)
+    if u.scheme not in ("https", "http") or not u.hostname or u.username or u.password:
+        raise invalid({"webhookUrl": "Enter a full https:// address"})
+    if config.DEVELOPMENT:
+        return
+    if u.scheme != "https":
+        raise invalid({"webhookUrl": "Use an https:// address"})
+    try:
+        addrs = {ai[4][0] for ai in socket.getaddrinfo(u.hostname, u.port or 443, proto=socket.IPPROTO_TCP)}
+    except OSError:
+        raise invalid({"webhookUrl": "This address can't be found"}) from None
+    if not addrs or not all(ipaddress.ip_address(a.split("%")[0]).is_global for a in addrs):
+        raise invalid({"webhookUrl": "Use a public internet address, not a private or local one"})
 
 
 def _hash(key: str) -> str:
@@ -36,10 +59,13 @@ def current() -> dict | None:
 # ---- Keys ----
 
 def new_credentials(company_id: str) -> dict:
-    """A new API key (the previous one keeps working for 24 hours) and webhook secret. Shown once."""
+    """A new API key and webhook secret, shown once. For 24 hours the previous key still works and webhooks are also
+    signed with the previous secret (X-Siteline-Signature-Previous), so the PM app can switch over without failures."""
     key, secret = f"sk_{secrets.token_urlsafe(32)}", f"whsec_{secrets.token_urlsafe(24)}"
     db.run("""UPDATE integrations SET previous_key_hash = api_key_hash,
                 previous_key_until = CASE WHEN api_key_hash IS NULL THEN NULL ELSE now() + interval '24 hours' END,
+                previous_webhook_secret = webhook_secret,
+                previous_secret_until = CASE WHEN webhook_secret IS NULL THEN NULL ELSE now() + interval '24 hours' END,
                 api_key_hash = %(h)s, webhook_secret = %(s)s WHERE company_id = %(c)s""",
            h=_hash(key), s=encrypt(secret), c=company_id)
     return {"apiKey": key, "webhookSecret": secret}
@@ -137,18 +163,23 @@ def deliver(payload: dict) -> None:
 def _post(integration: dict, event: str, body: dict, event_id: str) -> dict:
     if not integration["webhookUrl"]:
         raise Unreachable("No webhook URL set")
+    try:
+        check_webhook_url(integration["webhookUrl"])  # again now: the name may resolve somewhere else than when saved
+    except ApiError as e:
+        raise Unreachable("The webhook URL isn't allowed") from e
     raw = json.dumps(body).encode()
     ts = str(int(time.time()))
     headers = {"Content-Type": "application/json", "X-Siteline-Event": event, "X-Siteline-Id": event_id,
                "X-Siteline-Timestamp": ts,
                "X-Siteline-Signature": signature(decrypt(integration["webhookSecret"]) or "", ts, raw)}
+    previous = integration.get("previousWebhookSecret")
+    if previous and integration.get("previousSecretUntil") and db.value("SELECT %(t)s::timestamptz > now()", t=integration["previousSecretUntil"]):
+        headers["X-Siteline-Signature-Previous"] = signature(decrypt(previous) or "", ts, raw)
     try:
         r = httpx.post(integration["webhookUrl"], content=raw, headers=headers, timeout=WEBHOOK_TIMEOUT)
     except httpx.HTTPError as e:
-        _failed(str(e))
-        raise Unreachable(str(e)) from e
+        raise Unreachable(f"Couldn't reach the PM app: {e}") from e
     if r.status_code >= 300:
-        _failed(f"The PM app answered {r.status_code}")
         raise Unreachable(f"The PM app answered {r.status_code}")
     try:
         return r.json() if r.content else {}
@@ -156,7 +187,8 @@ def _post(integration: dict, event: str, body: dict, event_id: str) -> dict:
         return {}
 
 
-def _failed(error: str) -> None:
+def record_failure(error: str) -> None:
+    """Called by the worker after a failed webhook attempt, in its own transaction."""
     db.run("UPDATE integrations SET last_error = %(e)s WHERE company_id = current_company()", e=error[:300])
 
 
@@ -172,3 +204,42 @@ def gave_up(payload: dict) -> None:
         add_activity(userId=uid, kind="notice", actorId=card["userId"], projectId=None, channelId=None,
                      messageId=None, taskIds=[], text=f"An answer to \"{card['content']['title']}\" couldn't reach the PM app.",
                      lines=[])
+
+
+# ---- Delivery history (platform panel and the app's PM link screen) ----
+
+def deliveries(limit: int = 30) -> list[dict]:
+    """This company's recent webhooks to the PM app, newest first: what was sent, how it went, how many tries."""
+    rows = db.rows("""SELECT j.id, j.status, j.attempts, j.run_at, j.last_error, j.created_at, j.updated_at,
+                             j.payload->>'event' AS event, c.content->>'title' AS card_title, c.delivery, c.delivery_error
+                      FROM jobs j LEFT JOIN cards c ON c.id = j.payload->>'cardId'
+                      WHERE j.company_id = current_company() AND j.kind = 'webhook'
+                      ORDER BY j.created_at DESC LIMIT %(n)s""", n=limit)
+    return [{"id": r["id"], "event": r["event"], "cardTitle": r["cardTitle"], "status": r["status"], "attempts": r["attempts"],
+             "nextTryAt": r["runAt"] if r["status"] == "pending" and r["attempts"] else None,
+             "error": (r["lastError"] or "").removeprefix("Retry: ") or (r["deliveryError"] if r["delivery"] == "refused" else None),
+             "refused": r["delivery"] == "refused", "createdAt": r["createdAt"], "updatedAt": r["updatedAt"],
+             "canRetry": r["status"] == "failed"} for r in rows]
+
+
+def delivery_stats() -> dict:
+    """Counts for the last 7 days, for a quick health check."""
+    return db.row("""SELECT
+        (SELECT count(*) FROM cards WHERE created_at > now() - interval '7 days') AS cards_sent,
+        (SELECT count(*) FROM cards WHERE answered_at > now() - interval '7 days') AS cards_answered,
+        (SELECT count(*) FROM jobs WHERE company_id = current_company() AND kind = 'webhook' AND status IN ('pending', 'running')) AS pending,
+        (SELECT count(*) FROM jobs WHERE company_id = current_company() AND kind = 'webhook' AND status = 'failed') AS failed""")
+
+
+def retry_delivery(job_id: str, actor: str) -> None:
+    """Sends a webhook that gave up again, as the same event (same X-Siteline-Id), so the PM app can still drop repeats.
+    Only this company's failed webhooks; anything else is "not found"."""
+    job = db.row("""UPDATE jobs SET status = 'pending', attempts = 0, run_at = now(), locked_until = NULL, last_error = NULL,
+                      updated_at = now()
+                    WHERE id = %(id)s AND company_id = current_company() AND kind = 'webhook' AND status = 'failed'
+                    RETURNING payload""", id=job_id)
+    if not job:
+        raise not_found("Delivery")
+    if job["payload"].get("cardId"):
+        set_delivery(job["payload"]["cardId"], "pending")
+    accounts.audit(db.company_id(), actor, "webhook.retried", job_id)

@@ -87,6 +87,9 @@
     "leave": "Leave channel",
     "members": "{{count}} members",
     "membersTitle": "Members",
+    "mute": "Mute",
+    "muteBotHint": "No notifications for new cards. You still see them here.",
+    "muteHint": "No notifications from this conversation, except when someone @mentions you.",
     "online": "Online",
     "pinned": "Pinned",
     "pinnedCard": "Card",
@@ -118,6 +121,7 @@
     "messagePerson": "Message {{name}}",
     "micDenied": "Allow microphone access in Settings to record voice notes.",
     "more": "More options",
+    "muted": "Muted",
     "new": "New",
     "noAccessHint": "You may no longer have access to it.",
     "noAccessTitle": "This channel isn't available",
@@ -276,6 +280,11 @@
     "gallery": "Gallery"
   },
   "pm": {
+    "answered": "Answered",
+    "delivered": "Delivered",
+    "event": "Event",
+    "failed": "Couldn't deliver",
+    "failedCount": "Answers that couldn't be delivered",
     "hint": "The PM app sends cards to anyone in the company, any time, through the Siteline Bot, and gets the answers back. Each card goes to one person. It has no access to projects, channels or messages.",
     "lastCall": "Last heard from {{when}}",
     "live": "Your PM app",
@@ -283,7 +292,15 @@
     "neverCalled": "Not heard from yet",
     "none": "Not linked",
     "noneHint": "Without a PM app the bot sends no cards. Ask the Siteline team to link it.",
-    "title": "PM app link"
+    "pending": "Answers waiting to send",
+    "recent": "Recent deliveries to the PM app",
+    "refused": "Refused by the PM app",
+    "retry": "Send again",
+    "retrying": "Retrying ({{n}} tries)",
+    "sent": "Cards sent",
+    "title": "PM app link",
+    "waiting": "Waiting to send",
+    "week": "Last 7 days"
   },
   "project": {
     "address": "Site address",

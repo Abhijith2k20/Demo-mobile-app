@@ -739,3 +739,26 @@ without a work email can't use Siteline; the company gives them one, or an addre
   peer). Expo Go for SDK 58 is needed on test phones; development builds must be rebuilt.
 - `/internal` (dev panel) answers only the seeded demo accounts outside local development, so a real account on staging
   can't wipe it. `/docs` is served only in local development.
+
+## Design review fixes (2026-11-04)
+
+An outside review of the guide raised eight points; all are fixed and tested (`backend/tests/test_review_fixes.py`).
+- **Webhook URL (SSRF):** outside development it must be https and resolve only to public addresses, checked when
+  saved and again before every delivery (a name can be pointed somewhere else later). Redirects aren't followed.
+- **Webhook secret overlap:** a new secret keeps the previous one for 24 hours; webhooks carry
+  `X-Siteline-Signature-Previous` meanwhile (migration `009`). The API key already had the same overlap.
+- **Delivery history and resend:** webhooks are the `jobs` table's `webhook` rows; the platform panel's company
+  page and the app's PM link screen list them (status, tries, last error) with 7-day counts. "Send again" resets a
+  failed job as the same event (same `X-Siteline-Id`), so the PM app can still drop repeats; it's audited.
+- **Bug found while testing:** a failed attempt's "last error" was rolled back with the attempt, so the PM link
+  status never showed it. The worker now records it in the transaction that marks the failure.
+- **Mute:** per person per conversation (`channel_members.muted`). No pushes from it except @mentions of you; a
+  muted conversation isn't bold, has a grey badge and a bell-off mark, and doesn't count in the tab badges. Bot
+  cards can be muted too (they still arrive). `PUT /channels/:id/mute {muted}`.
+- **File links after removal:** signed links work to the end of the next hour, so someone removed can open a link
+  they already had for at most about 2 hours. Accepted and documented; new links need channel access.
+- **Shared tables:** a test checks invites, integrations, jobs (deliveries), memberships and activity from the other
+  company; cancelling another company's invite now answers 404 (it changed nothing, but said 200). Tests that update
+  `integrations` now name their company (an unfiltered update touched every company's PM link).
+- **Guide:** the API examples are real JSON, and the status page separates built, tested, real services verified
+  and production-ready.

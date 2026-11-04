@@ -26,12 +26,17 @@ def add_activity(**a) -> None:
     publish({"type": "activity.new", "activity": public_activity(activity)}, [a["userId"]])
 
 
-def push(user_ids: list[str], title: str, body: str, data: dict, *, kind: str) -> None:
+def push(user_ids: list[str], title: str, body: str, data: dict, *, kind: str, channel_id: str | None = None) -> None:
     """Queues a push to each active member of this company who wants this kind (their notification level).
-    Someone deactivated here gets nothing from this company, whatever lists they're still on."""
+    Someone deactivated here gets nothing from this company, whatever lists they're still on. People who muted
+    `channel_id` get nothing from it, except an @mention of them."""
     ids = [u for u in dict.fromkeys(user_ids) if u != BOT_ID]
     if not ids:
         return
+    if channel_id and kind != "mention":
+        muted = {r["userId"] for r in db.rows("""SELECT user_id FROM channel_members
+                                                WHERE channel_id = %(c)s AND muted AND user_id = ANY(%(ids)s)""", c=channel_id, ids=ids)}
+        ids = [u for u in ids if u not in muted]
     for r in db.rows("""SELECT u.id, u.notify FROM users u
                         JOIN memberships m ON m.user_id = u.id AND m.company_id = current_company() AND m.status = 'active'
                         WHERE u.id = ANY(%(ids)s) AND u.deleted_at IS NULL""", ids=ids):

@@ -117,6 +117,10 @@ class ReadMarker(Body):
     upToMessageId: Id
 
 
+class MuteSetting(Body):
+    muted: bool
+
+
 class DmOpen(Body):
     userId: Id
 

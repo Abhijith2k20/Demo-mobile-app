@@ -76,6 +76,9 @@ def channel_views(chs: list[dict], viewer: dict) -> list[dict]:
     if not ids:
         return []
     stats = channel_stats(viewer, ids)
+    muted = {r["channelId"] for r in db.rows("""SELECT channel_id FROM channel_members
+                                                WHERE user_id = %(u)s AND channel_id = ANY(%(ids)s) AND muted""",
+                                             u=viewer["id"], ids=ids)}
     members: dict[str, list[str]] = {}
     for r in db.rows("""SELECT cm.channel_id, cm.user_id FROM channel_members cm JOIN users u ON u.id = cm.user_id
                         WHERE cm.channel_id = ANY(%(ids)s) ORDER BY u.name""", ids=ids):
@@ -101,6 +104,7 @@ def channel_views(chs: list[dict], viewer: dict) -> list[dict]:
             "peerId": next((u for u in member_ids if u != viewer["id"]), None) if ch["kind"] == "dm" else None,
             "joined": viewer["id"] in member_ids or (admin and project_channel),
             "unreadCount": unread,
+            "muted": ch["id"] in muted,
             "lastReadMessageId": marker["id"] if marker else None,
             # The "new" divider starts after this time (server clock).
             "lastReadAt": marker["at"] if marker else None,

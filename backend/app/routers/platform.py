@@ -146,7 +146,8 @@ def company_page(company_id: str, siteline_platform: str | None = Cookie(None), 
     return render("company.html", title=c["name"], admin=admin, nav="companies", c=c, link=link, members=members, invites=invites,
                   note=note, public_url=config.PUBLIC_URL, active_count=sum(1 for m in members if m["status"] == "active"),
                   transferable=[m for m in members if m["status"] == "active" and m["role"] != "owner"],
-                  mock=_mock_data(company_id) if link.get("kind") == "mock" else None)
+                  mock=_mock_data(company_id) if link.get("kind") == "mock" else None,
+                  deliveries=_as_company_do(company_id, lambda: integrations.deliveries(30)) if link else [])
 
 
 def _mock_data(company_id: str) -> dict:
@@ -184,9 +185,21 @@ def transfer(company_id: str, user_id: str = Form(...), siteline_platform: str |
 @router.post("/companies/{company_id}/pm-link")
 def save_pm_link(company_id: str, kind: str = Form(...), webhook_url: str = Form(""), pm_company_id: str = Form(""),
                  card_seen: str = Form(""), siteline_platform: str | None = Cookie(None)):
-    companies.update_pm_link(company_id, kind=kind, webhook_url=webhook_url or None, pm_company_id=pm_company_id or None,
-                             card_seen=card_seen == "1", actor=_require(siteline_platform))
+    admin = _require(siteline_platform)
+    try:
+        companies.update_pm_link(company_id, kind=kind, webhook_url=webhook_url or None, pm_company_id=pm_company_id or None,
+                                 card_seen=card_seen == "1", actor=admin)
+    except ApiError as e:
+        return _back(company_id, "Not saved: " + next(iter((e.details.get("fields") or {}).values()), e.message))
     return _back(company_id, "PM link saved.")
+
+
+@router.post("/companies/{company_id}/deliveries/{delivery_id}/retry")
+def platform_retry_delivery(company_id: str, delivery_id: str, siteline_platform: str | None = Cookie(None)):
+    admin = _require(siteline_platform)
+    _as_company(company_id)
+    integrations.retry_delivery(delivery_id, admin)
+    return _back(company_id, "The webhook will be sent again now.")
 
 
 @router.post("/companies/{company_id}/pm-key", response_class=HTMLResponse)
@@ -202,6 +215,17 @@ def new_pm_key(company_id: str, siteline_platform: str | None = Cookie(None)):
 
 def _as_company(company_id: str):
     db.current().set_company(company_id)
+
+
+def _as_company_do(company_id: str, fn):
+    """Runs `fn` with this company set, then puts the previous one back (the panel itself has no company)."""
+    t = db.current()
+    previous = t.company_id
+    t.set_company(company_id)
+    try:
+        return fn()
+    finally:
+        t.set_company(previous)
 
 
 @router.post("/companies/{company_id}/mock/tasks")

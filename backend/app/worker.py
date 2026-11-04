@@ -9,7 +9,7 @@ import time
 
 from . import db
 from .jobs import queue
-from .jobs.handlers import COMPANY_JOBS, HANDLERS, Retry, on_gave_up
+from .jobs.handlers import COMPANY_JOBS, HANDLERS, Retry, on_failed, on_gave_up
 
 log = logging.getLogger("siteline.worker")
 
@@ -26,6 +26,7 @@ def run_job(job: dict) -> None:
         if not isinstance(e, Retry):
             log.exception("job %s (%s) failed", job["id"], job["kind"])
         with db.transaction(job["companyId"]):
+            on_failed(job, str(e))  # its own transaction: the failed attempt's changes were rolled back
             if not queue.fail(job, f"{type(e).__name__}: {e}", retry=job["kind"] in HANDLERS):
                 on_gave_up(job)
 

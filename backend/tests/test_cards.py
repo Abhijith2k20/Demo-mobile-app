@@ -197,7 +197,7 @@ def test_the_cards_api_reaches_nothing_but_cards(client):
 
 def test_webhooks_are_signed_and_a_refusal_is_shown(login, client, monkeypatch):
     with in_company("Paliath Interiors"):
-        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks'")
+        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks' WHERE company_id = current_company()")
         creds = integrations.new_credentials(db.company_id())
     sent = []
 
@@ -221,7 +221,7 @@ def test_webhooks_are_signed_and_a_refusal_is_shown(login, client, monkeypatch):
 
 def test_after_a_day_of_failures_the_card_says_so_and_admins_hear(login, client, monkeypatch):
     with in_company("Paliath Interiors"):
-        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks'")
+        db.run("UPDATE integrations SET kind = 'http', webhook_url = 'https://pm.example/hooks' WHERE company_id = current_company()")
     monkeypatch.setattr(integrations.httpx, "post", lambda *a, **k: httpx.Response(500))
     ravi = login("ravi@paliath.in")
     c = open_card(ravi)
@@ -251,7 +251,7 @@ def test_card_seen_is_sent_once_and_only_when_turned_on(login, client):
     ravi.post(f"/cards/{c['id']}/seen")
     with in_company("Paliath Interiors"):
         assert db.rows(hooks) == []  # off by default
-        db.run("UPDATE integrations SET send_card_seen = true")
+        db.run("UPDATE integrations SET send_card_seen = true WHERE company_id = current_company()")
         db.run("UPDATE cards SET seen_at = NULL")
     ravi.post(f"/cards/{c['id']}/seen")
     ravi.post(f"/cards/{c['id']}/seen")  # opened again: nothing more

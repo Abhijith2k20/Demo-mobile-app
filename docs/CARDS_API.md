@@ -20,8 +20,10 @@
   - an **API key** (`sk_live_…`) for the PM app to call Siteline; it belongs to that company only, and every
     call with it acts in that company;
   - a **webhook secret** to check that webhooks really come from Siteline.
-  The PM app gives Siteline its **webhook URL**. Keys can be rotated on the panel; the old one keeps working for
-  24 hours.
+  The PM app gives Siteline its **webhook URL**: an `https://` address on the public internet (private, local
+  and cloud-metadata addresses are refused, both when it's saved and before each delivery). Keys can be rotated
+  on the panel: the old API key keeps working for 24 hours, and for 24 hours webhooks are signed with both the
+  new and the previous secret (below), so the PM app can switch without failing any webhook.
 - Base URL: `https://api.siteline.app/api/v1` (staging: `https://staging-api.siteline.app/api/v1`).
 - Every call: `Authorization: Bearer <api key>`, JSON in and out, the standard Siteline error format:
   `{"error": {"code": "NOT_A_MEMBER", "message": "...", "details": {}, "request_id": "req_..."}}`.
@@ -109,10 +111,18 @@ X-Siteline-Event: card.answered
 X-Siteline-Id: evt_01JD...            (the same for every retry of this event)
 X-Siteline-Timestamp: 1793612345
 X-Siteline-Signature: hex(HMAC-SHA256(secret, "<timestamp>.<body>"))
+X-Siteline-Signature-Previous: hex(HMAC-SHA256(previous secret, ...))   (only for 24 hours after a new secret)
 ```
 
-The PM app should check the signature and that the timestamp is within 5 minutes, and ignore an
-`X-Siteline-Id` it has seen.
+The PM app should accept the webhook if **either** signature matches a secret it holds, check that the timestamp
+is within 5 minutes, and ignore an `X-Siteline-Id` it has seen.
+
+**Delivery:** the PM app has 10 seconds to answer (3 to connect); a `2xx` answer counts as delivered, anything
+else is retried after 1, 5 and 15 minutes, then hourly for 24 hours, always with the same `X-Siteline-Id`.
+Siteline doesn't follow redirects. After the last try the card shows "Couldn't reach <PM app>" and the
+company's admins are told; the Siteline team (platform panel) and the company's Owner and Admins (PM link
+screen) see every webhook with its status, tries and last error, and can send a failed one again.
+Each card is answered once, so `card.answered` events for one card never arrive out of order.
 
 ### `card.answered`
 

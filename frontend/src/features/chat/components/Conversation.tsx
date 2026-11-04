@@ -2,17 +2,19 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, View } from 'react-native';
+import { KeyboardAvoidingView, Switch, View } from 'react-native';
 import { Avatar, Button, Divider, EmptyState, IconButton, Row, Skeleton } from '@/components/basics';
 import { Header, OfflineBanner, Screen } from '@/components/chrome';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/T';
-import { space } from '@/theme/spacing';
+import { space, touch } from '@/theme/spacing';
+import { useTheme } from '@/theme/useTheme';
 import type { ID, Message, MessageView } from '@/types/models';
 import { BotProgress } from '../../bot/components/BotProgress';
 import { CardQueueProvider } from '../../bot/queue';
 import { leaveChannel } from '../../projects/api';
 import { firstName, useMe, useProject, useProjectAccess, useUsers } from '../../shared';
+import { setMuted } from '../api';
 import { ChatContext, type ChatContextValue } from '../context';
 import { useChannelInfo, useChannelMessages, useMessageSearch, usePinned, type ListItem } from '../hooks';
 import { Composer, ReadOnlyBar } from './Composer';
@@ -29,6 +31,7 @@ function renderItem({ item }: { item: ListItem }) {
 
 export function Conversation({ channelId }: { channelId: ID }) {
   const { t } = useTranslation();
+  const { c } = useTheme();
   const me = useMe();
   const users = useUsers();
   const info = useChannelInfo(channelId);
@@ -191,6 +194,25 @@ export function Conversation({ channelId }: { channelId: ID }) {
         />
 
         <Sheet visible={details} onClose={() => setDetails(false)} title={info.title} subtitle={info.subtitle} full>
+          {info.channel ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: touch.min, marginBottom: space.lg }}>
+              <View style={{ flex: 1 }}>
+                <T variant="bodyStrong">{t('channel.mute', 'Mute')}</T>
+                <T variant="meta" color="textMuted">
+                  {info.isBot
+                    ? t('channel.muteBotHint', 'No notifications for new cards. You still see them here.')
+                    : t('channel.muteHint', 'No notifications from this conversation, except when someone @mentions you.')}
+                </T>
+              </View>
+              <Switch
+                value={info.channel.muted}
+                onValueChange={(on) => void setMuted(info.channel!.id, on)}
+                trackColor={{ true: c.accent, false: c.border }}
+                thumbColor={c.surface}
+                accessibilityLabel={t('channel.mute', 'Mute')}
+              />
+            </View>
+          ) : null}
           {pinned.length > 0 ? (
             <View style={{ marginBottom: space.lg }}>
               <T variant="label" color="textMuted" style={{ marginBottom: space.sm }}>

@@ -63,7 +63,7 @@ function DmsScreen() {
 
   const row = (r: DmRow) => {
     const name = r.peer?.name ?? 'Siteline Bot';
-    const strong = r.unread > 0;
+    const strong = r.unread > 0 && !r.channel.muted;
     return (
       <Pressable
         key={r.channel.id}
@@ -102,6 +102,7 @@ function DmsScreen() {
             <T variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
               {name}
             </T>
+            {r.channel.muted ? <Feather name="bell-off" size={13} color={c.textFaint} accessibilityLabel={t('chat.muted', 'Muted')} /> : null}
             {r.last ? (
               <T variant="meta" color={strong ? 'accent' : 'textFaint'}>
                 {when(r.last.createdAt, t('common.yesterday', 'Yesterday'))}
@@ -112,7 +113,7 @@ function DmsScreen() {
             <T variant="meta" color={strong ? 'text' : 'textMuted'} numberOfLines={1} style={{ flex: 1 }}>
               {preview(r.last)}
             </T>
-            <Badge count={r.unread} />
+            <Badge count={r.unread} muted={r.channel.muted} />
           </View>
         </View>
       </Pressable>

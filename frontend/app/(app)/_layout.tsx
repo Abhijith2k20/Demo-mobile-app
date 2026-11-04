@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
 import type { IconName } from '@/components/basics';
 import { useUnreadActivityCount } from '@/features/activity/hooks';
-import { useDmList } from '@/features/home/hooks';
-import { useMeSync, useUnreadCounts } from '@/features/shared';
+import { useMeSync, useTabUnread } from '@/features/shared';
 import { usePushSetup } from '@/features/shared/push';
 import { useSession } from '@/stores/session';
 import { fonts } from '@/theme/typography';
@@ -23,13 +22,9 @@ function TabsForUser() {
   const { t } = useTranslation();
   useMeSync();
   usePushSetup();
-  const unread = useUnreadCounts();
-  const dms = useDmList();
+  // Home counts channels, DMs counts direct messages and the bot; muted conversations count in neither.
+  const unread = useTabUnread();
   const activity = useUnreadActivityCount();
-  let allUnread = 0;
-  for (const n of unread.values()) allUnread += n;
-  // Direct messages have their own tab, so Home counts channels only.
-  const totalUnread = allUnread - dms.totalUnread;
   const count = (n: number) => (n > 0 ? (n > 99 ? '99+' : n) : undefined);
   const badgeStyle = { backgroundColor: c.accent, color: c.onAccent, fontFamily: fonts.semibold, fontSize: 11 };
 
@@ -51,7 +46,7 @@ function TabsForUser() {
         options={{
           title: t('tabs.home', 'Home'),
           tabBarIcon: tabIcon('home'),
-          tabBarBadge: count(totalUnread),
+          tabBarBadge: count(unread.channels),
         }}
       />
       <Tabs.Screen
@@ -59,7 +54,7 @@ function TabsForUser() {
         options={{
           title: t('tabs.dms', 'DMs'),
           tabBarIcon: tabIcon('message-circle'),
-          tabBarBadge: count(dms.totalUnread),
+          tabBarBadge: count(unread.dms),
         }}
       />
       <Tabs.Screen

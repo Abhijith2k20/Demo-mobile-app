@@ -76,6 +76,21 @@ export function useUnreadCounts(): Map<ID, number> {
   return useMemo(() => new Map(channels.list.map((c) => [c.id, c.unreadCount])), [channels.list]);
 }
 
+/** Unread totals for the tab badges: channels (Home) and direct messages (DMs), leaving out muted ones. */
+export function useTabUnread(): { channels: number; dms: number } {
+  const channels = useChannels();
+  return useMemo(() => {
+    let ch = 0;
+    let dm = 0;
+    for (const c of channels.list) {
+      if (c.muted) continue;
+      if (c.kind === 'dm' || c.kind === 'bot') dm += c.unreadCount;
+      else ch += c.unreadCount;
+    }
+    return { channels: ch, dms: dm };
+  }, [channels.list]);
+}
+
 /** Pull-to-refresh: fetch everything on screen again. */
 export function useRefresh(): { refreshing: boolean; refresh: () => void } {
   const [refreshing, setRefreshing] = useState(false);

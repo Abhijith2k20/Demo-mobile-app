@@ -13,6 +13,11 @@ export function invitePerson(input: InviteInput) {
   return submit(async () => (await api<{ invite: SentInvite }>('POST', '/invites', { id: uuidv7(), ...input })).invite, [keys.invites]);
 }
 
+/** Sends a webhook that gave up again (Owner/Admin). */
+export function retryDelivery(id: string): Promise<unknown> {
+  return attempt(() => api('POST', `/integration/deliveries/${id}/retry`), [keys.integration]);
+}
+
 export function resendInvite(invite: SentInvite): Promise<unknown> {
   return attempt(() => api('POST', `/invites/${invite.id}/resend`), [keys.invites]);
 }
