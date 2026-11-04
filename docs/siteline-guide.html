@@ -524,7 +524,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
     <div class="card"><div class="stat">99</div><div>app source files</div></div>
     <div class="card"><div class="stat">48</div><div>server source files</div></div>
     <div class="card"><div class="stat">120</div><div>server tests</div></div>
-    <div class="card"><div class="stat">10</div><div>database migrations</div></div>
+    <div class="card"><div class="stat">11</div><div>database migrations</div></div>
   </div>
 </section>
 
@@ -1200,7 +1200,7 @@ const arch = [
   { z: 'Siteline servers (Render, Singapore)' },
   { k: 'api', e: '', n: 'API server', s: 'FastAPI', d: 'Answers every request: the app API, the Cards API, the platform panel, and live WebSocket updates. Checks sign-in, permissions and rate limits.', tech: 'Python 3.13, FastAPI, Pydantic, uvicorn', where: 'backend/app/main.py, routers/, services/', to: ['db', 'r2', 'phone'] },
   { k: 'worker', e: '', n: 'Worker', s: 'Background jobs', d: 'Runs jobs from the jobs table in 4 parallel loops (they never take the same job): emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff; after a failed webhook it records the error on the company\'s PM link. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
-  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 10 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
+  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 11 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
   { k: 'r2', e: '', n: 'File storage', s: 'Cloudflare R2', d: 'Photos, voice notes and files, in a private bucket. Each file is under its company; links are signed and expire.', tech: 'S3 API (boto3)', where: 'backend/app/services/files.py', to: ['api'] },
   { z: 'Hosted services' },
   { k: 'email', e: '', n: 'Email', s: 'Resend', d: 'Sign-in codes and invites.', tech: 'Resend HTTP API', where: 'backend/app/senders/email.py', to: ['worker'] },
@@ -1266,13 +1266,13 @@ const trees = {
     ['app/services/', 'Business actions', [
       ['accounts.py', 'Codes, sessions, account deletion'], ['companies.py', 'Create, suspend, transfer ownership'], ['messaging.py', 'Posting messages'],
       ['cards.py', 'Cards and their answers'], ['integrations.py', 'PM link: keys, signed webhooks, webhook URL checks, delivery history and resend'], ['files.py', 'File type checks, storage, signed links'],
-      ['limits.py', 'Per-person rate limits'], ['secrets.py', 'Encrypts PM webhook secrets'],
+      ['limits.py', 'Every rate limit (per person, and the Cards API per company)'], ['secrets.py', 'Encrypts PM webhook secrets'],
     ]],
     ['app/jobs/', 'queue.py (add, claim, retry) and handlers.py (what each job does)'],
     ['app/senders/', 'email.py (Resend), push.py (Expo)'],
     ['app/mockpm/', 'The stand-in PM app: decides what to ask and when'],
     ['app/templates/platform/', 'The platform panel\'s pages (Jinja2)'],
-    ['db/migrations/', '001–010, numbered SQL files, applied at start-up, never edited once run'],
+    ['db/migrations/', '001–011, numbered SQL files, applied at start-up, never edited once run'],
     ['tests/', '120 tests: rules, every route, company separation, jobs, security'],
     ['.env.example · requirements.txt · Dockerfile', 'Settings list, pinned packages, the server image'],
   ]],
@@ -1312,7 +1312,7 @@ const tables = [
   ['events', 'global', 'Short-lived live-update events, deleted after 10 minutes.'],
   ['push_tokens', 'global', 'One per phone, for notifications.'],
   ['platform_admins · audit_log', 'global', 'Siteline staff, and the permanent record of admin actions.'],
-  ['api_calls · user_calls', 'global', 'Counters behind the Cards API and per-person rate limits.'],
+  ['call_counts', 'global', 'One counter for every rate limit: per person, and the Cards API per company.'],
   ['projects', 'company', 'A group of channels for one job. Name, client, address, archived or not.'],
   ['project_members', 'company', 'Who is on each project (and whether they\'re a guest).'],
   ['channels · channel_members', 'company', 'Conversations: project, company, DM or bot; who\'s in them; read markers; who muted them.'],

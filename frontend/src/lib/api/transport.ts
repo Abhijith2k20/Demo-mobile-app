@@ -10,7 +10,7 @@ export interface TransportRequest {
   form?: Upload;
   headers: Record<string, string>;
 }
-export interface TransportResponse {
+interface TransportResponse {
   status: number;
   body: unknown;
 }

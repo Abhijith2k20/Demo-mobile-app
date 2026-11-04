@@ -38,7 +38,7 @@ server returns (`access.permissions`, `can*` flags, computed fields) and never w
 
 ### 0.1 Project management removed from Siteline
 
-Everything below exists in the demo and is **deleted** in the MVP (build step 2, §15; order in `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md`). The PM app does it now.
+Everything below exists in the demo and is **deleted** in the MVP (build step 2, §15; order in `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md` (removed; in git history)). The PM app does it now.
 
 | Where | Removed |
 |---|---|
@@ -875,7 +875,7 @@ Each step ends with tests passing and the app working against it.
 2. **Remove project management**, on the current in-memory backend, before Postgres, so no tables are built for
    deleted features. First the PM connector interface and an in-memory mock PM holding the seeded tasks, with
    the bot switched to it; then the old task code is deleted (§0.1). Step by step in
-   `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md`.
+   `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md` (removed; in git history).
 3. **Database:** Postgres, models, Alembic, row-level security, the store replaced by queries; the existing
    chat and bot tests pass on Postgres; tenant separation tests.
 4. **Accounts:**
@@ -893,7 +893,7 @@ Each step ends with tests passing and the app working against it.
 8. **The Cards API (version 2.1):** the API for the PM app (`/api/v1`, keys, projects, cards, nudges, channel
    messages, webhooks with retries); cards in the app drawn from their content; the 2.0 bot (planner, PM sync,
    PM writes, saved copy of tasks) moves out of Siteline into `mockpm/`, which uses the Cards API like the real
-   PM app will. Step by step in `docs/PLAN_CARDS_API.md`.
+   PM app will. Step by step in `docs/PLAN_CARDS_API.md` (removed; in git history).
 9. **Chat only (version 2.2):** remove company templates and setups, job titles, project roles, simple mode,
    default channels per job title, Report issue and Daily report, Recent updates, scripted teammates; the Cards API
    loses projects and channel messages; projects are made only in Siteline by the Owner and Admins (§0.2).

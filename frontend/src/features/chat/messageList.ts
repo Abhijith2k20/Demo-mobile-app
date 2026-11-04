@@ -11,7 +11,7 @@ export type ListItem =
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 const GROUPABLE = new Set(['text', 'image', 'voice', 'file']);
 
-export function dayLabel(iso: string, today: string, yesterday: string): string {
+function dayLabel(iso: string, today: string, yesterday: string): string {
   const d = parseISO(iso);
   if (isToday(d)) return today;
   if (isYesterday(d)) return yesterday;

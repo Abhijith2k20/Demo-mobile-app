@@ -3,7 +3,7 @@ import { api } from '@/lib/api/client';
 import { get, keys, refresh } from '@/lib/queries';
 import type { ActivityView } from '@/types/models';
 
-export function useActivityFeed() {
+function useActivityFeed() {
   return useQuery({ queryKey: keys.activity, queryFn: get<{ items: ActivityView[]; unreadCount: number }>('/activity') });
 }
 

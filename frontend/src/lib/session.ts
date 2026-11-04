@@ -12,7 +12,7 @@ import { useSession } from '@/stores/session';
 import { toast, useUi } from '@/stores/ui';
 import type { CompanyChoice, PendingInvite } from '@/types/models';
 
-export type CompanySession = SavedSession;
+type CompanySession = SavedSession;
 
 /** What /auth/otp/verify answers: the person's companies and invites, and a session when there's only one company. */
 export interface SignedIn {

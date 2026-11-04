@@ -5,7 +5,7 @@ import { attempt, submit } from '@/lib/mutations';
 import { keys } from '@/lib/queries';
 import type { Channel, ChannelView, ID, Project, ProjectView } from '@/types/models';
 
-export interface ProjectDetails {
+interface ProjectDetails {
   name: string;
   client: string;
   address: string;

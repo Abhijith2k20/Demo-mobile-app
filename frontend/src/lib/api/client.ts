@@ -5,7 +5,7 @@ import { useSession } from '@/stores/session';
 import { useUi } from '@/stores/ui';
 import { request, TransportError, type TransportRequest, type Upload } from './transport';
 
-export type ErrorKind =
+type ErrorKind =
   | 'offline'
   | 'timeout'
   | 'auth'

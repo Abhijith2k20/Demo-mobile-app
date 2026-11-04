@@ -264,12 +264,12 @@ def test_card_seen_is_sent_once_and_only_when_turned_on(login, client):
 
 
 def test_the_rate_limit_is_counted_in_the_database_per_company(client, monkeypatch):
-    from app.routers import integration_api
+    from app.services import limits
 
-    monkeypatch.setattr(integration_api, "CALLS_PER_MINUTE", 3)
+    monkeypatch.setitem(limits.LIMITS, "cards_api", (3, "minute"))
     paliath, brightline = api_key("Paliath Interiors"), api_key("Brightline Events")
     codes = [client.get("/api/v1/cards/none", headers=paliath).status_code for _ in range(4)]
     assert codes == [404, 404, 404, 429]
     assert client.get("/api/v1/cards/none", headers=brightline).status_code == 404  # each company has its own count
     with db.transaction():
-        assert db.value("SELECT max(calls) FROM api_calls") == 4
+        assert db.value("SELECT max(calls) FROM call_counts WHERE kind = 'cards_api'") == 4

@@ -2,7 +2,7 @@ import { api } from '@/lib/api/client';
 import { holdAccountToken, pickCompany, startSession, type SignedIn } from '@/lib/session';
 import type { CompanyChoice, PendingInvite } from '@/types/models';
 
-export interface CodeSent {
+interface CodeSent {
   resendInSeconds: number;
 }
 

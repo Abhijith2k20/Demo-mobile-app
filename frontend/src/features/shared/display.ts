@@ -25,6 +25,6 @@ export function useRoleLabels() {
   );
 }
 
-export const BOT_EMAIL = 'bot@siteline.app';
+const BOT_EMAIL = 'bot@siteline.app';
 
 export const isBotUser = (u: User | undefined): boolean => u?.email === BOT_EMAIL;

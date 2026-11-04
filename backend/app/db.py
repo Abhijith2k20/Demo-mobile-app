@@ -124,6 +124,19 @@ def company_id() -> str | None:
     return current().company_id
 
 
+@contextmanager
+def as_company(company: str | None) -> Iterator[None]:
+    """Runs the block in this company (row-level security follows), then switches back to the one before.
+    For work that reaches into a company from outside it: the platform panel, sign-in, jobs for every company."""
+    t = current()
+    previous = t.company_id
+    t.set_company(company)
+    try:
+        yield
+    finally:
+        t.set_company(previous)
+
+
 # ---- Queries ----
 
 _SNAKE = re.compile(r"_([a-z0-9])")
@@ -276,7 +289,7 @@ PER_COMPANY_TABLES = [
     "activities", "cards", "messages", "channel_members", "channels", "project_members", "projects",
 ]
 GLOBAL_TABLES = [
-    "api_calls", "user_calls", "events", "jobs", "audit_log", "platform_admins", "push_tokens", "sessions", "otp_requests", "otp_codes",
+    "call_counts", "events", "jobs", "audit_log", "platform_admins", "push_tokens", "sessions", "otp_requests", "otp_codes",
     "invites", "memberships", "integrations", "companies", "users", "worker_heartbeat",
 ]
 

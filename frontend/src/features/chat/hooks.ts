@@ -13,7 +13,7 @@ import { buildItems } from './messageList';
 
 export type { ListItem } from './messageList';
 
-export interface ChannelInfo {
+interface ChannelInfo {
   channel: ChannelView | null;
   loading: boolean;
   title: string;
@@ -26,7 +26,7 @@ export interface ChannelInfo {
   projectName: string | null;
 }
 
-export function useChannel(channelId: ID) {
+function useChannel(channelId: ID) {
   const list = useChannels();
   return useQuery({
     queryKey: keys.channel(channelId),
@@ -101,7 +101,7 @@ function queuedView(i: Extract<OutboxItem, { kind: 'message' }>): MessageView {
 }
 
 /** Messages for a channel (or one thread) still waiting in the send queue. */
-export function useQueuedMessages(channelId: ID, threadParentId: ID | null): MessageView[] {
+function useQueuedMessages(channelId: ID, threadParentId: ID | null): MessageView[] {
   const items = useOutbox((st) => st.items);
   return useMemo(
     () =>

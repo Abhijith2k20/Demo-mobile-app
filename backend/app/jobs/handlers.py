@@ -47,16 +47,13 @@ def webhook(p: dict) -> None:
 def cleanup(p: dict) -> None:
     db.run("DELETE FROM events WHERE created_at < now() - interval '10 minutes'")
     db.run("DELETE FROM jobs WHERE status IN ('done', 'cancelled') AND updated_at < now() - interval '7 days'")
-    db.run("DELETE FROM api_calls WHERE minute < now() - interval '1 hour'")
-    db.run("DELETE FROM user_calls WHERE window_start < now() - interval '2 hours'")
+    db.run("DELETE FROM call_counts WHERE window_start < now() - interval '2 hours'")
     db.run("DELETE FROM otp_requests WHERE at < now() - interval '1 hour'")
     db.run("DELETE FROM otp_codes WHERE expires_at < now() - interval '1 day'")
     db.run("UPDATE invites SET status = 'cancelled' WHERE status = 'pending' AND expires_at < now() - interval '30 days'")
-    t = db.current()
     for cid in [r["id"] for r in db.rows("SELECT id FROM companies")]:
-        t.set_company(cid)
-        files.remove_unused_uploads()
-    t.set_company(None)
+        with db.as_company(cid):
+            files.remove_unused_uploads()
     nxt = datetime.now(ZoneInfo("UTC")) + timedelta(hours=1)
     # Labelled with the next hour: this run's own label (this hour) is still taken by the job that is running.
     enqueue("cleanup", {}, run_at=nxt, company_id=None, dedupe_key=f"cleanup:{nxt:%Y-%m-%dT%H}")

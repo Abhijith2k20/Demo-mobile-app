@@ -31,7 +31,7 @@ export function useBrowseChannels(projectId: ID, enabled = true) {
 }
 
 /** Last few status cards from the PM app across the project's channels. */
-export interface ProjectFile {
+interface ProjectFile {
   key: string;
   kind: 'photo' | 'file';
   photo?: Attachment;

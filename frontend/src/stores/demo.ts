@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export interface ApiLogEntry {
+interface ApiLogEntry {
   id: number;
   method: string;
   path: string;
@@ -9,7 +9,7 @@ export interface ApiLogEntry {
   requestId: string;
   code?: string;
 }
-export interface EventLogEntry {
+interface EventLogEntry {
   id: number;
   type: string;
   summary: string;

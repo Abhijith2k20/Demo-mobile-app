@@ -62,7 +62,7 @@ export const dark: Colors = {
 };
 
 // clay, sage, slate, ochre, plum, teal, sand, rust
-export const avatarTones = [
+const avatarTones = [
   '#B5694A',
   '#6F8A6B',
   '#5C6F80',

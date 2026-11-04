@@ -500,7 +500,7 @@ still demo 1.4. Decisions:
   app can call later). No public sign-up. A super-admin can't read companies' messages; every platform action
   is audited.
 - **One person, several companies** (changes the 2026-10-23 decision "one company per login" in
-  `docs/CHANGE_02_MULTI_TENANT.md`): memberships per company, a picker after sign-in and a switcher. Field
+  `docs/CHANGE_02_MULTI_TENANT.md` (removed; in git history)): memberships per company, a picker after sign-in and a switcher. Field
   subcontractors often work for several firms.
 - **Sign-in by one-time code, email or phone (SMS)**, no passwords: site workers forget passwords and share
   phones. The proposal's "email link to set a password" became "sign in with the invited email or phone to
@@ -512,7 +512,7 @@ still demo 1.4. Decisions:
   survive restarts and never double-send), LISTEN/NOTIFY to carry events from the worker to the API, Cloudflare
   R2 for files, Resend (email) and MSG91 (SMS), Expo push, Sentry, Render in Singapore, staging and production.
   No Redis until load needs it.
-- `docs/CHANGE_01_PARENT_SUBTASKS_AREAS.md` (tasks move to the PM app) and `docs/CHANGE_02_MULTI_TENANT.md`
+- `docs/CHANGE_01_PARENT_SUBTASKS_AREAS.md` (removed; in git history) (tasks move to the PM app) and `docs/CHANGE_02_MULTI_TENANT.md` (removed; in git history)
   are marked superseded.
 - **Bot data flow:** the PM app pushes facts (webhooks), Siteline pulls a nightly full sync as a safety net,
   and the bot re-checks each task with one `GET /tasks/:id` just before sending its check-in card (falls back to
@@ -521,7 +521,7 @@ still demo 1.4. Decisions:
 
 ## Build step 2: project management removed (2026-11-02)
 
-Done as in `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md`.
+Done as in `docs/PLAN_REMOVE_PROJECT_MANAGEMENT.md` (removed; in git history).
 - **Mock PM app** (`backend/app/pm/mock.py`, data in `S().pm`): the seeded tasks moved there with the same
   names, dates and owners (owner = email). `pm/connector.py` is the only way in. Each Siteline project has a
   `pmProjectId`; projects made in Siteline have none (`linked: false`).
@@ -595,7 +595,7 @@ Business API: the business system decides, WhatsApp delivers.
   queue). Changing how cards look still needs a Siteline release.
 - Spec 2.0's bot (planner, PM sync, re-check, PM writes, saved copy of tasks, check-in times in the setup)
   becomes the **mock PM app** (`mockpm/`), which uses the Cards API like the real PM app will, then the old code
-  is removed. Plan: `docs/PLAN_CARDS_API.md`. Built 2026-11-02 (see below).
+  is removed. Plan: `docs/PLAN_CARDS_API.md` (removed; in git history). Built 2026-11-02 (see below).
 - "Related task" in Report issue lists the tasks named in the project's cards from the last 30 days, since
   Siteline no longer has the PM app's task list.
 
@@ -797,3 +797,13 @@ Eight findings, each fixed at its cause (`backend/tests/test_audit2_fixes.py`, m
   certificate, instead of looking the name up again.
 - **Delivery history:** an index on jobs by company, kind and time.
 - **Removed:** the always-empty `activities.task_ids` and `taskIds`.
+
+## Clean-up (2026-11-04)
+
+- Removed the finished planning docs (`docs/CHANGE_01…`, `CHANGE_02…`, `PLAN_CARDS_API.md`, `PLAN_REMOVE_PROJECT_MANAGEMENT.md`;
+  in git history), the unused `Stepper` form component and the dead `EMAIL_TAKEN` error code.
+- `db.as_company(id)`: one way to work inside another company and switch back (platform panel, sign-in, account
+  deletion, company creation, clean-up job), replacing six hand-written save/switch/restore blocks.
+- One rate-limit counter (`call_counts`, migration `011`) for the per-person limits and the Cards API's per-company
+  limit, replacing `api_calls` and `user_calls`.
+- App code exported only what other files import (29 exports were used only in their own file).

@@ -98,10 +98,9 @@ def demo_accounts():
         raise ApiError("NOT_FOUND", "Not found.")
     picked = []
     for c in db.rows("SELECT id, name FROM companies WHERE status = 'active' ORDER BY created_at"):
-        db.current().set_company(c["id"])
-        for u in db.rows("""SELECT u.name, u.email, m.role FROM memberships m JOIN users u ON u.id = m.user_id
-                            WHERE m.company_id = %(c)s AND m.status = 'active' ORDER BY m.joined_at, u.id""", c=c["id"]):
-            picked.append({"identifier": u["email"], "email": u["email"], "name": u["name"],
-                           "companyRole": u["role"], "company": c["name"]})
-    db.current().set_company(None)
+        with db.as_company(c["id"]):
+            for u in db.rows("""SELECT u.name, u.email, m.role FROM memberships m JOIN users u ON u.id = m.user_id
+                                WHERE m.company_id = %(c)s AND m.status = 'active' ORDER BY m.joined_at, u.id""", c=c["id"]):
+                picked.append({"identifier": u["email"], "email": u["email"], "name": u["name"],
+                               "companyRole": u["role"], "company": c["name"]})
     return {"accounts": picked}

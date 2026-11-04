@@ -4,7 +4,7 @@ import { api } from '@/lib/api/client';
 import { enqueue } from '@/lib/outbox';
 import type { Card, CardAnswer } from '@/types/models';
 
-export interface AnswerFiles {
+interface AnswerFiles {
   photoUris: string[];
   voice: { uri: string; seconds: number } | null;
 }

@@ -200,10 +200,7 @@ def membership(user_id: str, company_id: str) -> dict | None:
 def join_company(company_id: str, user_id: str, role: str, channel_ids: list[str] | None = None) -> None:
     """Membership plus the starting channels: both company channels and a bot DM; guests get only the
     channels they were given. Runs with the transaction switched to that company."""
-    t = db.current()
-    previous = t.company_id
-    t.set_company(company_id)
-    try:
+    with db.as_company(company_id):
         db.run("""INSERT INTO memberships (company_id, user_id, role, status) VALUES (%(c)s, %(u)s, %(r)s, 'active')
                   ON CONFLICT (company_id, user_id) DO UPDATE SET role = excluded.role, status = 'active', updated_at = now()""",
                c=company_id, u=user_id, r=role)
@@ -231,8 +228,6 @@ def join_company(company_id: str, user_id: str, role: str, channel_ids: list[str
 
         publish({"type": "user.updated", "user": public_user(person(user_id))}, human_ids())
         _tell_pm_app("person.joined", user_id)
-    finally:
-        t.set_company(previous)
 
 
 def _tell_pm_app(event: str, user_id: str) -> None:
@@ -272,12 +267,9 @@ def deactivate_member(user_id: str) -> None:
 
 def delete_account(user_id: str) -> None:
     """Spec §9.8: details removed, every membership deactivated, messages stay as "Former member"."""
-    t = db.current()
-    previous = t.company_id
     for m in db.rows("SELECT company_id FROM memberships WHERE user_id = %(u)s AND status = 'active'", u=user_id):
-        t.set_company(m["companyId"])
-        _tell_pm_app("person.left", user_id)
-    t.set_company(previous)
+        with db.as_company(m["companyId"]):
+            _tell_pm_app("person.left", user_id)
     db.run("""UPDATE users SET name = 'Former member', email = NULL, deleted_at = now(), updated_at = now()
               WHERE id = %(u)s""", u=user_id)
     db.run("UPDATE memberships SET status = 'deactivated', updated_at = now() WHERE user_id = %(u)s", u=user_id)

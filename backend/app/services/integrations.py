@@ -120,14 +120,6 @@ def send_card_seen(card: dict) -> None:
                                  "seenAt": card["seenAt"]}, f"evt_card.seen_{card['id']}")
 
 
-def count_call(company_id: str, limit: int) -> bool:
-    """Counts one Cards API call for this minute; False once the company is over `limit`."""
-    calls = db.value("""INSERT INTO api_calls (company_id, minute, calls) VALUES (%(c)s, date_trunc('minute', now()), 1)
-                        ON CONFLICT (company_id, minute) DO UPDATE SET calls = api_calls.calls + 1 RETURNING calls""",
-                     c=company_id)
-    return calls <= limit
-
-
 def _answer_body(card: dict) -> dict:
     """card.answered, with links to the person's files (valid 7 days) and upload ids."""
     a = card["answer"] or {}

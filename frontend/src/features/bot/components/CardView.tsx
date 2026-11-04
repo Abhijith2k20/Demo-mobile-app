@@ -28,7 +28,7 @@ function useTone(): (tone: Tone | undefined) => string {
 }
 
 /** What the person answered, in the card's own words. */
-export function answerLabel(content: CardContent, a: CardAnswer): string {
+function answerLabel(content: CardContent, a: CardAnswer): string {
   if (a.scale) return content.scale?.find((s) => s.id === a.scale)?.label ?? a.scale;
   const b = content.buttons?.find((x) => x.id === a.button);
   const choice = b?.choices?.find((x) => x.id === a.choice);

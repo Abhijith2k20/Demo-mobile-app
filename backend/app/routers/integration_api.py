@@ -10,17 +10,13 @@ from fastapi.responses import JSONResponse
 from .. import db
 from ..core import ApiError
 from ..schemas import CardCreate, CardPatch
-from ..services import cards, integrations
+from ..services import cards, integrations, limits
 
 router = APIRouter(prefix="/api/v1", tags=["cards api"])
 
-CALLS_PER_MINUTE = 120
-
-
 def integration(authorization: str = Header(default="")) -> str:
     company_id = integrations.company_for_key(authorization.removeprefix("Bearer ").strip())
-    if not integrations.count_call(company_id, CALLS_PER_MINUTE):
-        raise ApiError("RATE_LIMITED", "Too many calls: 120 a minute per company.", {"retryAfter": 60})
+    limits.hit(company_id, "cards_api")
     db.current().set_company(company_id)
     return company_id
 

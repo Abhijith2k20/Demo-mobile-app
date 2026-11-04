@@ -139,20 +139,20 @@ def company_page(company_id: str, siteline_platform: str | None = Cookie(None), 
                   note=note, public_url=config.PUBLIC_URL, active_count=sum(1 for m in members if m["status"] == "active"),
                   transferable=[m for m in members if m["status"] == "active" and m["role"] != "owner"],
                   mock=_mock_data(company_id) if link.get("kind") == "mock" else None,
-                  deliveries=_as_company_do(company_id, lambda: integrations.deliveries(30)) if link else [])
+                  deliveries=_deliveries(company_id) if link else [])
+
+
+def _deliveries(company_id: str) -> list[dict]:
+    with db.as_company(company_id):
+        return integrations.deliveries(30)
 
 
 def _mock_data(company_id: str) -> dict:
     """The mock PM app's projects and tasks for one company (its tables are per company)."""
-    t = db.current()
-    previous = t.company_id
-    t.set_company(company_id)
-    try:
+    with db.as_company(company_id):
         projects = db.rows("SELECT * FROM pm_mock_projects ORDER BY name")
         tasks = db.rows("SELECT * FROM pm_mock_tasks WHERE deleted_at IS NULL ORDER BY project_id, planned_start, name")
         down = mock.is_down()
-    finally:
-        t.set_company(previous)
     return {"projects": projects, "tasks": tasks, "down": down, "names": {p["id"]: p["name"] for p in projects}}
 
 
@@ -208,16 +208,6 @@ def new_pm_key(company_id: str, siteline_platform: str | None = Cookie(None)):
 def _as_company(company_id: str):
     db.current().set_company(company_id)
 
-
-def _as_company_do(company_id: str, fn):
-    """Runs `fn` with this company set, then puts the previous one back (the panel itself has no company)."""
-    t = db.current()
-    previous = t.company_id
-    t.set_company(company_id)
-    try:
-        return fn()
-    finally:
-        t.set_company(previous)
 
 
 @router.post("/companies/{company_id}/mock/tasks")

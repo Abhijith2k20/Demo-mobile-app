@@ -30,16 +30,11 @@ def create(*, name: str, time_zone: str, owner_name: str, owner_identifier: str,
     cid = company_id or uuid7()
     c = db.insert("companies", {"id": cid, "name": name, "slug": _slug(name), "timeZone": time_zone,
                                 "pmCompanyId": pm_company_id})
-    t = db.current()
-    previous = t.company_id
-    t.set_company(cid)
-    try:
+    with db.as_company(cid):
         db.insert("channels", {"id": uuid7(), "companyId": cid, "projectId": None, "name": "announcements", "kind": "company",
                                "isPrivate": False, "postingPolicy": "admins"})
         db.insert("channels", {"id": uuid7(), "companyId": cid, "projectId": None, "name": "general", "kind": "company",
                                "isPrivate": False, "postingPolicy": "everyone"})
-    finally:
-        t.set_company(previous)
     if pm_kind != "none":  # without a link the company simply gets no cards
         db.insert("integrations", {"companyId": cid, "kind": pm_kind, "webhookUrl": webhook_url, "options": {}})
         if pm_kind == "mock":

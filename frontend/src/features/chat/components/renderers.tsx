@@ -16,7 +16,7 @@ import { useChat } from '../context';
 type Props = { message: Message };
 
 /** Body text with @mentions highlighted. */
-export function RichText({ text }: { text: string }) {
+function RichText({ text }: { text: string }) {
   const { c } = useTheme();
   const { mentionNames, me } = useChat();
   const parts = text.split(/(@[\p{L}]+)/gu);

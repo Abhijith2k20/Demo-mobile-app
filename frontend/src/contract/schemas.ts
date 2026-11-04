@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const id = z.string().min(8);
 
-export const projectPatchSchema = z
+const projectPatchSchema = z
   .object({
     name: z.string().trim().min(2, 'Give the project a name').max(80),
     client: z.string().trim().max(80),

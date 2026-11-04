@@ -31,7 +31,7 @@ export interface ProjectMember {
   userId: ID;
 }
 
-export type ChannelKind = 'project' | 'company' | 'dm' | 'bot';
+type ChannelKind = 'project' | 'company' | 'dm' | 'bot';
 export interface Channel {
   id: ID;
   companyId: ID;
@@ -52,7 +52,7 @@ export type MessageType =
   | 'system';
 
 /** 'pending' and 'failed' only exist on the phone, for messages still in the send queue. */
-export type MessageStatus = 'sent' | 'pending' | 'failed';
+type MessageStatus = 'sent' | 'pending' | 'failed';
 
 export interface Message {
   id: ID;
@@ -73,7 +73,7 @@ export interface Message {
 
 export type Tone = 'info' | 'success' | 'warning' | 'danger';
 
-export interface CardChoice {
+interface CardChoice {
   id: string;
   label: string;
   noteRequired?: boolean;
@@ -161,7 +161,7 @@ export interface Activity {
 // ---- What the API returns: records plus fields the server works out for the viewer ----
 
 /** What the server says the viewer may do in a project (the app's hook adds helpers: `useProjectAccess`). */
-export interface ProjectAccessInfo {
+interface ProjectAccessInfo {
   /** Actions the viewer may take in this project right now (e.g. 'channel.manage', 'project.archive'). */
   permissions: string[];
 }

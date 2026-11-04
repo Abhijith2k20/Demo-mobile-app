@@ -4,7 +4,7 @@ import { get, keys } from '@/lib/queries';
 import type { DemoAccount } from '@/types/models';
 import { useRoleLabels } from '../shared';
 
-export interface DemoUser {
+interface DemoUser {
   identifier: string;
   company: string;
   name: string;

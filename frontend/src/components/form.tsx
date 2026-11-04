@@ -1,8 +1,7 @@
-// Form pieces: Field (label + error), Input, Stepper.
-import { Feather } from '@expo/vector-icons';
+// Form pieces: Field (label + error), Input.
 import type { ReactNode } from 'react';
-import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
-import { radius, space, touch } from '@/theme/spacing';
+import { TextInput, View, type TextInputProps } from 'react-native';
+import { radius, space } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { T } from './T';
 
@@ -41,34 +40,5 @@ export function Input({ style, ...rest }: TextInputProps) {
       ]}
       {...rest}
     />
-  );
-}
-
-export function Stepper({ value, onChange, min = 0, max = 99 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
-  const { c } = useTheme();
-  const btn = (icon: 'minus' | 'plus', next: number, label: string) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={() => onChange(Math.max(min, Math.min(max, next)))}
-      style={{
-        width: touch.large,
-        height: touch.large,
-        borderRadius: radius.input,
-        backgroundColor: c.surfaceAlt,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <Feather name={icon} size={20} color={c.text} />
-    </Pressable>
-  );
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
-      {btn('minus', value - 1, 'Fewer')}
-      <T variant="title" style={{ minWidth: 36, textAlign: 'center' }}>
-        {value}
-      </T>
-      {btn('plus', value + 1, 'More')}
-    </View>
   );
 }

@@ -14,7 +14,7 @@ import { useSession } from '@/stores/session';
 import { toast } from '@/stores/ui';
 import type { Attachment, CardAnswer, ID, MessageType } from '@/types/models';
 
-export interface QueuedPhoto {
+interface QueuedPhoto {
   attachmentId: ID;
   /** File on the phone. */
   uri: string;
@@ -77,7 +77,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export type NewItem = DistributiveOmit<OutboxItem, keyof Base> & { id?: ID };
 
 /** Waits after a temporary failure: 2 s, 5 s, 10 s, then every 20 s. */
-export const BACKOFF_MS = [2000, 5000, 10000, 20000];
+const BACKOFF_MS = [2000, 5000, 10000, 20000];
 const TEMPORARY = new Set(['offline', 'timeout', 'server', 'rate_limited']);
 /** A server error this many times in a row is a bug, not bad signal: stop blocking the queue. */
 export const MAX_SERVER_ERRORS = 5;

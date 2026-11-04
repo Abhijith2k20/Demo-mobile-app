@@ -7,7 +7,7 @@ export function useInvites(enabled: boolean): { invites: SentInvite[]; loading: 
   return { invites: q.data?.invites ?? [], loading: q.isPending && enabled };
 }
 
-export interface PmLink {
+interface PmLink {
   connected: boolean;
   kind?: 'mock' | 'http';
   /** When the PM app last called Siteline. */

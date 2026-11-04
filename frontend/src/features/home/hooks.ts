@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import type { ChannelView, MessageView, ProjectView, UserView } from '@/types/models';
 import { useChannels, useMe, useProjects, useUnreadCounts, useUsers } from '../shared';
 
-export interface HomeProject {
+interface HomeProject {
   project: ProjectView;
   channels: ChannelView[];
   unread: number;
 }
-export interface HomeDm {
+interface HomeDm {
   channel: ChannelView;
   peer: UserView;
   unread: number;
