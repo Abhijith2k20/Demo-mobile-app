@@ -1,6 +1,11 @@
 # Every push: backend tests against a real Postgres, and the app's typecheck, lint and tests (spec §2, CI).
+# Also every Monday, so a newly published vulnerability in a dependency fails the checks without waiting for a push.
 name: checks
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -17,7 +22,9 @@ jobs:
         with: { python-version: "3.13" }
       - name: App database user (not a superuser, so row-level security applies)
         run: psql postgresql://postgres:postgres@localhost:5432/postgres -f db/init-local.sql
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt pip-audit
+      - name: Known vulnerabilities in Python packages
+        run: pip-audit -r requirements.txt
       - run: python -m pyflakes app tests
       - run: pytest -q
         env: { TEST_DATABASE_URL: "postgresql://siteline:siteline@localhost:5432/siteline_test" }
@@ -29,6 +36,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
+      - name: Known vulnerabilities in packages the app ships
+        # Critical only for now: the remaining highs are in Expo's build tools and in expo-router's query-string,
+        # fixed by the SDK 58 upgrade (DECISIONS.md). Raise this to "high" after that upgrade.
+        run: npm audit --omit=dev --audit-level=critical
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --ci

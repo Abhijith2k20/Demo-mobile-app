@@ -1,0 +1,18 @@
+# Weekly pull requests for outdated or vulnerable dependencies (security fixes arrive as soon as they're published).
+# Expo packages must stay on versions the SDK supports: for those, run `npx expo install --fix` instead of merging blindly.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      expo:
+        patterns: ["expo", "expo-*", "@expo/*", "react-native", "react-native-*", "react", "react-dom", "jest-expo"]
+  - package-ecosystem: pip
+    directory: /backend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
