@@ -7,7 +7,7 @@ export interface TransportRequest {
   path: string;
   body?: unknown;
   /** multipart upload instead of JSON */
-  form?: FormData;
+  form?: Upload;
   headers: Record<string, string>;
 }
 export interface TransportResponse {
@@ -36,6 +36,21 @@ function baseUrl(): string {
 export const API_URL = baseUrl();
 
 const TIMEOUT_MS = 12_000;
+/** Uploads get time for their size: the slowest connection still worth waiting for (about 64 kbit/s, weak 2G). */
+const MIN_UPLOAD_BYTES_PER_SECOND = 8_000;
+/** When the phone can't tell a file's size: as long as the largest file allowed (25 MB). */
+const UNKNOWN_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/** A multipart upload and its size, so the time limit can grow with the file. */
+export interface Upload {
+  data: FormData;
+  bytes: number;
+}
+
+function timeoutFor(req: TransportRequest): number {
+  if (!req.form) return TIMEOUT_MS;
+  return TIMEOUT_MS + ((req.form.bytes || UNKNOWN_UPLOAD_BYTES) / MIN_UPLOAD_BYTES_PER_SECOND) * 1000;
+}
 
 /** Demo panel switch: behave as if the phone had no signal. */
 let simulatedOffline = false;
@@ -49,11 +64,11 @@ export const isSimulatedOffline = (): boolean => simulatedOffline;
 export async function request(req: TransportRequest): Promise<TransportResponse> {
   if (simulatedOffline) throw new TransportError('offline');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutFor(req));
   try {
     const headers: Record<string, string> = { Accept: 'application/json', ...req.headers };
     let body: BodyInit | undefined;
-    if (req.form) body = req.form;
+    if (req.form) body = req.form.data;
     else if (req.body !== undefined) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify(req.body);
@@ -141,17 +156,21 @@ export function openEventStream(
 }
 
 /** A photo on the phone becomes a file on the server. */
-export function photoForm(uri: string): FormData {
+export function photoForm(uri: string, id: string, bytes: number): Upload {
   const name = uri.split('/').pop() || 'photo.jpg';
   const type = /\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : 'image/jpeg';
-  return uploadForm(uri, 'image', name, type);
+  return uploadForm(uri, 'image', name, type, id, bytes);
 }
 
-/** A file for POST /uploads; `kind` sets the server's size limit and allowed types (it checks the content). */
-export function uploadForm(uri: string, kind: 'image' | 'voice' | 'file', name: string, type: string): FormData {
-  const form = new FormData();
+/**
+ * A file for POST /uploads; `kind` sets the server's size limit and allowed types (it checks the content).
+ * `id` is picked by the phone and kept with the queued item: sending it again returns the same upload.
+ */
+export function uploadForm(uri: string, kind: 'image' | 'voice' | 'file', name: string, type: string, id: string, bytes: number): Upload {
+  const data = new FormData();
   // React Native's FormData takes a { uri, name, type } file descriptor.
-  form.append('file', { uri, name, type } as unknown as Blob);
-  form.append('kind', kind);
-  return form;
+  data.append('file', { uri, name, type } as unknown as Blob);
+  data.append('kind', kind);
+  data.append('id', id);
+  return { data, bytes };
 }

@@ -19,6 +19,15 @@ export function keepPhoto(uri: string, id: string): string {
   }
 }
 
+/** The file's size in bytes, or 0 when the phone can't tell. */
+export function fileSize(uri: string): number {
+  try {
+    return new File(uri).size ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function photoExists(uri: string): boolean {
   try {
     return new File(uri).exists;

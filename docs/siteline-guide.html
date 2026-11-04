@@ -523,8 +523,8 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <div class="grid g4" style="margin-top:14px">
     <div class="card"><div class="stat">99</div><div>app source files</div></div>
     <div class="card"><div class="stat">48</div><div>server source files</div></div>
-    <div class="card"><div class="stat">109</div><div>server tests</div></div>
-    <div class="card"><div class="stat">9</div><div>database migrations</div></div>
+    <div class="card"><div class="stat">120</div><div>server tests</div></div>
+    <div class="card"><div class="stat">10</div><div>database migrations</div></div>
   </div>
 </section>
 
@@ -685,7 +685,7 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
 
   <h2>Checks before anything ships</h2>
   <div class="grid g3">
-    <div class="card"><b>On every push (GitHub Actions)</b><ul class="clean small"><li>Server: pyflakes, 109 tests on a real Postgres</li><li>App: typecheck, lint, tests</li><li>Known vulnerabilities: <code>pip-audit</code>, <code>npm audit</code></li></ul></div>
+    <div class="card"><b>On every push (GitHub Actions)</b><ul class="clean small"><li>Server: pyflakes, 120 tests on a real Postgres</li><li>App: typecheck, lint, tests</li><li>Known vulnerabilities: <code>pip-audit</code>, <code>npm audit</code></li></ul></div>
     <div class="card"><b>Every Monday</b><p class="muted small">The same checks run again, so a newly published vulnerability fails the build. Dependabot opens update pull requests weekly.</p></div>
     <div class="card"><b>In production</b><ul class="clean small"><li>Sentry for errors</li><li><code>GET /health</code> checks the database and worker</li><li>JSON logs with no secrets or message text</li><li>Daily backups kept 14 days</li></ul></div>
   </div>
@@ -718,7 +718,7 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
   <p class="lead">Where Siteline stands, in four honest levels: built, tested, connected to the real services, and ready for customers.</p>
   <div class="grid g4">
     <div class="card"><span class="pill ok">Done</span><h3>1 · Development complete</h3><p class="muted small">Every MVP feature in the spec is built (build steps 1–9).</p></div>
-    <div class="card"><span class="pill ok">Done</span><h3>2 · Functionally tested</h3><p class="muted small">109 server tests, 19 app tests, 140 black-box checks against a running server, and the Android emulator.</p></div>
+    <div class="card"><span class="pill ok">Done</span><h3>2 · Functionally tested</h3><p class="muted small">120 server tests, 20 app tests, 140 black-box checks against a running server, and the Android emulator.</p></div>
     <div class="card"><span class="pill warn">Not yet</span><h3>3 · Real services verified</h3><p class="muted small">Push, email (Resend), file storage (R2), Render's proxy and iOS still need a staging deploy and real phones.</p></div>
     <div class="card"><span class="pill warn">Not yet</span><h3>4 · Production readiness verified</h3><p class="muted small">Needs the load test, a tested database restore, and an outside security review.</p></div>
   </div>
@@ -1199,8 +1199,8 @@ const arch = [
   { k: 'mock', e: '', n: 'Mock PM app', s: 'Built in, for testing', d: 'Stands in for a real PM app in development and staging. Uses the same Cards API code and the same webhook delivery.', tech: 'Python, inside the server', where: 'backend/app/mockpm/', to: ['api'] },
   { z: 'Siteline servers (Render, Singapore)' },
   { k: 'api', e: '', n: 'API server', s: 'FastAPI', d: 'Answers every request: the app API, the Cards API, the platform panel, and live WebSocket updates. Checks sign-in, permissions and rate limits.', tech: 'Python 3.13, FastAPI, Pydantic, uvicorn', where: 'backend/app/main.py, routers/, services/', to: ['db', 'r2', 'phone'] },
-  { k: 'worker', e: '', n: 'Worker', s: 'Background jobs', d: 'Runs one job at a time from the jobs table: emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff; after a failed webhook it records the error on the company\'s PM link. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
-  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 9 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
+  { k: 'worker', e: '', n: 'Worker', s: 'Background jobs', d: 'Runs jobs from the jobs table in 4 parallel loops (they never take the same job): emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff; after a failed webhook it records the error on the company\'s PM link. Sign-in codes and pushes go first.'s PM link. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
+  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 10 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
   { k: 'r2', e: '', n: 'File storage', s: 'Cloudflare R2', d: 'Photos, voice notes and files, in a private bucket. Each file is under its company; links are signed and expire.', tech: 'S3 API (boto3)', where: 'backend/app/services/files.py', to: ['api'] },
   { z: 'Hosted services' },
   { k: 'email', e: '', n: 'Email', s: 'Resend', d: 'Sign-in codes and invites.', tech: 'Resend HTTP API', where: 'backend/app/senders/email.py', to: ['worker'] },
@@ -1272,8 +1272,8 @@ const trees = {
     ['app/senders/', 'email.py (Resend), push.py (Expo)'],
     ['app/mockpm/', 'The stand-in PM app: decides what to ask and when'],
     ['app/templates/platform/', 'The platform panel\'s pages (Jinja2)'],
-    ['db/migrations/', '001–009, numbered SQL files, applied at start-up, never edited once run'],
-    ['tests/', '109 tests: rules, every route, company separation, jobs, security'],
+    ['db/migrations/', '001–010, numbered SQL files, applied at start-up, never edited once run'],
+    ['tests/', '120 tests: rules, every route, company separation, jobs, security'],
     ['.env.example · requirements.txt · Dockerfile', 'Settings list, pinned packages, the server image'],
   ]],
   root: ['Demo paliath/', 'The repository', [
@@ -1319,7 +1319,7 @@ const tables = [
   ['messages', 'company', 'Every message: type, text, extra data, reactions, thread parent.'],
   ['cards', 'company', 'The PM app\'s cards: content, state, answer, delivery to the PM app.'],
   ['activities', 'company', 'Mentions and thread replies for the Activity tab.'],
-  ['uploads', 'company', 'Files: storage key, real type, size.'],
+  ['uploads', 'company', 'Files: storage key, real type, size, and when a message or answer first used it. Unused uploads are removed after 7 days.'],
   ['pm_mock_*', 'company', 'The mock PM app\'s own projects and tasks (development and staging).'],
 ];
 function renderTables(k) {
@@ -1388,17 +1388,18 @@ renderRoutes();
 /* ---------- Security ---------- */
 const sec = [
   ['Sign-in', '', 'No passwords', 'Sign-in is a 6-digit email code: nothing to guess, reuse or leak. Codes last 10 minutes, die after 5 wrong tries, and are stored only as fingerprints.'],
-  ['Sign-in', '', 'Limits on sign-in', 'At most 5 codes per email and 20 per network address an hour. The same answer for unknown emails, so nobody can probe who\'s on Siteline.'],
-  ['Sign-in', '', 'Tokens kept safe', 'Phone tokens live in encrypted SecureStore. Refresh tokens change on every use; reusing an old one signs that device out. The platform panel uses an httponly cookie.'],
+  ['Sign-in', '', 'Limits on sign-in', 'At most 5 codes per email and 20 per network address an hour, for the app and the platform panel alike (one code service). The same answer for unknown emails, so nobody can probe who\'s on Siteline.'],
+  ['Sign-in', '', 'Tokens kept safe', 'Phone tokens live in encrypted SecureStore. Refresh tokens change on every use. If the reply was lost on a bad line, the phone can retry with the old one until it uses its new tokens; after that, the old one signs that device out. The platform panel uses an httponly cookie.'],
   ['Separation', '', 'Companies can\'t see each other', 'The company comes from the session. Postgres row-level security returns only that company\'s rows. Another company\'s ids answer "not found". Tested on every route.'],
   ['Separation', '', 'Permissions on the server', 'Every check runs on the server (rules.py, access.py). Changing the app can\'t unlock anything.'],
   ['Separation', '', 'Only allowed fields saved', 'Requests drop unknown fields. Nobody can make themselves an admin by adding "role" to a request.'],
   ['Input', '', 'Every input checked', 'Request bodies are validated and size-limited (1 MB; 26 MB for uploads). SQL always uses parameters, never text built from input.'],
+  ['Input', '', 'Uploads safe to repeat', 'The phone picks each upload\'s id and keeps it, so sending a file again after a lost reply returns the first upload, and uploads get time for their size (about 64 kbit/s), so big files finish on slow signal.'],
   ['Input', '', 'Uploads checked by content', 'Only JPEG, PNG, WebP, HEIC and PDF, judged by the file\'s first bytes, not its name. Stored privately under the company; links are signed and expire; nothing uploaded is ever run.'],
   ['Input', '', 'No HTML injection', 'The app shows text as text. The platform panel\'s templates escape every value automatically.'],
   ['Abuse', '', 'Rate limits', 'Per person: 120 changes a minute, 30 uploads, 30 searches, 30 invites an hour. Cards API: 120 calls a minute per company. The phone\'s queue waits and retries, so nothing is lost.'],
   ['Abuse', '', 'Signed webhooks', 'Every webhook to the PM app is signed (HMAC-SHA256) with a timestamp and an id, so the PM app can check it\'s real and drop repeats.'],
-  ['Abuse', '', 'Webhook addresses checked', 'Outside local development a webhook URL must be https and point to a public address, checked when it\'s saved and again before every delivery, so Siteline can\'t be aimed at its own network (SSRF).'],
+  ['Abuse', '', 'Webhook addresses checked', 'Outside local development a webhook URL must be https and point to a public address, checked when it\'s saved and again before every delivery, and Siteline connects to the exact address it checked (no second lookup), so it can\'t be aimed at its own network (SSRF, DNS rebinding).'],
   ['Abuse', '', 'Secret changes without breaking', 'For 24 hours after a new webhook secret is made, webhooks carry both the new signature and the previous one (X-Siteline-Signature-Previous). The old API key also works for 24 hours.'],
   ['Input', '', 'File links expire', 'File links are signed and work until the end of the next hour. Someone removed from a channel can still open a link they already had until it expires (at most about 2 hours), but gets no new ones.'],
   ['Running', '', 'Safe defaults', 'The server won\'t start without SITELINE_ENV, and refuses weak secrets, the demo code, local file storage or http in production. Dev routes are never mounted in production.'],
@@ -1431,7 +1432,7 @@ const decisions = [
   ['Design', 'Own bottom sheet component', 'Sheets are built from React Native Modal, Reanimated and gesture-handler, not @gorhom/bottom-sheet.', 'That library mounted but never opened on Expo.', 'Siteline maintains its own sheet code (one file).'],
   ['Tech', 'One database, company id on every row', 'Shared tables with company_id and row-level security, instead of a database per company.', 'Cheaper, one migration for everyone, fits hundreds of companies.', 'Mistakes are caught by RLS, but global tables still need care.'],
   ['Tech', 'Plain SQL, no ORM', 'psycopg 3 with numbered SQL migrations instead of SQLAlchemy and Alembic.', 'The code needs neither an ORM nor generated migrations; SQL stays visible.', 'Hand-written queries; helpers keep them safe.'],
-  ['Tech', 'Jobs in Postgres, no Redis', 'Emails, pushes and webhooks are rows in a jobs table, run by one worker.', 'Survives restarts, never double-sends, queued in the same transaction as the change.', 'One worker; add more when job lag passes a minute (claiming already allows it).'],
+  ['Tech', 'Jobs in Postgres, no Redis', 'Emails, pushes and webhooks are rows in a jobs table, run by a worker with 4 parallel loops.', 'Survives restarts, never double-sends, queued in the same transaction as the change; one slow call holds up only its own loop.', 'More loops (SITELINE_WORKER_LOOPS) or worker processes if job lag passes a minute.'],
   ['Tech', 'Events say "changed", the app refetches', 'Live events carry ids only, through an events table plus NOTIFY.', 'No data leaks through events; avoids Postgres\'s 8 kB notify limit.', 'An extra fetch after each event.'],
   ['Tech', 'Platform panel as server templates', 'Jinja2 pages served by the API, not a separate admin web app.', 'Standard for internal tools: one deploy, cookie sign-in, auto-escaping.', 'Less interactive than a full web app.'],
   ['Tech', 'Development builds, Expo SDK 58', 'The app ships through EAS builds; upgraded to SDK 58, which also cleared the last security warnings.', 'Push, real voice notes and files need native modules.', 'Testers need Expo Go 58 or a development build.'],

@@ -152,7 +152,6 @@ export interface Activity {
   projectId: ID | null;
   channelId: ID | null;
   messageId: ID | null;
-  taskIds: ID[];
   text: string;
   /** Extra lines under the text. */
   lines: string[];

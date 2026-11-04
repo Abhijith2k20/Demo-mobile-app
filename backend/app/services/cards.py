@@ -9,6 +9,7 @@ from ..events import publish
 from ..jobs.queue import enqueue
 from ..notify import push
 from ..store import BOT_ID, bot_channel_for
+from . import files
 from .messaging import post_message
 
 ANSWER_PARTS = ("scale", "scaleReached", "buttons", "note")
@@ -175,6 +176,7 @@ def answer(user: dict, card_id: str, a: dict) -> dict:
     for upload_id in [a.get("voiceUploadId"), *(a.get("photoUploadIds") or [])]:
         if upload_id and not db.value("SELECT 1 FROM uploads WHERE id = %(id)s AND user_id = %(u)s", id=upload_id, u=user["id"]):
             raise invalid({"note": "Upload not found"})
+    files.mark_attached([a.get("voiceUploadId"), *(a.get("photoUploadIds") or [])])
     answered_at = a.pop("answeredAt", None) or now_iso()
     c = db.update("cards", {"id": c["id"]}, {
         "state": "answered", "answer": {k: v for k, v in a.items() if v not in (None, "", [])},

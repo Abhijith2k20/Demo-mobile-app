@@ -7,7 +7,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import html
-import secrets
 import time
 
 from datetime import date
@@ -17,7 +16,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import config, db
 from ..core import ApiError, uuid7
-from ..jobs.queue import enqueue
 from ..mockpm import data as mock
 from ..deps import client_ip
 from ..schemas import CompanyCreate
@@ -74,17 +72,11 @@ def panel(siteline_platform: str | None = Cookie(None), error: str = ""):
 @router.post("/login", response_class=HTMLResponse)
 def login(request: Request, email: str = Form(...)):
     email = email.strip().lower()
-    ip = client_ip(request)
-    if db.value("SELECT count(*) FROM otp_requests WHERE ip = %(ip)s AND at > now() - interval '1 hour'", ip=ip) >= 20:
-        return RedirectResponse("/platform?error=Too+many+tries.+Wait+an+hour.", status_code=303)
-    db.run("INSERT INTO otp_requests (identifier, ip) VALUES (%(v)s, %(ip)s)", v="platform:" + email, ip=ip)
-    if db.value("SELECT 1 FROM platform_admins WHERE email = %(e)s", e=email):
-        # The demo code never opens the panel outside local development (staging is on the internet).
-        code = (config.fixed_code_for(email) if config.DEVELOPMENT else None) or f"{secrets.randbelow(1_000_000):06d}"
-        db.run("""INSERT INTO otp_codes (identifier, code_hash, expires_at) VALUES (%(v)s, %(h)s, now() + interval '10 minutes')
-                  ON CONFLICT (identifier) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at,
-                  attempts = 0""", v="platform:" + email, h=accounts._hash("platform:" + email + code))
-        enqueue("send_code", {"identifier": email, "code": code}, company_id=None)
+    try:
+        accounts.request_code("platform:" + email, client_ip(request), send_to=email,
+                              may_sign_in=lambda _: db.value("SELECT 1 FROM platform_admins WHERE email = %(e)s", e=email))
+    except ApiError as e:
+        return RedirectResponse("/platform?error=" + e.message.replace(" ", "+"), status_code=303)
     return render("code.html", title="Enter code", email=email)
 
 

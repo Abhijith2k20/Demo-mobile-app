@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from .. import db
 from ..mockpm import bot as mock
-from ..services import integrations
+from ..services import files, integrations
 from ..senders import email, push
 from .queue import enqueue
 
@@ -52,6 +52,11 @@ def cleanup(p: dict) -> None:
     db.run("DELETE FROM otp_requests WHERE at < now() - interval '1 hour'")
     db.run("DELETE FROM otp_codes WHERE expires_at < now() - interval '1 day'")
     db.run("UPDATE invites SET status = 'cancelled' WHERE status = 'pending' AND expires_at < now() - interval '30 days'")
+    t = db.current()
+    for cid in [r["id"] for r in db.rows("SELECT id FROM companies")]:
+        t.set_company(cid)
+        files.remove_unused_uploads()
+    t.set_company(None)
     nxt = datetime.now(ZoneInfo("UTC")) + timedelta(hours=1)
     # Labelled with the next hour: this run's own label (this hour) is still taken by the job that is running.
     enqueue("cleanup", {}, run_at=nxt, company_id=None, dedupe_key=f"cleanup:{nxt:%Y-%m-%dT%H}")

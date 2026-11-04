@@ -7,13 +7,17 @@ import { useSession } from '@/stores/session';
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest's documented mock for AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('@/lib/api/client', () => ({ ...jest.requireActual('@/lib/api/client'), api: jest.fn() }));
-jest.mock('@/lib/api/transport', () => ({ photoForm: (uri: string) => ({ uri }) }));
+jest.mock('@/lib/api/transport', () => ({
+  photoForm: (uri: string, id: string, bytes: number) => ({ uri, id, bytes }),
+  uploadForm: (uri: string, _k: string, _n: string, _t: string, id: string, bytes: number) => ({ uri, id, bytes }),
+}));
 jest.mock('@/lib/queries', () => ({ keys: new Proxy({}, { get: () => () => [] }), refresh: jest.fn() }));
 jest.mock('@/stores/ui', () => ({ toast: jest.fn() }));
 const mockMissing = new Set<string>();
 jest.mock('@/lib/queuedFiles', () => ({
   keepPhoto: (uri: string, id: string) => `kept://${id}`,
   photoExists: (uri: string) => !mockMissing.has(uri),
+  fileSize: () => 1000,
   dropPhoto: jest.fn(),
 }));
 
@@ -105,7 +109,26 @@ it('uploads each photo once, even when the message itself has to be retried', as
   expect(api.mock.calls.filter((c) => c[1] === '/uploads')).toHaveLength(1);
   const sent = api.mock.calls.at(-1)?.[2];
   expect(sent.data.attachments).toEqual([{ id: 'a1', kind: 'image', uri: 'http://server/files/up1', uploadId: 'up1' }]);
-  expect(api.mock.calls[0][3]).toEqual({ uri: 'kept://a1' }); // uploaded from the app's own copy
+  expect(api.mock.calls[0][3]).toEqual(expect.objectContaining({ uri: 'kept://a1', bytes: 1000 })); // the app's own copy, with its size
+});
+
+it('an upload whose reply was lost is sent again with the same id, so the server keeps one copy', async () => {
+  const timeout = () => new AppError('timeout', 'TIMEOUT', 'timeout', {}, 'r');
+  api.mockImplementationOnce(async () => {
+    throw timeout();
+  });
+  enqueue({ ...text('photo'), type: 'image', photos: [{ attachmentId: 'a1', uri: 'file:///p.jpg' }] });
+  await flush();
+  const firstId = api.mock.calls[0][3].id;
+  expect(firstId).toBeTruthy();
+  expect(items()[0].kind === 'message' && items()[0].photos[0].uploadKey).toBe(firstId); // saved before sending
+  api.mockImplementation(async (_m: string, path: string) => (path === '/uploads' ? { uploadId: firstId, url: 'u' } : {}));
+  jest.advanceTimersByTime(2000);
+  await flush();
+  const uploads = api.mock.calls.filter((c) => c[1] === '/uploads');
+  expect(uploads).toHaveLength(2);
+  expect(uploads[1][3].id).toBe(firstId);
+  expect(items()).toEqual([]);
 });
 
 it('survives an app restart: saved per person, and "sending" items are tried again', async () => {

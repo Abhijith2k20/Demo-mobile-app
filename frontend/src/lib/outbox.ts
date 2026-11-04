@@ -9,7 +9,7 @@ import { api, isAppError, type AppError } from '@/lib/api/client';
 import { photoForm, uploadForm } from '@/lib/api/transport';
 import { errorText } from '@/lib/i18n';
 import { keys, refresh } from '@/lib/queries';
-import { dropPhoto, keepPhoto, photoExists } from '@/lib/queuedFiles';
+import { dropPhoto, fileSize, keepPhoto, photoExists } from '@/lib/queuedFiles';
 import { useSession } from '@/stores/session';
 import { toast } from '@/stores/ui';
 import type { Attachment, CardAnswer, ID, MessageType } from '@/types/models';
@@ -21,6 +21,8 @@ export interface QueuedPhoto {
   /** Set once uploaded, so a retry never uploads it again. */
   uploadId?: ID;
   url?: string;
+  /** The id the upload is sent with, saved before sending: after a lost reply, sending again returns the same upload. */
+  uploadKey?: ID;
 }
 
 /** A voice note or a document sent with a message. */
@@ -31,6 +33,8 @@ export interface QueuedFile {
   mime: string;
   /** Set once uploaded, so a retry never uploads it again. */
   uploadId?: ID;
+  /** The id the upload is sent with, saved before sending (see QueuedPhoto). */
+  uploadKey?: ID;
 }
 
 interface Base {
@@ -183,7 +187,11 @@ async function uploadPhotos(item: OutboxItem & { photos: QueuedPhoto[] }): Promi
   for (let n = 0; n < photos.length; n++) {
     if (photos[n].uploadId) continue;
     if (!photoExists(photos[n].uri)) throw new MissingPhoto();
-    const res = await api<{ uploadId: ID; url: string }>('POST', '/uploads', undefined, photoForm(photos[n].uri));
+    if (!photos[n].uploadKey) {
+      photos[n] = { ...photos[n], uploadKey: uuidv7() };
+      update(item.id, { photos });
+    }
+    const res = await api<{ uploadId: ID; url: string }>('POST', '/uploads', undefined, photoForm(photos[n].uri, photos[n].uploadKey!, fileSize(photos[n].uri)));
     photos[n] = { ...photos[n], uploadId: res.uploadId, url: res.url };
     update(item.id, { photos });
   }
@@ -193,8 +201,11 @@ async function uploadPhotos(item: OutboxItem & { photos: QueuedPhoto[] }): Promi
 async function uploadFile(id: ID, file: QueuedFile | undefined, field: 'file' | 'voice'): Promise<QueuedFile | undefined> {
   if (!file || file.uploadId) return file;
   if (!photoExists(file.uri)) throw new MissingPhoto();
-  const res = await api<{ uploadId: ID }>('POST', '/uploads', undefined, uploadForm(file.uri, file.kind, file.name, file.mime));
-  const done = { ...file, uploadId: res.uploadId };
+  const key = file.uploadKey ?? uuidv7();
+  if (!file.uploadKey) update(id, { [field]: { ...file, uploadKey: key } });
+  const form = uploadForm(file.uri, file.kind, file.name, file.mime, key, fileSize(file.uri));
+  const res = await api<{ uploadId: ID }>('POST', '/uploads', undefined, form);
+  const done = { ...file, uploadKey: key, uploadId: res.uploadId };
   update(id, { [field]: done });
   return done;
 }

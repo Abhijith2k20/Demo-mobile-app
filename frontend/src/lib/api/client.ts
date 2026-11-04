@@ -3,7 +3,7 @@ import type { ApiErrorBody } from '@/contract/errorCodes';
 import { useDemo } from '@/stores/demo';
 import { useSession } from '@/stores/session';
 import { useUi } from '@/stores/ui';
-import { request, TransportError, type TransportRequest } from './transport';
+import { request, TransportError, type TransportRequest, type Upload } from './transport';
 
 export type ErrorKind =
   | 'offline'
@@ -50,7 +50,7 @@ export function setAuthLostHandler(fn: () => void): void {
   onAuthLost = fn;
 }
 
-async function send<T>(method: TransportRequest['method'], path: string, body: unknown, form?: FormData): Promise<T> {
+async function send<T>(method: TransportRequest['method'], path: string, body: unknown, form?: Upload): Promise<T> {
   const requestId = `req_${uuidv7()}`;
   const token = useSession.getState().accessToken;
   const headers: Record<string, string> = { 'X-Request-Id': requestId };
@@ -112,7 +112,7 @@ function refreshOnce(): Promise<boolean> {
 }
 
 /** The one function every feature uses to talk to the server. */
-export async function api<T>(method: TransportRequest['method'], path: string, body?: unknown, form?: FormData): Promise<T> {
+export async function api<T>(method: TransportRequest['method'], path: string, body?: unknown, form?: Upload): Promise<T> {
   try {
     return await send<T>(method, path, body, form);
   } catch (e) {

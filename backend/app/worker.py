@@ -4,6 +4,7 @@ SKIP LOCKED, so each is taken once."""
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 
@@ -60,12 +61,17 @@ def ensure_schedules() -> None:
                 queue.enqueue("mock_plan_day", {}, company_id=cid)
 
 
-def loop(stop: threading.Event | None = None) -> None:
+# Jobs run in parallel loops: one slow call (a PM app taking its 10 s, Expo at a busy moment) holds up only its own
+# loop. Claiming uses FOR UPDATE SKIP LOCKED, so two loops never take the same job.
+LOOPS = int(os.environ.get("SITELINE_WORKER_LOOPS", "4"))
+
+
+def loop(stop: threading.Event | None = None, *, schedules: bool = True) -> None:
     checked = 0.0
     while not (stop and stop.is_set()):
         try:
             # Hourly, not only at start: a daily plan or clean-up that failed for good is booked again.
-            if time.monotonic() - checked > SCHEDULE_CHECK_SECONDS:
+            if schedules and time.monotonic() - checked > SCHEDULE_CHECK_SECONDS:
                 ensure_schedules()
                 checked = time.monotonic()
             if run_due() == 0:
@@ -75,9 +81,18 @@ def loop(stop: threading.Event | None = None) -> None:
             time.sleep(5)
 
 
+def start(stop: threading.Event | None = None) -> list[threading.Thread]:
+    """LOOPS loops; only the first books the daily schedules."""
+    threads = [threading.Thread(target=loop, args=(stop,), kwargs={"schedules": n == 0}, daemon=True,
+                                name=f"siteline-worker-{n}") for n in range(LOOPS)]
+    for t in threads:
+        t.start()
+    return threads
+
+
 def start_inline() -> threading.Event:
     stop = threading.Event()
-    threading.Thread(target=loop, args=(stop,), daemon=True, name="siteline-worker").start()
+    start(stop)
     return stop
 
 
@@ -86,5 +101,6 @@ if __name__ == "__main__":
 
     setup_logging()
     db.migrate()
-    log.info("worker started")
-    loop()
+    log.info("worker started with %d loops", LOOPS)
+    for t in start():
+        t.join()

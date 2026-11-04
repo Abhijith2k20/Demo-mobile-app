@@ -775,3 +775,25 @@ Beyond the automated tests, three end-to-end checks against the running server, 
 - **Offline on the phone:** three messages and a card answer made in airplane mode, the app force-quit, the access
   token expired, then reconnected: the token refreshed by itself, each message arrived once and in order, and the
   answer reached the PM app. Note: a queued message's time is when the server received it, not when it was typed.
+
+## Second ponytail audit fixes (2026-11-04)
+
+Eight findings, each fixed at its cause (`backend/tests/test_audit2_fixes.py`, migration `010`):
+- **Uploads on slow signal:** every request had one 12-second limit, so a large file could never finish and blocked the
+  queue. Uploads now get time for their size (12 s plus the file at about 64 kbit/s).
+- **Lost refresh reply:** single-use refresh tokens treated a retry after a lost reply as a stolen copy and signed the
+  phone out. Sessions now record whether the newest access token has been used; until it has, the previous refresh
+  token is a retry and gets fresh tokens. After it has, reuse still ends the session.
+- **Platform codes:** the panel had its own copy of the code logic without the per-email limit, and every new code reset
+  the 5-try count. It now uses the app's code service (same limits and locks), with its own identifier and email.
+  The demo code never applies to platform identifiers outside development (`config.fixed_code_for`).
+- **Worker:** one loop ran jobs one at a time, so slow calls delayed everything. The worker runs 4 loops
+  (`SITELINE_WORKER_LOOPS`); claiming with `SKIP LOCKED` keeps them apart.
+- **Duplicate and orphan uploads:** the server picked upload ids, so a retry stored a second copy. The phone now picks the
+  id and keeps it with the queued item; the server returns the first upload for a repeat. Uploads record when a message
+  or answer first used them; unused ones are removed after 7 days by the hourly clean-up (existing used uploads were
+  marked by the migration).
+- **DNS rebinding:** webhooks now connect to the address that passed the check, with the real name for Host, SNI and the
+  certificate, instead of looking the name up again.
+- **Delivery history:** an index on jobs by company, kind and time.
+- **Removed:** the always-empty `activities.task_ids` and `taskIds`.

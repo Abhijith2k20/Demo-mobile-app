@@ -28,24 +28,37 @@ class Unreachable(Exception):
     """The PM app didn't take the webhook; try again later."""
 
 
-def check_webhook_url(url: str | None) -> None:
+def check_webhook_url(url: str | None) -> str | None:
     """Refuses a webhook URL that could point Siteline at its own network (SSRF): outside local development it must be
-    https and every address its name resolves to must be public. Checked when saved and again before each delivery."""
+    https and every address its name resolves to must be public. Returns the checked address to connect to (None in
+    development), so the name isn't looked up a second time between the check and the connection (DNS rebinding)."""
     if not url:
-        return
+        return None
     u = urlparse(url)
     if u.scheme not in ("https", "http") or not u.hostname or u.username or u.password:
         raise invalid({"webhookUrl": "Enter a full https:// address"})
     if config.DEVELOPMENT:
-        return
+        return None
     if u.scheme != "https":
         raise invalid({"webhookUrl": "Use an https:// address"})
     try:
-        addrs = {ai[4][0] for ai in socket.getaddrinfo(u.hostname, u.port or 443, proto=socket.IPPROTO_TCP)}
+        addrs = [ai[4][0] for ai in socket.getaddrinfo(u.hostname, u.port or 443, proto=socket.IPPROTO_TCP)]
     except OSError:
         raise invalid({"webhookUrl": "This address can't be found"}) from None
     if not addrs or not all(ipaddress.ip_address(a.split("%")[0]).is_global for a in addrs):
         raise invalid({"webhookUrl": "Use a public internet address, not a private or local one"})
+    return addrs[0]
+
+
+def _pinned(url: str, address: str | None) -> tuple[str, dict, dict]:
+    """The URL to connect to, extra headers and request options: the checked address, with the real name kept for the
+    Host header and for TLS (SNI and certificate checks), so the certificate must still match the name."""
+    if not address:
+        return url, {}, {}
+    u = urlparse(url)
+    host = f"[{address}]" if ":" in address else address
+    target = u._replace(netloc=f"{host}:{u.port}" if u.port else host).geturl()
+    return target, {"Host": u.netloc}, {"extensions": {"sni_hostname": u.hostname}}
 
 
 def _hash(key: str) -> str:
@@ -164,9 +177,10 @@ def _post(integration: dict, event: str, body: dict, event_id: str) -> dict:
     if not integration["webhookUrl"]:
         raise Unreachable("No webhook URL set")
     try:
-        check_webhook_url(integration["webhookUrl"])  # again now: the name may resolve somewhere else than when saved
+        address = check_webhook_url(integration["webhookUrl"])  # again now: the name may resolve somewhere else than when saved
     except ApiError as e:
         raise Unreachable("The webhook URL isn't allowed") from e
+    url, extra_headers, options = _pinned(integration["webhookUrl"], address)
     raw = json.dumps(body).encode()
     ts = str(int(time.time()))
     headers = {"Content-Type": "application/json", "X-Siteline-Event": event, "X-Siteline-Id": event_id,
@@ -176,7 +190,7 @@ def _post(integration: dict, event: str, body: dict, event_id: str) -> dict:
     if previous and integration.get("previousSecretUntil") and db.value("SELECT %(t)s::timestamptz > now()", t=integration["previousSecretUntil"]):
         headers["X-Siteline-Signature-Previous"] = signature(decrypt(previous) or "", ts, raw)
     try:
-        r = httpx.post(integration["webhookUrl"], content=raw, headers=headers, timeout=WEBHOOK_TIMEOUT)
+        r = httpx.post(url, content=raw, headers={**headers, **extra_headers}, timeout=WEBHOOK_TIMEOUT, **options)
     except httpx.HTTPError as e:
         raise Unreachable(f"Couldn't reach the PM app: {e}") from e
     if r.status_code >= 300:
@@ -202,7 +216,7 @@ def gave_up(payload: dict) -> None:
     set_delivery(card["id"], "failed", "Couldn't reach the PM app")
     for uid in admins():
         add_activity(userId=uid, kind="notice", actorId=card["userId"], projectId=None, channelId=None,
-                     messageId=None, taskIds=[], text=f"An answer to \"{card['content']['title']}\" couldn't reach the PM app.",
+                     messageId=None, text=f"An answer to \"{card['content']['title']}\" couldn't reach the PM app.",
                      lines=[])
 
 

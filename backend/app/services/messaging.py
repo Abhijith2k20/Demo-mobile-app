@@ -44,7 +44,7 @@ def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, 
     for uid in mentions:
         add_activity(
             userId=uid, kind="mention", actorId=sender_id, projectId=channel["projectId"], channelId=channel["id"],
-            messageId=thread_parent_id or m["id"], taskIds=[],
+            messageId=thread_parent_id or m["id"],
             text=f"{who} mentioned you in {channel_label(channel)}", lines=[body or ""],
         )
     url = f"/thread/{thread_parent_id}" if thread_parent_id else f"/channel/{channel['id']}"
@@ -60,7 +60,7 @@ def post_message(channel: dict, sender_id: str, *, type: str, body: str | None, 
         for uid in repliers:
             add_activity(
                 userId=uid, kind="thread_reply", actorId=sender_id, projectId=channel["projectId"],
-                channelId=channel["id"], messageId=thread_parent_id, taskIds=[],
+                channelId=channel["id"], messageId=thread_parent_id,
                 text=f"{who} replied in a thread in {channel_label(channel)}", lines=[body or ""],
             )
         push(list(repliers), f"{who} replied in {channel_label(channel)}", preview, {"url": url}, kind="thread",

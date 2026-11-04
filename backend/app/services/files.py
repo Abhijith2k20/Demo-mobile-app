@@ -9,7 +9,7 @@ import os
 import time
 from pathlib import Path
 
-from .. import config
+from .. import config, db
 
 LOCAL_DIR = Path(__file__).resolve().parents[2] / "uploads"
 LINK_SECONDS = 5 * 60  # a link to R2 works this long
@@ -66,6 +66,34 @@ def save(key: str, data: bytes, content_type: str) -> None:
     path = LOCAL_DIR / key
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
+
+
+def delete(key: str) -> None:
+    """Removes a stored file; a file that's already gone is fine."""
+    if config.STORAGE == "r2":
+        _r2().delete_object(Bucket=os.environ["R2_BUCKET"], Key=key)
+        return
+    (LOCAL_DIR / key).unlink(missing_ok=True)
+
+
+def mark_attached(upload_ids: list[str | None]) -> None:
+    """A message or card answer now uses these uploads, so the clean-up keeps them."""
+    ids = [u for u in upload_ids if u]
+    if ids:
+        db.run("UPDATE uploads SET attached_at = now() WHERE id = ANY(%(ids)s) AND attached_at IS NULL", ids=ids)
+
+
+UNUSED_UPLOAD_DAYS = 7  # long enough for a "Not sent" item to be retried; then an unused upload is removed
+
+
+def remove_unused_uploads() -> int:
+    """Deletes this company's uploads no message or answer ever used: a discarded queue item, or a second copy from
+    before uploads were safe to repeat. Runs per company (uploads are behind row-level security)."""
+    keys = [r["key"] for r in db.rows(f"""DELETE FROM uploads WHERE attached_at IS NULL
+                                          AND created_at < now() - interval '{UNUSED_UPLOAD_DAYS} days' RETURNING key""")]
+    for key in keys:
+        delete(key)
+    return len(keys)
 
 
 def local_path(key: str) -> Path:

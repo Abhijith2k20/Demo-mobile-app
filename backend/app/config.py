@@ -21,7 +21,10 @@ TEST_ACCOUNTS = ("@paliath.in", "@brightline.events", "@siteline.app")
 
 
 def fixed_code_for(identifier: str) -> str | None:
-    """The fixed code when this is a seeded test account (outside production), else None."""
+    """The fixed code when this is a seeded test account (outside production), else None. The platform panel
+    (identifiers "platform:…") gets it only in local development: staging is on the internet."""
+    if identifier.startswith("platform:") and not DEVELOPMENT:
+        return None
     return FIXED_CODE if FIXED_CODE and identifier.endswith(TEST_ACCOUNTS) else None
 
 # Siteline staff who may sign in to the platform panel (comma-separated emails), added at start-up. Without this a

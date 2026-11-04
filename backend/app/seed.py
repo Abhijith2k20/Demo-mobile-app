@@ -420,11 +420,11 @@ def build() -> Data:
     s.asks.append((s.users[U["ravi"]]["email"], T["False ceiling – living room"]))
 
     # ---- Activity ----
-    def activity(user: str, kind: str, actor: str, created: str, *, channel_id=None, message_id=None, task_ids=(),
+    def activity(user: str, kind: str, actor: str, created: str, *, channel_id=None, message_id=None,
                  text: str, lines=(), project_id=None) -> None:
         s.activities.append({"id": uuid_at(int(datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp() * 1000)),
                              "userId": U[user], "kind": kind, "actorId": U[actor], "projectId": project_id or sharma["id"],
-                             "channelId": channel_id, "messageId": message_id, "taskIds": list(task_ids), "text": text,
+                             "channelId": channel_id, "messageId": message_id, "text": text,
                              "lines": list(lines), "createdAt": created, "readAt": None})
 
     for who, prefix in (("ravi", "@Ravi"), ("suresh", "@Suresh")):

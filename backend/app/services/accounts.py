@@ -50,8 +50,10 @@ def pending_invites(identifier: str) -> list[dict]:
                       ORDER BY i.created_at""", v=identifier)
 
 
-def request_code(identifier: str, ip: str) -> None:
-    """Sends a code when the address belongs to someone or has an invite. The reply is the same either way."""
+def request_code(identifier: str, ip: str, *, may_sign_in=None, send_to: str | None = None) -> None:
+    """Sends a code when the address may sign in (by default: it belongs to someone or has an invite). The reply is the
+    same either way. The limits (per address and per IP) and the 5-try rule are the same for every sign-in, the
+    platform panel's included (it passes its own `may_sign_in` and an identifier of its own)."""
     # Requests at the same moment queue here, so each one sees the others in the count (no "50 at once").
     db.run("SELECT pg_advisory_xact_lock(hashtext(%(k)s))", k="otp-ip:" + ip)
     db.run("SELECT pg_advisory_xact_lock(hashtext(%(k)s))", k="otp-id:" + identifier)
@@ -61,13 +63,14 @@ def request_code(identifier: str, ip: str) -> None:
     if by_id >= PER_IDENTIFIER_PER_HOUR or by_ip >= PER_IP_PER_HOUR:
         raise ApiError("RATE_LIMITED", "Too many codes asked for. Try again in an hour.")
     db.run("INSERT INTO otp_requests (identifier, ip) VALUES (%(v)s, %(ip)s)", v=identifier, ip=ip)
-    if not user_by_identifier(identifier) and not pending_invites(identifier):
+    allowed = may_sign_in(identifier) if may_sign_in else (user_by_identifier(identifier) or pending_invites(identifier))
+    if not allowed:
         return
     code = config.fixed_code_for(identifier) or f"{secrets.randbelow(1_000_000):06d}"
     db.run(f"""INSERT INTO otp_codes (identifier, code_hash, expires_at, attempts) VALUES (%(v)s, %(h)s, now() + interval '{CODE_TTL}', 0)
                ON CONFLICT (identifier) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at,
                attempts = 0, created_at = now()""", v=identifier, h=_hash(identifier + code))
-    enqueue("send_code", {"identifier": identifier, "code": code}, company_id=None)
+    enqueue("send_code", {"identifier": send_to or identifier, "code": code}, company_id=None)
 
 
 def check_code(identifier: str, code: str) -> None:
@@ -119,23 +122,36 @@ def create_session(user_id: str, company_id: str | None, device: str | None = No
 def session_for_access(token: str) -> dict | None:
     if not token:
         return None
-    return db.row("""SELECT * FROM sessions WHERE access_hash = %(h)s AND revoked_at IS NULL AND access_expires_at > now()""",
-                  h=_hash(token))
+    s = db.row("""SELECT * FROM sessions WHERE access_hash = %(h)s AND revoked_at IS NULL AND access_expires_at > now()""",
+               h=_hash(token))
+    if s and not s["accessUsed"]:  # the phone has the tokens from its last refresh: an older refresh token is now a copy
+        db.run("UPDATE sessions SET access_used = true WHERE id = %(id)s", id=s["id"])
+    return s
 
 
 def refresh_session(token: str) -> dict:
-    """New access and refresh tokens. Using an old refresh token again ends the session (it was copied)."""
+    """New access and refresh tokens; the refresh token is single-use.
+    The previous refresh token is accepted again only while the tokens that replaced it are unused: then the phone
+    never got the reply (lost on a bad line) and is retrying. Once the new access token has been used, the previous
+    refresh token can only be a copy, and using it ends the session."""
     h = _hash(token or "")
-    s = db.row("SELECT * FROM sessions WHERE refresh_hash = %(h)s AND revoked_at IS NULL AND refresh_expires_at > now()", h=h)
+    s = db.row("""SELECT * FROM sessions WHERE refresh_hash = %(h)s AND revoked_at IS NULL AND refresh_expires_at > now()
+                  FOR UPDATE""", h=h)
+    retry = False
     if not s:
-        reused = db.row("SELECT * FROM sessions WHERE previous_refresh_hash = %(h)s AND revoked_at IS NULL", h=h)
-        if reused:
-            revoke_session(reused["id"])
-        raise ApiError("AUTH_EXPIRED", "Your session has expired.")
+        s = db.row("""SELECT * FROM sessions WHERE previous_refresh_hash = %(h)s AND revoked_at IS NULL
+                      AND refresh_expires_at > now() FOR UPDATE""", h=h)
+        if not s:
+            raise ApiError("AUTH_EXPIRED", "Your session has expired.")
+        if s["accessUsed"]:
+            revoke_session(s["id"])
+            raise ApiError("AUTH_EXPIRED", "Your session has expired.")
+        retry = True
     access, refresh = f"at_{secrets.token_urlsafe(32)}", f"rt_{secrets.token_urlsafe(32)}"
     db.run(f"""UPDATE sessions SET access_hash = %(a)s, access_expires_at = now() + interval '{config.ACCESS_TTL_SECONDS} seconds',
-                                   previous_refresh_hash = refresh_hash, refresh_hash = %(r)s, last_used_at = now()
-               WHERE id = %(id)s""", a=_hash(access), r=_hash(refresh), id=s["id"])
+                                   previous_refresh_hash = CASE WHEN %(retry)s THEN previous_refresh_hash ELSE refresh_hash END,
+                                   refresh_hash = %(r)s, access_used = false, last_used_at = now()
+               WHERE id = %(id)s""", a=_hash(access), r=_hash(refresh), retry=retry, id=s["id"])
     return {"accessToken": access, "refreshToken": refresh, "session": s}
 
 

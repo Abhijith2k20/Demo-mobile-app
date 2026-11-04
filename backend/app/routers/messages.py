@@ -12,7 +12,7 @@ from ..schemas import DmOpen, MessageCreate, MessagePatch, MuteSetting, Reaction
 from ..access import assert_project_active, channel_audience, visible_channel
 from ..store import BOT_ID, MESSAGE_COLUMNS, add_channel_member, ensure_channel_member, message, person
 from ..views import channel_view, message_view, order_key, reply_info
-from ..services import limits
+from ..services import files, limits
 from ..services.messaging import post_message
 
 router = APIRouter(tags=["messages"])
@@ -129,6 +129,7 @@ def create_message(channel_id: str, body: MessageCreate, user: dict = Depends(cu
     if body.type in ("voice", "file"):
         upload = _own_upload(user, (data or {}).get("uploadId"))
         data = {**(data or {}), "uri": None, "name": upload["name"] or (data or {}).get("name"), "size": upload["size"]}
+    files.mark_attached([a.get("uploadId") for a in (data or {}).get("attachments", []) or []] + [(data or {}).get("uploadId")])
     m = post_message(ch, user["id"], type=body.type, body=body.body, data=data,
                      thread_parent_id=body.threadParentId, id=body.id)
     return message_view(m, user, ch)

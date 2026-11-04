@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 
 from .. import config, db
+import re
+
 from ..core import ApiError, invalid, not_found, uuid7
 from ..deps import current_user
 from ..services import files, limits
@@ -13,8 +15,20 @@ from ..services import files, limits
 router = APIRouter(tags=["uploads"])
 
 
+UPLOAD_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
 @router.post("/uploads")
-def upload(file: UploadFile = File(...), kind: str = Form("image"), user: dict = Depends(current_user)):
+def upload(file: UploadFile = File(...), kind: str = Form("image"), id: str = Form(""), user: dict = Depends(current_user)):
+    """The phone picks the upload's id (like a message's), so sending the same file again after a lost reply gives
+    back the first upload instead of storing a second copy."""
+    if id:
+        if not UPLOAD_ID.match(id):
+            raise invalid({"id": "Not a valid id"})
+        if existing := db.row("SELECT * FROM uploads WHERE id = %(id)s", id=id):
+            if existing["userId"] != user["id"]:
+                raise invalid({"id": "Already used"})
+            return {"uploadId": existing["id"], "url": files.signed_url(db.company_id(), existing["id"])}
     limits.hit(user["id"], "upload")
     rule = files.KINDS.get(kind)
     if not rule:
@@ -26,7 +40,7 @@ def upload(file: UploadFile = File(...), kind: str = Form("image"), user: dict =
     content_type = files.sniff(data)
     if content_type not in rule["types"]:
         raise invalid({"file": "Only photos can be uploaded" if kind == "image" else "This kind of file can't be sent"})
-    upload_id = uuid7()
+    upload_id = id or uuid7()
     key = files.key_for(db.company_id(), upload_id, content_type)
     files.save(key, data, content_type)
     db.insert("uploads", {"id": upload_id, "companyId": db.company_id(), "userId": user["id"], "key": key, "kind": kind,
