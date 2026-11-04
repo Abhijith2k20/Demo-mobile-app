@@ -63,7 +63,8 @@ def _seed_if_empty() -> None:
 
 
 app = FastAPI(title="Siteline API", version="2.0", lifespan=lifespan,
-              docs_url=None if config.PRODUCTION else "/docs", redoc_url=None, openapi_url=None if config.PRODUCTION else "/openapi.json")
+              docs_url="/docs" if config.DEVELOPMENT else None, redoc_url=None,
+              openapi_url="/openapi.json" if config.DEVELOPMENT else None)  # API docs only on a developer's machine
 
 
 def error_response(code: str, message: str, details: dict, rid: str) -> JSONResponse:

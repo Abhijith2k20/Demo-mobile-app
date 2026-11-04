@@ -10,6 +10,8 @@ import html
 import secrets
 import time
 
+from datetime import date
+
 from fastapi import APIRouter, Cookie, Form, Header, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -20,7 +22,7 @@ from ..mockpm import data as mock
 from ..deps import client_ip
 from ..schemas import CompanyCreate
 from ..services import accounts, companies, integrations
-from ..platform_ui import render
+from ..platform_ui import TASK_STATUSES, render
 
 router = APIRouter(prefix="/platform", tags=["platform"])
 COOKIE = "siteline_platform"
@@ -207,6 +209,12 @@ def mock_save_task(company_id: str, id: str = Form(""), project_id: str = Form(.
                    planned_start: str = Form(...), planned_finish: str = Form(...), owner_ref: str = Form(""),
                    status: str = Form("not_started"), percent: int = Form(0), siteline_platform: str | None = Cookie(None)):
     admin = _require(siteline_platform)
+    if status not in TASK_STATUSES:
+        return _back(company_id, "Pick one of the task statuses.")
+    try:
+        date.fromisoformat(planned_start), date.fromisoformat(planned_finish)
+    except ValueError:
+        return _back(company_id, "Dates must be real dates.")
     _as_company(company_id)
     mock.save_task({"id": id or uuid7(), "projectId": project_id, "name": name, "plannedStart": planned_start,
                     "plannedFinish": max(planned_start, planned_finish), "ownerRef": owner_ref.strip() or None,

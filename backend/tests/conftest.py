@@ -107,6 +107,7 @@ def _app():
 @pytest.fixture()
 def client(_app):
     restore_seed()
+    _app.cookies.clear()  # the client is shared: no test starts signed in to the platform panel
     return _app
 
 

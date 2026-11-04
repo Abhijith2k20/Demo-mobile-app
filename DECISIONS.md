@@ -727,3 +727,13 @@ without a work email can't use Siteline; the company gives them one, or an addre
 ## Chat bubbles instead of Slack-style rows (spec §5, "not bubbles")
 - Messages are bubbles: your own on the right (accent-soft), everyone else's on the left (grey) with avatar and name. Asked for by the product owner ("like WhatsApp"); field teams know that layout.
 - DMs skip names and avatars (two people). Time sits at the bottom right of each bubble. The bot conversation keeps its full-width column for cards.
+
+## Security audit (20-point checklist)
+- Per-person rate limits (`services/limits.py`, counted in Postgres): changes 120 a minute, uploads 30 a minute, message
+  search 30 a minute, invites and resends 30 an hour. Too many answers RATE_LIMITED; the app's send queue waits and retries.
+- Dependencies: vulnerable packages patched; Dependabot weekly; CI runs `pip-audit` and `npm audit` on every push and
+  every Monday. Known and accepted until the SDK 58 upgrade: `query-string` 7 inside expo-router 57 (denial of service on a
+  malformed link, fixed in expo-router 58.0.30) and Expo's build-tool advisories. The npm check fails on critical for
+  now; raise it to high after SDK 58.
+- `/internal` (dev panel) answers only the seeded demo accounts outside local development, so a real account on staging
+  can't wipe it. `/docs` is served only in local development.

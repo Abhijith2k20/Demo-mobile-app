@@ -41,3 +41,31 @@ def test_the_demo_code_opens_the_platform_panel_only_in_development(client, monk
     client.post("/platform/login", data={"email": "admin@siteline.app"})
     r = client.post("/platform/verify", data={"email": "admin@siteline.app", "code": "123456"}, follow_redirects=False)
     assert "siteline_platform" not in r.headers.get("set-cookie", "")
+
+
+def test_dev_routes_answer_only_demo_accounts_outside_development(login, monkeypatch):
+    ravi = login("ravi@paliath.in")
+    assert ravi.get("/internal/state").status_code == 200
+    monkeypatch.setattr(config, "DEVELOPMENT", False)
+    assert ravi.get("/internal/state").status_code == 200  # a seeded demo account (staging keeps the dev panel)
+    monkeypatch.setattr(config, "TEST_ACCOUNTS", ("@demo-only.example",))
+    assert ravi.get("/internal/state").status_code == 404
+    assert ravi.post("/internal/reset").status_code == 404  # a real account can't wipe staging
+
+
+def test_the_platform_task_form_refuses_made_up_statuses_and_dates(client):
+    from app import db
+
+    client.post("/platform/login", data={"email": "admin@siteline.app"})
+    client.post("/platform/verify", data={"email": "admin@siteline.app", "code": "123456"})
+    with db.transaction():
+        cid = db.value("SELECT id FROM companies WHERE name = 'Paliath Interiors'")
+        db.current().set_company(cid)
+        project = db.value("SELECT id FROM pm_mock_projects LIMIT 1")
+    form = {"project_id": project, "name": "Test task", "planned_start": "2026-11-04", "planned_finish": "2026-11-05"}
+    r = client.post(f"/platform/companies/{cid}/mock/tasks", data={**form, "status": "hacked"}, follow_redirects=False)
+    assert "Pick+one+of+the+task+statuses" in r.headers["location"]
+    r = client.post(f"/platform/companies/{cid}/mock/tasks", data={**form, "status": "done", "planned_start": "soon"}, follow_redirects=False)
+    assert "Dates+must+be+real+dates" in r.headers["location"]
+    r = client.post(f"/platform/companies/{cid}/mock/tasks", data={**form, "status": "done"}, follow_redirects=False)
+    assert "Task+saved" in r.headers["location"]
