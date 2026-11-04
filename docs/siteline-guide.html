@@ -322,9 +322,9 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <p class="lead">Siteline is a work chat app for companies with people out in the field: interior designers, event crews, builders. It replaces the WhatsApp groups they use today, and lets the company's project-management app ask people for updates without anyone typing.</p>
 
   <div class="grid g3">
-    <div class="card"><div class="ico">💬</div><h3>Chat, like Slack or WhatsApp</h3><p class="muted small">Each company gets its own workspace: projects with channels, company channels, direct messages, threads, photos, voice notes and files.</p></div>
-    <div class="card"><div class="ico">🤖</div><h3>A bot that asks for updates</h3><p class="muted small">The company's project-management (PM) app sends a person a <b>card</b>, for example "How far is the false ceiling?" with a one-tap 25% / 50% / 75% / Done. The answer goes straight back to the PM app.</p></div>
-    <div class="card"><div class="ico">🏢</div><h3>Many companies, kept apart</h3><p class="muted small">Every company is a separate "tenant". Nothing from one company is ever visible to another. One person can belong to several companies and switch between them.</p></div>
+    <div class="card"><h3>Chat, like Slack or WhatsApp</h3><p class="muted small">Each company gets its own workspace: projects with channels, company channels, direct messages, threads, photos, voice notes and files.</p></div>
+    <div class="card"><h3>A bot that asks for updates</h3><p class="muted small">The company's project-management (PM) app sends a person a <b>card</b>, for example "How far is the false ceiling?" with a one-tap 25% / 50% / 75% / Done. The answer goes straight back to the PM app.</p></div>
+    <div class="card"><h3>Many companies, kept apart</h3><p class="muted small">Every company is a separate "tenant". Nothing from one company is ever visible to another. One person can belong to several companies and switch between them.</p></div>
   </div>
 
   <h2>The one idea to remember</h2>
@@ -338,14 +338,14 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
     <div class="arrow">→</div>
     <div class="node"><b>Siteline sends it back</b><span>to the PM app, signed, retried for 24 hours</span></div>
   </div>
-  <div class="callout info"><span class="em">ℹ️</span><div><b>Siteline knows nothing about tasks.</b> It keeps no copy of the PM app's projects or tasks and has no rules about them. The PM app can't see Siteline's channels or messages either. This works like the WhatsApp Business API: the business system decides, the messaging app delivers.</div></div>
+  <div class="callout info"><div><b>Siteline knows nothing about tasks.</b> It keeps no copy of the PM app's projects or tasks and has no rules about them. The PM app can't see Siteline's channels or messages either. This works like the WhatsApp Business API: the business system decides, the messaging app delivers.</div></div>
 
   <h2>Who it's for</h2>
   <div class="grid g4">
-    <div class="card"><div class="ico">👷</div><b>Site workers</b><p class="muted small">Chat with their team, send photos from site, answer the bot's cards in one tap.</p></div>
-    <div class="card"><div class="ico">🧑‍💼</div><b>Owners and admins</b><p class="muted small">Create projects and channels, invite people, manage roles.</p></div>
-    <div class="card"><div class="ico">🤝</div><b>Guests</b><p class="muted small">Clients, architects, subcontractors who only see the channels they're given.</p></div>
-    <div class="card"><div class="ico">🛠️</div><b>The Siteline team</b><p class="muted small">Creates companies on the platform panel. Can't read any company's messages.</p></div>
+    <div class="card"><b>Site workers</b><p class="muted small">Chat with their team, send photos from site, answer the bot's cards in one tap.</p></div>
+    <div class="card"><b>Owners and admins</b><p class="muted small">Create projects and channels, invite people, manage roles.</p></div>
+    <div class="card"><b>Guests</b><p class="muted small">Clients, architects, subcontractors who only see the channels they're given.</p></div>
+    <div class="card"><b>The Siteline team</b><p class="muted small">Creates companies on the platform panel. Can't read any company's messages.</p></div>
   </div>
 
   <h2>Built to run for real</h2>
@@ -358,9 +358,9 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
 
   <h2>What's in the box</h2>
   <div class="grid g3">
-    <div class="card"><b>📱 The phone app</b><p class="muted small">Expo (React Native) for Android first, iOS too. Folder <code>frontend/</code>.</p></div>
-    <div class="card"><b>⚙️ The server</b><p class="muted small">Python FastAPI on Postgres, plus a background worker. Folder <code>backend/</code>.</p></div>
-    <div class="card"><b>🖥️ The platform panel</b><p class="muted small">Web pages for the Siteline team at <code>/platform</code>, served by the same server.</p></div>
+    <div class="card"><b>The phone app</b><p class="muted small">Expo (React Native) for Android first, iOS too. Folder <code>frontend/</code>.</p></div>
+    <div class="card"><b>The server</b><p class="muted small">Python FastAPI on Postgres, plus a background worker. Folder <code>backend/</code>.</p></div>
+    <div class="card"><b>The platform panel</b><p class="muted small">Web pages for the Siteline team at <code>/platform</code>, served by the same server.</p></div>
   </div>
   <p class="muted small" style="margin-top:14px">Main documents: <code>SITELINE_SPEC.md</code> (what to build, version 2.2), <code>DECISIONS.md</code> (where the build differs and why), <code>docs/CARDS_API.md</code> (the API for the PM team), <code>CLAUDE.md</code> (rules for anyone changing the code).</p>
 </section>
@@ -403,7 +403,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
       <li>Deactivating someone ends their access to that company only. Their messages stay under their name.</li>
     </ul></div>
   </div>
-  <div class="callout info"><span class="em">ℹ️</span><div><b>One person, several companies.</b> A subcontractor can work for two firms. They sign in once, then pick or switch companies. Each company sees only its own part.</div></div>
+  <div class="callout info"><div><b>One person, several companies.</b> A subcontractor can work for two firms. They sign in once, then pick or switch companies. Each company sees only its own part.</div></div>
 </section>
 
 <!-- ===================== 4. SCREENS ===================== -->
@@ -417,9 +417,9 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   </div>
   <h2>Small things that matter on a building site</h2>
   <div class="grid g3">
-    <div class="card"><b>📶 Works with bad signal</b><p class="muted small">The last screens show offline. Messages, photos and card answers wait in a <b>send queue</b> and go out when the signal is back, once and in order.</p></div>
-    <div class="card"><b>👆 Big targets</b><p class="muted small">Every button is at least 44 × 44 points. Text grows up to 200% with the phone's setting.</p></div>
-    <div class="card"><b>🌗 Light and dark</b><p class="muted small">Follows the phone's setting. One blue accent; colour shows state, not decoration.</p></div>
+    <div class="card"><b>Works with bad signal</b><p class="muted small">The last screens show offline. Messages, photos and card answers wait in a <b>send queue</b> and go out when the signal is back, once and in order.</p></div>
+    <div class="card"><b>Big targets</b><p class="muted small">Every button is at least 44 × 44 points. Text grows up to 200% with the phone's setting.</p></div>
+    <div class="card"><b>Light and dark</b><p class="muted small">Follows the phone's setting. One blue accent; colour shows state, not decoration.</p></div>
   </div>
 </section>
 
@@ -500,7 +500,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <div class="eyebrow">How it's built</div>
   <h1>Code structure</h1>
   <p class="lead">Two top-level folders: <code>frontend/</code> (the phone app) and <code>backend/</code> (the server). Open the folders to see what each part is for.</p>
-  <div class="chips" id="treeTabs"><button class="chip on" data-t="front">📱 frontend/</button><button class="chip" data-t="back">⚙️ backend/</button><button class="chip" data-t="root">📁 project root</button></div>
+  <div class="chips" id="treeTabs"><button class="chip on" data-t="front">frontend/</button><button class="chip" data-t="back">backend/</button><button class="chip" data-t="root">project root</button></div>
   <div class="card tree" id="tree"></div>
 
   <h2>Layering rules (checked by tests)</h2>
@@ -533,16 +533,16 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <div class="eyebrow">How it's built</div>
   <h1>Data</h1>
   <p class="lead">Everything lives in one Postgres database. Most tables belong to a company and are locked to it by row-level security. A few are "global": they describe people, companies and sign-in across companies.</p>
-  <div class="chips" id="tableTabs"><button class="chip on" data-k="all">All tables</button><button class="chip" data-k="company">🔒 Per company</button><button class="chip" data-k="global">🌐 Global</button></div>
+  <div class="chips" id="tableTabs"><button class="chip on" data-k="all">All tables</button><button class="chip" data-k="company">Per company</button><button class="chip" data-k="global">Global</button></div>
   <div class="card tablecard"><div class="scroll"><table id="tables"></table></div></div>
 
   <h2>How companies are kept apart</h2>
   <div class="grid g3">
-    <div class="card"><div class="ico">🔑</div><b>From the session</b><p class="muted small">Each request's company comes from the person's sign-in session.</p></div>
-    <div class="card"><div class="ico">🧱</div><b>Set on the transaction</b><p class="muted small">Every database transaction starts by setting <code>app.company_id</code>.</p></div>
-    <div class="card"><div class="ico">🛡️</div><b>Enforced by Postgres</b><p class="muted small">Row-level security policies return only that company's rows. A forgotten filter returns nothing, not someone else's data.</p></div>
+    <div class="card"><b>From the session</b><p class="muted small">Each request's company comes from the person's sign-in session.</p></div>
+    <div class="card"><b>Set on the transaction</b><p class="muted small">Every database transaction starts by setting <code>app.company_id</code>.</p></div>
+    <div class="card"><b>Enforced by Postgres</b><p class="muted small">Row-level security policies return only that company's rows. A forgotten filter returns nothing, not someone else's data.</p></div>
   </div>
-  <div class="callout warn"><span class="em">⚠️</span><div><b>One thing to watch:</b> global tables (invites, integrations, jobs, audit log) have no row-level security by design, so queries on them filter by company by hand. New queries on them need the same care.</div></div>
+  <div class="callout warn"><div><b>One thing to watch:</b> global tables (invites, integrations, jobs, audit log) have no row-level security by design, so queries on them filter by company by hand. New queries on them need the same care.</div></div>
 
   <h2>Message types</h2>
   <div class="chips">
@@ -566,10 +566,10 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--field);border-
   <h1>API</h1>
   <p class="lead">There are four ways into the server, each with its own sign-in. Filter the routes below or pick a group.</p>
   <div class="grid g4">
-    <div class="card"><div class="ico">📱</div><b>App API</b><p class="muted small">Used by the phone app. Signed in with a session token.</p></div>
-    <div class="card"><div class="ico">🤖</div><b>Cards API <code>/api/v1</code></b><p class="muted small">Used by the PM app. Signed in with the company's API key.</p></div>
-    <div class="card"><div class="ico">🖥️</div><b>Platform <code>/platform</code></b><p class="muted small">Siteline team. Email code and a cookie; or a platform key for scripts.</p></div>
-    <div class="card"><div class="ico">🧪</div><b>Dev <code>/internal</code></b><p class="muted small">Dev panel only. Off in production; demo accounts only on staging.</p></div>
+    <div class="card"><b>App API</b><p class="muted small">Used by the phone app. Signed in with a session token.</p></div>
+    <div class="card"><b>Cards API <code>/api/v1</code></b><p class="muted small">Used by the PM app. Signed in with the company's API key.</p></div>
+    <div class="card"><b>Platform <code>/platform</code></b><p class="muted small">Siteline team. Email code and a cookie; or a platform key for scripts.</p></div>
+    <div class="card"><b>Dev <code>/internal</code></b><p class="muted small">Dev panel only. Off in production; demo accounts only on staging.</p></div>
   </div>
   <h2>Routes</h2>
   <input class="filter" id="aq" placeholder="Filter routes, e.g. cards, invite, upload…" aria-label="Filter routes">
@@ -601,7 +601,7 @@ X-Siteline-Signature: HMAC-SHA256
 }
 → PM app replies "accepted" or "refused" + reason</pre></div>
   </div>
-  <div class="callout info"><span class="em">ℹ️</span><div><b>Safe to repeat:</b> sending the same card id twice returns the same card (no second push). <b>Limits:</b> 120 calls a minute per company, one nudge per card per hour. <b>Retries:</b> after 1, 5 and 15 minutes, then hourly for 24 hours. Full reference: <code>docs/CARDS_API.md</code>.</div></div>
+  <div class="callout info"><div><b>Safe to repeat:</b> sending the same card id twice returns the same card (no second push). <b>Limits:</b> 120 calls a minute per company, one nudge per card per hour. <b>Retries:</b> after 1, 5 and 15 minutes, then hourly for 24 hours. Full reference: <code>docs/CARDS_API.md</code>.</div></div>
 
   <h2>Errors</h2>
   <p class="muted small">Every error has the same shape, and the app turns each code into a friendly message:</p>
@@ -620,8 +620,8 @@ X-Siteline-Signature: HMAC-SHA256
   <div class="grid g2" id="secList"></div>
   <h2>What is and isn't secret</h2>
   <div class="grid g2">
-    <div class="card"><b>🔐 Secret, server only</b><p class="muted small">Kept in <code>backend/.env</code> locally and the Render dashboard when live. Never in the app or in git.</p><ul class="clean small"><li><code>SITELINE_SECRET</code>: the master key (signs codes, sessions, file links, encrypts PM keys)</li><li><code>SITELINE_PLATFORM_KEY</code>, <code>DATABASE_URL</code></li><li>R2, Resend and Expo access keys</li></ul></div>
-    <div class="card"><b>🌍 Public, fine in the app</b><p class="muted small">Built into the app, so anyone can read them. That's expected, because safety comes from the server's checks.</p><ul class="clean small"><li><code>EXPO_PUBLIC_API_URL</code>: the API's address, set in the Expo dashboard</li><li>App ids (<code>app.siteline.mobile</code>) and the link scheme</li></ul></div>
+    <div class="card"><b>Secret, server only</b><p class="muted small">Kept in <code>backend/.env</code> locally and the Render dashboard when live. Never in the app or in git.</p><ul class="clean small"><li><code>SITELINE_SECRET</code>: the master key (signs codes, sessions, file links, encrypts PM keys)</li><li><code>SITELINE_PLATFORM_KEY</code>, <code>DATABASE_URL</code></li><li>R2, Resend and Expo access keys</li></ul></div>
+    <div class="card"><b>Public, fine in the app</b><p class="muted small">Built into the app, so anyone can read them. That's expected, because safety comes from the server's checks.</p><ul class="clean small"><li><code>EXPO_PUBLIC_API_URL</code>: the API's address, set in the Expo dashboard</li><li>App ids (<code>app.siteline.mobile</code>) and the link scheme</li></ul></div>
   </div>
 </section>
 
@@ -643,8 +643,8 @@ X-Siteline-Signature: HMAC-SHA256
 
   <h2>Where settings live</h2>
   <div class="grid g2">
-    <div class="card"><b>⚙️ Server</b><p class="muted small">Locally: <code>backend/.env</code> (copy <code>.env.example</code>, which lists and explains every setting). Live: the Render dashboard, listed in <code>render.yaml</code>.</p></div>
-    <div class="card"><b>📱 App</b><p class="muted small">Locally: nothing needed, because the app finds your computer on port 8000 (or use <code>frontend/.env</code>). Builds: <code>EXPO_PUBLIC_API_URL</code> in the Expo dashboard for <i>preview</i> and <i>production</i>.</p></div>
+    <div class="card"><b>Server</b><p class="muted small">Locally: <code>backend/.env</code> (copy <code>.env.example</code>, which lists and explains every setting). Live: the Render dashboard, listed in <code>render.yaml</code>.</p></div>
+    <div class="card"><b>App</b><p class="muted small">Locally: nothing needed, because the app finds your computer on port 8000 (or use <code>frontend/.env</code>). Builds: <code>EXPO_PUBLIC_API_URL</code> in the Expo dashboard for <i>preview</i> and <i>production</i>.</p></div>
   </div>
 
   <h2>Run it on your computer</h2>
@@ -702,14 +702,14 @@ npx expo start</pre><p class="muted small" style="margin-top:8px">Push notificat
 
   <h2>Tested so far</h2>
   <div class="grid g2">
-    <div class="card"><b>✅ Verified</b><ul class="clean small">
+    <div class="card"><b>Verified</b><ul class="clean small">
       <li>Sign-in, company picker, every role's permissions, company separation on every route</li>
       <li>Chat: channels, DMs, threads, reactions, mentions, search, bubbles</li>
       <li>Bot cards: sending, answering, offline answers, webhooks with retries</li>
       <li>Production mode on an empty database; the platform panel</li>
       <li>Android emulator, including text at 200%</li>
     </ul></div>
-    <div class="card"><b>⏳ Not yet tested</b><ul class="clean small">
+    <div class="card"><b>Not yet tested</b><ul class="clean small">
       <li>Push notifications (need an EAS development build)</li>
       <li>Real camera, voice recording and file picking on a device</li>
       <li>iOS (including SDK 58's new iOS app start-up)</li>
@@ -785,7 +785,7 @@ const glossary = [
   ['Company', 'One customer of Siteline, with its own people, projects and chats. Also called a tenant.'],
   ['Tenant', 'Another word for a company. "Multi-tenant" means many companies share one server but never see each other\'s data.'],
   ['Project', 'A group of channels for one job, like "Villa 99". Made in Siteline by the Owner or an Admin. Has nothing to do with the PM app.'],
-  ['Channel', 'A group conversation. Public ones (#) are for everyone on the project; private ones (🔒) only for the people picked.'],
+  ['Channel', 'A group conversation. Public ones (#) are for everyone on the project; private ones only for the people picked.'],
   ['#general', 'Every project and company has one. It can\'t be renamed, made private, deleted or left.'],
   ['DM', 'A direct message between two people.'],
   ['Thread', 'Replies to one message, kept under it so the channel stays tidy.'],
@@ -827,11 +827,11 @@ renderGlossary();
 
 /* ---------- Roles ---------- */
 const roles = {
-  owner: { n: 'Owner', e: '👑', d: 'The one person in charge of a company. Exactly one per company; ownership moves only through the Siteline team.', can: ['Everything an Admin can do', 'Add or remove Admins', 'Deactivate anyone but themselves'], cant: ['Read other people\'s DMs'] },
-  admin: { n: 'Admin', e: '🧑‍💼', d: 'Helps run the company day to day.', can: ['Invite and deactivate Members and Guests', 'See every project and channel', 'Create, edit, archive and delete projects and channels', 'Pin messages, delete anyone\'s message', 'See the PM link status'], cant: ['Add Admins', 'Read other people\'s DMs'] },
-  member: { n: 'Member', e: '👷', d: 'A regular team member, such as a site supervisor or designer.', can: ['See the projects they\'re on and their public channels', 'Browse the company directory', 'DM anyone in the company', 'Answer bot cards'], cant: ['Create projects or invite people', 'See projects they\'re not on'] },
-  guest: { n: 'Guest', e: '🤝', d: 'Someone from outside: a client, architect or subcontractor.', can: ['Use only the channels they were given', 'DM people who share a channel with them', 'Get bot cards from the PM app'], cant: ['Browse channels, the directory or other projects'] },
-  platform: { n: 'Siteline team (super-admin)', e: '🛠️', d: 'Siteline staff, on the platform panel, not inside the app.', can: ['Create, suspend and edit companies', 'Set up the PM link and its API key', 'Resend the owner invite, transfer ownership', 'See the audit log'], cant: ['Read any company\'s messages, channels or files'] },
+  owner: { n: 'Owner', e: '', d: 'The one person in charge of a company. Exactly one per company; ownership moves only through the Siteline team.', can: ['Everything an Admin can do', 'Add or remove Admins', 'Deactivate anyone but themselves'], cant: ['Read other people\'s DMs'] },
+  admin: { n: 'Admin', e: '', d: 'Helps run the company day to day.', can: ['Invite and deactivate Members and Guests', 'See every project and channel', 'Create, edit, archive and delete projects and channels', 'Pin messages, delete anyone\'s message', 'See the PM link status'], cant: ['Add Admins', 'Read other people\'s DMs'] },
+  member: { n: 'Member', e: '', d: 'A regular team member, such as a site supervisor or designer.', can: ['See the projects they\'re on and their public channels', 'Browse the company directory', 'DM anyone in the company', 'Answer bot cards'], cant: ['Create projects or invite people', 'See projects they\'re not on'] },
+  guest: { n: 'Guest', e: '', d: 'Someone from outside: a client, architect or subcontractor.', can: ['Use only the channels they were given', 'DM people who share a channel with them', 'Get bot cards from the PM app'], cant: ['Browse channels, the directory or other projects'] },
+  platform: { n: 'Siteline team (super-admin)', e: '', d: 'Siteline staff, on the platform panel, not inside the app.', can: ['Create, suspend and edit companies', 'Set up the PM link and its API key', 'Resend the owner invite, transfer ownership', 'See the audit log'], cant: ['Read any company\'s messages, channels or files'] },
 };
 const matrix = [
   ['See every project and channel', 'yes', 'yes', 'part', 'part', 'no'],
@@ -850,7 +850,7 @@ const cols = ['owner', 'admin', 'member', 'guest', 'platform'];
 function renderRole(r) {
   const x = roles[r];
   $$('#roleTabs button').forEach((b) => b.classList.toggle('on', b.dataset.r === r));
-  $('#roleCard').innerHTML = `<div style="display:flex;gap:14px;align-items:flex-start"><div class="ico" style="margin:0;font-size:22px">${x.e}</div><div style="flex:1"><h3 style="margin:2px 0 4px">${esc(x.n)}</h3><p class="muted">${esc(x.d)}</p>
+  $('#roleCard').innerHTML = `<div style="display:flex;gap:14px;align-items:flex-start"><div style="flex:1"><h3 style="margin:2px 0 4px">${esc(x.n)}</h3><p class="muted">${esc(x.d)}</p>
     <div class="grid g2"><div><b class="small" style="color:var(--success)">CAN</b><ul class="clean small">${x.can.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>
     <div><b class="small" style="color:var(--danger)">CAN'T</b><ul class="clean small">${x.cant.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div></div></div></div>`;
   const ci = cols.indexOf(r);
@@ -865,36 +865,36 @@ renderRole('owner');
 /* ---------- Screens ---------- */
 const tabs = (on) => `<div class="tabs">${['Home', 'DMs', 'Activity', 'You'].map((t) => `<div class="${t === on ? 'on' : ''}">${t}</div>`).join('')}</div>`;
 const screens = [
-  { k: 'login', e: '🔑', t: 'Sign in', d: 'Type your work email, get a 6-digit code by email, type it in. No passwords. If you\'ve been invited, you see "Paliath Interiors invited you" with Join.',
+  { k: 'login', e: '', t: 'Sign in', d: 'Type your work email, get a 6-digit code by email, type it in. No passwords. If you\'ve been invited, you see "Paliath Interiors invited you" with Join.',
     p: `<div class="bar">Siteline<small>Work chat for field teams</small></div><div class="body"><b style="font-size:16px">Sign in</b><span class="muted">Enter your work email to get a 6-digit code.</span><div style="border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--faint)">name@company.com</div><div style="background:var(--accent);color:var(--onAccent);border-radius:10px;padding:10px;text-align:center;font-weight:650">Continue</div><span class="muted small" style="margin-top:auto;text-align:center">Can't sign in? Ask your company admin to invite you.</span></div>` },
-  { k: 'home', e: '🏠', t: 'Home', d: 'Your company\'s workspace: projects (each with its channels), then company channels. Bold rows and blue badges mean unread. "Jump to…" finds any channel, person or project. Owners and Admins see a New project button.',
-    p: `<div class="bar">Paliath Interiors<small>Jump to…</small></div><div class="body"><span class="muted small" style="font-weight:650;letter-spacing:.06em">PROJECTS</span><div class="row bold">▾ Villa 99</div><div class="row"><span class="h">#</span>general</div><div class="row bold"><span class="h">#</span>site-work<span class="badge">3</span></div><div class="row"><span class="h">🔒</span>qs</div><span class="muted small" style="font-weight:650;letter-spacing:.06em;margin-top:6px">COMPANY</span><div class="row"><span class="h">#</span>announcements</div></div>${tabs('Home')}` },
+  { k: 'home', e: '', t: 'Home', d: 'Your company\'s workspace: projects (each with its channels), then company channels. Bold rows and blue badges mean unread. "Jump to…" finds any channel, person or project. Owners and Admins see a New project button.',
+    p: `<div class="bar">Paliath Interiors<small>Jump to…</small></div><div class="body"><span class="muted small" style="font-weight:650;letter-spacing:.06em">PROJECTS</span><div class="row bold">▾ Villa 99</div><div class="row"><span class="h">#</span>general</div><div class="row bold"><span class="h">#</span>site-work<span class="badge">3</span></div><div class="row"><span class="h">#</span>qs (private)</div><span class="muted small" style="font-weight:650;letter-spacing:.06em;margin-top:6px">COMPANY</span><div class="row"><span class="h">#</span>announcements</div></div>${tabs('Home')}` },
   { k: 'channel', e: '#', t: 'A channel', d: 'Messages as bubbles: yours on the right, others on the left with name and avatar. Long-press for React, Reply in thread, Copy, Edit (15 min), Delete (1 hour), Pin. "+" adds a photo, voice note or file. The magnifier searches the whole history.',
     p: `<div class="bar"># site-work<small>Villa 99 · 6 members</small></div><div class="body"><div class="bub them"><b>Suresh Gowda</b>Boards arrived. 24 nos.<small>1:30 PM</small></div><div class="bub them"><b>Amit Kulkarni</b>Thanks for chasing, @Suresh<small>1:48 PM</small></div><div class="bub me">Starting the ceiling tomorrow<small>2:10 PM</small></div><div style="margin-top:auto;border:1px solid var(--border);border-radius:20px;padding:8px 12px;color:var(--faint)">Message # site-work</div></div>` },
-  { k: 'bot', e: '🤖', t: 'Siteline Bot', d: 'Where the PM app\'s cards arrive. One question at a time: the oldest open card is expanded, others wait as one-line rows. Tap a step on the scale, or a button. Answers made offline go out later.',
+  { k: 'bot', e: '', t: 'Siteline Bot', d: 'Where the PM app\'s cards arrive. One question at a time: the oldest open card is expanded, others wait as one-line rows. Tap a step on the scale, or a button. Answers made offline go out later.',
     p: `<div class="bar">Siteline Bot<small>Check-ins and reminders</small></div><div class="body"><span class="muted small">2 cards need an answer · 0 of 2 done</span><div class="botcard"><b>False ceiling – living room</b><div class="muted small">Villa 99 · due Wed 4 Nov</div><div class="scale"><span class="r">25%</span><span class="r">50%</span><span>75%</span><span>90%</span><span>Done</span></div><div style="display:flex;gap:6px;margin-top:6px"><span class="pill">Problem</span><span class="pill">Not started</span><span class="pill">Note</span></div></div><div class="botcard muted small">Kitchen carcass · <span style="color:var(--accent)">Update</span></div></div>` },
-  { k: 'dms', e: '✉️', t: 'DMs', d: 'The Siteline Bot first, then people by latest message. "Find a conversation" filters; the pencil starts a new message.',
-    p: `<div class="bar" style="background:var(--surface);color:var(--text)">Direct messages</div><div class="body"><div class="row bold">🤖 Siteline Bot<span class="muted small" style="margin-left:auto;font-weight:400">26 Oct</span></div><div class="row">🟣 Nibin<span class="muted small" style="margin-left:auto">2:49 PM</span></div><div class="row">🟡 Amit Kulkarni<span class="muted small" style="margin-left:auto">12:40 PM</span></div></div>${tabs('DMs')}` },
-  { k: 'activity', e: '🔔', t: 'Activity', d: 'Mentions and replies to your threads, newest first. Unread ones have a blue rule.',
+  { k: 'dms', e: '', t: 'DMs', d: 'The Siteline Bot first, then people by latest message. "Find a conversation" filters; the pencil starts a new message.',
+    p: `<div class="bar" style="background:var(--surface);color:var(--text)">Direct messages</div><div class="body"><div class="row bold">Siteline Bot<span class="muted small" style="margin-left:auto;font-weight:400">26 Oct</span></div><div class="row">Nibin<span class="muted small" style="margin-left:auto">2:49 PM</span></div><div class="row">Amit Kulkarni<span class="muted small" style="margin-left:auto">12:40 PM</span></div></div>${tabs('DMs')}` },
+  { k: 'activity', e: '', t: 'Activity', d: 'Mentions and replies to your threads, newest first. Unread ones have a blue rule.',
     p: `<div class="bar" style="background:var(--surface);color:var(--text)">Activity</div><div class="body"><div class="botcard" style="border-left:3px solid var(--accent)"><b class="small">Amit mentioned you in #site-work</b><div class="muted small">Thanks for chasing, @Suresh</div></div><div class="botcard"><b class="small">Meera replied in a thread</b><div class="muted small">Approved, go ahead</div></div></div>${tabs('Activity')}` },
-  { k: 'you', e: '👤', t: 'You', d: 'Your profile, company tools (People; Invites and PM link for Owners and Admins), theme, notification level (All, Important, Off), unsent items, log out, delete account.',
-    p: `<div class="bar" style="background:var(--surface);color:var(--text)">Arjun Rao<small style="opacity:1;color:var(--muted)">arjun@paliath.in · Owner</small></div><div class="body"><div class="botcard">👥 People</div><div class="botcard">➕ Invite person</div><div class="botcard">🔗 PM app link</div><div class="botcard muted small">Notifications: All · <b>Important</b> · Off</div><span style="color:var(--danger);text-align:center;margin-top:auto">Delete my account</span></div>${tabs('You')}` },
-  { k: 'project', e: '📁', t: 'Project info and settings', d: 'Info (client, address, channels), Members, and Files (every photo and file from the project). Owners and Admins manage people, channels, archive and delete here.',
-    p: `<div class="bar" style="background:var(--surface);color:var(--text)">Villa 99<small style="opacity:1;color:var(--muted)">Villa 99 owners · Whitefield</small></div><div class="body"><div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;text-align:center"><span style="flex:1;padding:6px;background:var(--alt);font-weight:650">Info</span><span style="flex:1;padding:6px">Members</span><span style="flex:1;padding:6px">Files</span></div><div class="botcard"># general · # site-work · 🔒 qs</div><div class="botcard">Project settings</div></div>` },
+  { k: 'you', e: '', t: 'You', d: 'Your profile, company tools (People; Invites and PM link for Owners and Admins), theme, notification level (All, Important, Off), unsent items, log out, delete account.',
+    p: `<div class="bar" style="background:var(--surface);color:var(--text)">Arjun Rao<small style="opacity:1;color:var(--muted)">arjun@paliath.in · Owner</small></div><div class="body"><div class="botcard">People</div><div class="botcard">Invite person</div><div class="botcard">PM app link</div><div class="botcard muted small">Notifications: All · <b>Important</b> · Off</div><span style="color:var(--danger);text-align:center;margin-top:auto">Delete my account</span></div>${tabs('You')}` },
+  { k: 'project', e: '', t: 'Project info and settings', d: 'Info (client, address, channels), Members, and Files (every photo and file from the project). Owners and Admins manage people, channels, archive and delete here.',
+    p: `<div class="bar" style="background:var(--surface);color:var(--text)">Villa 99<small style="opacity:1;color:var(--muted)">Villa 99 owners · Whitefield</small></div><div class="body"><div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;text-align:center"><span style="flex:1;padding:6px;background:var(--alt);font-weight:650">Info</span><span style="flex:1;padding:6px">Members</span><span style="flex:1;padding:6px">Files</span></div><div class="botcard"># general · # site-work · qs (private)</div><div class="botcard">Project settings</div></div>` },
 ];
 function renderScreen(k) {
   const s = screens.find((x) => x.k === k);
   $('#phone').innerHTML = s.p;
   $$('#screenList button').forEach((b) => b.classList.toggle('on', b.dataset.k === k));
 }
-$('#screenList').innerHTML = screens.map((s) => `<button data-k="${s.k}"><span class="ico">${s.e}</span><span><b>${esc(s.t)}</b><span>${esc(s.d)}</span></span></button>`).join('');
+$('#screenList').innerHTML = screens.map((s) => `<button data-k="${s.k}"><span><b>${esc(s.t)}</b><span>${esc(s.d)}</span></span></button>`).join('');
 $$('#screenList button').forEach((b) => (b.onclick = () => renderScreen(b.dataset.k)));
 renderScreen('home');
 
 /* ---------- Flows ---------- */
-const actors = { phone: ['📱', 'Phone app'], api: ['⚙️', 'API server'], db: ['🗄️', 'Postgres'], worker: ['🔁', 'Worker'], pm: ['📋', 'PM app'], out: ['📨', 'Email / Push'] };
+const actors = { phone: ['', 'Phone app'], api: ['', 'API server'], db: ['', 'Postgres'], worker: ['', 'Worker'], pm: ['', 'PM app'], out: ['', 'Email / Push'] };
 const flows = {
-  signin: { n: '🔑 Signing in', steps: [
+  signin: { n: 'Signing in', steps: [
     ['phone', 'You type your work email', 'The app sends it to the server. The server gives the same answer whether or not the address exists, so nobody can test which emails are on Siteline.', 'POST /auth/otp/request'],
     ['api,db', 'The server checks limits and makes a code', 'At most 5 codes per email and 20 per network address an hour. The 6-digit code is stored only as a fingerprint, never as the code itself.', 'otp_codes ← hash(code)'],
     ['worker,out', 'The code is emailed', 'Sending is a job, so it retries if the email service hiccups. Sign-in codes jump the job queue.', 'job: send_code → Resend'],
@@ -902,7 +902,7 @@ const flows = {
     ['api,db', 'You pick a company', 'With one company it opens straight away; with several you pick; pending invites show "Join".', 'POST /auth/session {companyId}'],
     ['phone', 'You\'re in', 'The phone keeps a 1-hour access token and a 60-day refresh token in secure storage. Using an old refresh token signs that device out.', 'SecureStore'],
   ] },
-  message: { n: '💬 Sending a message', steps: [
+  message: { n: 'Sending a message', steps: [
     ['phone', 'You tap Send', 'The message is saved on the phone first, in the send queue, with an id the phone makes up. It shows straight away as "Sending…".', 'outbox.add'],
     ['phone', 'No signal? It waits', 'If the phone is offline, the message waits. It retries with growing pauses and keeps the order, so nothing jumps ahead.', 'retry: 2s, 5s, 10s, 20s'],
     ['phone,api', 'Photos upload first', 'A photo or voice note is uploaded before its message. The server checks the real file type from its bytes, not its name.', 'POST /uploads → POST /channels/:id/messages'],
@@ -910,7 +910,7 @@ const flows = {
     ['api,phone', 'Everyone\'s screen refreshes', 'A small "message.new" event goes to the people in the channel, and their apps re-fetch the channel.', 'WebSocket event'],
     ['worker,out', 'Pushes go out', 'People mentioned, or in a DM, get a push, following each person\'s notification level.', 'job: send_push → Expo'],
   ] },
-  card: { n: '🤖 A bot card, round trip', steps: [
+  card: { n: 'A bot card, round trip', steps: [
     ['pm', 'The PM app decides to ask', 'Its own scheduler decides Ravi should be asked about the false ceiling at 5:30 pm. Siteline makes none of these decisions.', 'PM app scheduler'],
     ['pm,api,db', 'It sends a card', 'The API key decides the company. The card is saved and posted in Ravi\'s private bot conversation. The same card id sent again returns the same card.', 'POST /api/v1/cards'],
     ['worker,out', 'Ravi gets a push', '"How is False ceiling going?" The push opens the bot conversation.', 'job: send_push'],
@@ -919,20 +919,20 @@ const flows = {
     ['worker,pm', 'The webhook is delivered', 'Signed with the company\'s secret. If the PM app is down, it retries after 1, 5 and 15 minutes, then hourly for 24 hours.', 'POST <webhook URL> card.answered'],
     ['pm,phone', 'The PM app accepts or refuses', '"Accepted" shows as saved. A refusal shows the reason on the card, like "This task is already closed". What happens next (a follow-up card or nothing) is the PM app\'s choice.', '{"result": "accepted"}'],
   ] },
-  company: { n: '🏢 A new company', steps: [
+  company: { n: 'A new company', steps: [
     ['api', 'The Siteline team fills in the form', 'On the platform panel: company name, time zone, owner\'s name and email, and the PM link (mock, real PM app, or none).', '/platform → New company'],
     ['api,db', 'One transaction creates everything', 'The company, #announcements and #general, the owner\'s invite, and an audit-log entry, all together or not at all.', 'companies.create'],
     ['worker,out', 'The owner gets an email', '"You\'re invited to Paliath Interiors on Siteline. Get the app." The link holds no secret.', 'job: send_invite'],
     ['phone', 'The owner signs in', 'Signing in with the invited email accepts the invite. They become the Owner.', 'sign-in flow'],
     ['api', 'The PM app is connected', 'The panel makes an API key and webhook secret, shown once, for the PM team. The key is stored only as a fingerprint.', 'Make a new API key'],
   ] },
-  invite: { n: '✉️ Inviting someone', steps: [
+  invite: { n: 'Inviting someone', steps: [
     ['phone', 'An Admin taps Invite person', 'Name, work email and role. For a Guest, also which channels they get.', 'POST /invites'],
     ['api,db', 'The server checks and saves', 'Only the Owner can invite an Admin. An address already in the company gets "Already in Paliath Interiors". 30 invites an hour per person.', 'invites'],
     ['worker,out', 'The invite email goes out', 'Invites last 14 days. Resend restarts the timer; Cancel stops it.', 'job: send_invite'],
     ['phone,api', 'They sign in with that email', 'They see "Paliath Interiors invited you" and tap Join. A Member starts in both company channels and their bot conversation; a Guest only in their channels.', 'POST /auth/invites/:id/accept'],
   ] },
-  offline: { n: '📶 No signal on site', steps: [
+  offline: { n: 'No signal on site', steps: [
     ['phone', 'The phone loses signal', 'An offline banner appears. The last loaded screens still show.', 'cached screens'],
     ['phone', 'You keep working', 'You send messages, photos and card answers. They wait in the queue, each marked "Sending…".', 'outbox'],
     ['phone,api', 'Signal comes back', 'The queue sends items one by one, oldest first. Too many at once? The server says "slow down" and the queue waits. Nothing is lost.', 'RATE_LIMITED → retry'],
@@ -941,7 +941,7 @@ const flows = {
 };
 let flow = 'signin', step = 0;
 $('#flowTabs').innerHTML = Object.entries(flows).map(([k, f]) => `<button class="chip" data-f="${k}">${esc(f.n)}</button>`).join('');
-$('#actors').innerHTML = Object.entries(actors).map(([k, [e, n]]) => `<div class="actor" data-a="${k}"><span class="em">${e}</span><b>${esc(n)}</b></div>`).join('');
+$('#actors').innerHTML = Object.entries(actors).map(([k, [e, n]]) => `<div class="actor" data-a="${k}"><b>${esc(n)}</b></div>`).join('');
 function renderFlow() {
   const f = flows[flow], s = f.steps[step], on = s[0].split(',');
   $$('#flowTabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.f === flow));
@@ -961,7 +961,7 @@ renderFlow();
 /* ---------- Domain model ---------- */
 const ents = [
   { g: 'People and access' },
-  { k: 'company', e: '🏢', n: 'Company', s: 'One customer (tenant)', d: 'A customer of Siteline with its own people, projects and chats. Nothing in one company is ever visible to another.',
+  { k: 'company', e: '', n: 'Company', s: 'One customer (tenant)', d: 'A customer of Siteline with its own people, projects and chats. Nothing in one company is ever visible to another.',
     f: ['name', 'slug', 'time_zone', 'status', 'pm_company_id'], rel: [['membership', 'has many'], ['project', 'has many'], ['channel', 'has many (company channels, DMs, bot)'], ['integration', 'has one PM link'], ['invite', 'has many']],
     st: ['active', 'suspended', 'deleted'],
     r: ['Created only by the Siteline team (platform panel or POST /platform/companies); there is no public sign-up.',
@@ -970,14 +970,14 @@ const ents = [
         'Suspended: sign-in is refused (COMPANY_SUSPENDED), its sessions are revoked and its PM key stops working.',
         'Deleted: suspended first, data removed after 30 days.',
         'Its data is reached only with its own company id, set from the session; another company\'s ids answer 404.'] },
-  { k: 'person', e: '🙂', n: 'Person', s: 'users · global', d: 'A human, known by their work email. Not tied to one company: one person can belong to several.',
+  { k: 'person', e: '', n: 'Person', s: 'users · global', d: 'A human, known by their work email. Not tied to one company: one person can belong to several.',
     f: ['name', 'email (unique, lower case)', 'avatar_color', 'notify', 'deleted_at'], rel: [['membership', 'has one per company'], ['session', 'has many'], ['message', 'writes'], ['card', 'receives']],
     st: ['active', 'deleted'],
     r: ['Signs in only with a one-time code sent to their email; there are no passwords or phone numbers.',
         'Email is stored in lower case and compared ignoring case and spaces.',
         'Notification level is All, Important (DMs, mentions, cards) or Off.',
         'Deleting the account removes name, email and push tokens and deactivates every membership; their messages stay, shown as "Former member".'] },
-  { k: 'membership', e: '🪪', n: 'Membership', s: 'A person in a company', d: 'Puts one person in one company with a role. Most permissions come from here.',
+  { k: 'membership', e: '', n: 'Membership', s: 'A person in a company', d: 'Puts one person in one company with a role. Most permissions come from here.',
     f: ['company_id', 'user_id', 'role', 'status', 'joined_at'], rel: [['company', 'belongs to'], ['person', 'belongs to']],
     st: ['active', 'deactivated'],
     r: ['Role is Owner, Admin, Member or Guest.',
@@ -987,7 +987,7 @@ const ents = [
         'Deactivating ends access to that company only: its sessions are revoked; messages stay under their name.',
         'An Owner or Admin changed to Member or Guest leaves the project channels they were in only as admin.',
         'A new Member starts in both company channels and their bot conversation; a Guest only in their chosen channels.'] },
-  { k: 'invite', e: '✉️', n: 'Invite', s: 'An offer to join', d: 'How someone joins a company: an email to their work address.',
+  { k: 'invite', e: '', n: 'Invite', s: 'An offer to join', d: 'How someone joins a company: an email to their work address.',
     f: ['identifier (email)', 'name', 'role', 'channel_ids (guests)', 'invited_by', 'expires_at', 'status'], rel: [['company', 'belongs to'], ['membership', 'becomes, when accepted']],
     st: ['pending', 'accepted', 'cancelled', 'expired'],
     r: ['Sent by the Owner or an Admin; only the Owner can invite an Admin; nobody is invited as Owner.',
@@ -996,7 +996,7 @@ const ents = [
         'Expires after 14 days; Resend restarts the timer; Cancel stops it.',
         'Signing in after it was cancelled gives INVITE_EXPIRED.',
         'At most 30 invites or resends an hour per person.'] },
-  { k: 'session', e: '🔐', n: 'Session', s: 'A sign-in on one device', d: 'Proof a person is signed in to one company on one phone.',
+  { k: 'session', e: '', n: 'Session', s: 'A sign-in on one device', d: 'Proof a person is signed in to one company on one phone.',
     f: ['user_id', 'company_id', 'access_hash', 'refresh_hash', 'device', 'revoked_at'], rel: [['person', 'belongs to'], ['company', 'for one']],
     st: ['active', 'revoked'],
     r: ['Belongs to one company; switching company makes a new session.',
@@ -1005,7 +1005,7 @@ const ents = [
         'Tokens are stored only as fingerprints on the server, and in SecureStore on the phone.',
         'Logging out revokes the session.'] },
   { g: 'Where people talk' },
-  { k: 'project', e: '📁', n: 'Project', s: 'A group of channels', d: 'A job, like "Villa 99": a group of channels and the people on it. Made in Siteline; it has nothing to do with the PM app\'s projects.',
+  { k: 'project', e: '', n: 'Project', s: 'A group of channels', d: 'A job, like "Villa 99": a group of channels and the people on it. Made in Siteline; it has nothing to do with the PM app\'s projects.',
     f: ['name', 'client', 'address', 'archived_at'], rel: [['company', 'belongs to'], ['projectMember', 'has many'], ['channel', 'has many']],
     st: ['active', 'archived', 'deleted'],
     r: ['Created and managed only by the Owner and Admins.',
@@ -1015,7 +1015,7 @@ const ents = [
         'Archived projects are read-only.',
         'Deleting a project removes its messages for everyone (the name must be typed to confirm).',
         'The Owner and Admins see every project without being listed as members.'] },
-  { k: 'projectMember', e: '👥', n: 'Project member', s: 'Who is on a project', d: 'Says a person is on a project, which lets them see it and browse its channels.',
+  { k: 'projectMember', e: '', n: 'Project member', s: 'Who is on a project', d: 'Says a person is on a project, which lets them see it and browse its channels.',
     f: ['project_id', 'user_id', 'joined_at', 'guest'], rel: [['project', 'belongs to'], ['person', 'is']],
     st: ['on the project', 'removed'],
     r: ['Adding someone to any channel of a project also puts them on the project.',
@@ -1033,12 +1033,12 @@ const ents = [
         'A DM is private to its two people; Owners and Admins never see other people\'s DMs.',
         'A new DM exists only on the phone until its first message.',
         'Deleting a channel removes its messages for everyone.'] },
-  { k: 'channelMember', e: '✅', n: 'Channel member', s: 'Who is in a channel', d: 'Puts a person in a channel and remembers how far they\'ve read.',
+  { k: 'channelMember', e: '', n: 'Channel member', s: 'Who is in a channel', d: 'Puts a person in a channel and remembers how far they\'ve read.',
     f: ['channel_id', 'user_id', 'last_read_message_id'], rel: [['channel', 'belongs to'], ['person', 'is']],
     st: ['in', 'left'],
     r: ['Messages are marked read only while the channel is on screen and the app is open.',
         'Unread counts and the "New" divider come from the read marker.'] },
-  { k: 'message', e: '💬', n: 'Message', s: 'Something said', d: 'One message in a channel: text, photos, a voice note, a file, a card, or a system line.',
+  { k: 'message', e: '', n: 'Message', s: 'Something said', d: 'One message in a channel: text, photos, a voice note, a file, a card, or a system line.',
     f: ['type', 'body', 'data', 'reactions', 'thread_parent_id', 'deleted_at'], rel: [['channel', 'belongs to'], ['person', 'written by'], ['upload', 'may carry'], ['message', 'may be a reply to (thread)']],
     st: ['sending', 'sent', 'edited', 'deleted'],
     r: ['Types: text, image, voice, file, card, system; an unknown type shows "Update the app to see this message".',
@@ -1053,7 +1053,7 @@ const ents = [
         'Only known data keys are kept; "edited" and "pinned" are set by the server alone.',
         'Can\'t post in read-only channels (CHANNEL_READ_ONLY) or archived projects (PROJECT_ARCHIVED).'] },
   { g: 'The bot' },
-  { k: 'integration', e: '🔗', n: 'PM link', s: 'integrations · one per company', d: 'How a company\'s PM app connects: its API key, webhook URL and secret.',
+  { k: 'integration', e: '', n: 'PM link', s: 'integrations · one per company', d: 'How a company\'s PM app connects: its API key, webhook URL and secret.',
     f: ['kind (mock / http / none)', 'api_key_hash', 'webhook_url', 'webhook_secret (encrypted)', 'last_call_at', 'last_error'], rel: [['company', 'belongs to'], ['card', 'sends']],
     st: ['not linked', 'mock PM app', 'real PM app'],
     r: ['Set up by the Siteline team on the platform panel.',
@@ -1062,7 +1062,7 @@ const ents = [
         'The webhook secret is stored encrypted and signs every webhook (HMAC-SHA256).',
         '120 Cards API calls a minute per company.',
         'The PM app can reach only cards: never projects, channels or messages.'] },
-  { k: 'card', e: '🤖', n: 'Card', s: 'A question from the PM app', d: 'A question the PM app sends to one person, shown in their bot conversation, with one-tap answers.',
+  { k: 'card', e: '', n: 'Card', s: 'A question from the PM app', d: 'A question the PM app sends to one person, shown in their bot conversation, with one-tap answers.',
     f: ['ext_id (PM app\'s id)', 'user_id', 'content', 'ref', 'state', 'answer', 'delivery', 'seen_at', 'nudged_at', 'expires_at'], rel: [['integration', 'sent by'], ['person', 'to one'], ['message', 'shown as'], ['upload', 'answer may carry']],
     st: ['open', 'answered', 'closed', 'expired'],
     r: ['Goes only to an active member of the company; an unknown email gives NOT_A_MEMBER.',
@@ -1078,7 +1078,7 @@ const ents = [
         'Every answer reaches the PM app at least once; webhooks retry for 24 hours and carry an id to drop repeats.',
         'Siteline never decides what to ask, whom or when; that is the PM app\'s job.'] },
   { g: 'Files and records' },
-  { k: 'upload', e: '📎', n: 'Upload', s: 'A photo, voice note or file', d: 'A file someone sent, stored privately under its company.',
+  { k: 'upload', e: '', n: 'Upload', s: 'A photo, voice note or file', d: 'A file someone sent, stored privately under its company.',
     f: ['key', 'content_type', 'size', 'user_id'], rel: [['message', 'attached to'], ['card', 'or a card answer']],
     st: ['uploaded', 'linked to a message'],
     r: ['Type is judged by the file\'s first bytes, not its name.',
@@ -1086,12 +1086,12 @@ const ents = [
         'Stored under the company\'s id; links are signed and expire.',
         'At most 30 uploads a minute per person.',
         'Uploaded files are never run.'] },
-  { k: 'activity', e: '🔔', n: 'Activity', s: 'Mentions and replies', d: 'An item in someone\'s Activity tab: a mention or a reply to their thread.',
+  { k: 'activity', e: '', n: 'Activity', s: 'Mentions and replies', d: 'An item in someone\'s Activity tab: a mention or a reply to their thread.',
     f: ['user_id', 'kind', 'message_id', 'read'], rel: [['person', 'for'], ['message', 'about']],
     st: ['unread', 'read'],
     r: ['Created for @mentions and replies in threads you\'re part of.',
         'Unread items have a blue rule until opened.'] },
-  { k: 'job', e: '🔁', n: 'Job', s: 'Background work', d: 'Something to do later or again: an email, a push, a webhook, a clean-up.',
+  { k: 'job', e: '', n: 'Job', s: 'Background work', d: 'Something to do later or again: an email, a push, a webhook, a clean-up.',
     f: ['kind', 'run_at', 'payload', 'dedupe_key', 'status', 'attempts', 'last_error'], rel: [['company', 'usually for one']],
     st: ['pending', 'running', 'done', 'failed'],
     r: ['Saved in the same transaction as the change that causes it, so a crash never loses one.',
@@ -1099,7 +1099,7 @@ const ents = [
         'Retried with backoff up to a limit per kind, then marked failed and reported.',
         'Sign-in codes, invites and pushes run before other jobs.',
         'The worker sets the job\'s company before touching data.'] },
-  { k: 'audit', e: '📜', n: 'Audit log', s: 'A permanent record', d: 'Who did what and when, for platform and admin actions.',
+  { k: 'audit', e: '', n: 'Audit log', s: 'A permanent record', d: 'Who did what and when, for platform and admin actions.',
     f: ['company_id', 'actor', 'action', 'target', 'data', 'at'], rel: [['company', 'about (or none)']],
     st: ['written', 'never edited'],
     r: ['Every platform-panel action is written here.',
@@ -1112,9 +1112,9 @@ function renderEnt(k) {
   const related = new Set([...sel.rel.map((r) => r[0]), ...Object.values(entMap).filter((x) => x.rel.some((r) => r[0] === k)).map((x) => x.k)]);
   related.delete(k);
   $('#dm').innerHTML = ents.map((x) => x.g ? `<div class="grp">${esc(x.g)}</div>` :
-    `<button class="ent ${x.k === k ? 'on' : related.has(x.k) ? 'rel' : 'dim'}" data-k="${x.k}"><span class="em">${x.e}</span><b>${esc(x.n)}</b><span>${esc(x.s)}</span></button>`).join('');
+    `<button class="ent ${x.k === k ? 'on' : related.has(x.k) ? 'rel' : 'dim'}" data-k="${x.k}"><b>${esc(x.n)}</b><span>${esc(x.s)}</span></button>`).join('');
   $$('#dm .ent').forEach((b) => (b.onclick = () => renderEnt(b.dataset.k)));
-  $('#entDetail').innerHTML = `<h3 style="margin:0">${sel.e} ${esc(sel.n)}</h3><p class="muted" style="margin:6px 0 0">${esc(sel.d)}</p>
+  $('#entDetail').innerHTML = `<h3 style="margin:0">${esc(sel.n)}</h3><p class="muted" style="margin:6px 0 0">${esc(sel.d)}</p>
     <div class="cols"><div>
       <span class="k">Key fields</span><div class="fields">${sel.f.map((x) => `<code>${esc(x)}</code>`).join('')}</div>
       <span class="k">Connected to</span><div class="rels">${sel.rel.map(([t, how]) => `<div>${esc(how)} <button data-k="${t}">${esc(entMap[t].n)}</button></div>`).join('')}</div>
@@ -1125,11 +1125,11 @@ function renderEnt(k) {
 renderEnt('channel');
 
 const lifecycles = [
-  ['🤖 Card', [['open', 'start'], ['answered', 'Person taps an answer'], ['delivered to PM app', 'Webhook accepted']], ['open → closed: the PM app closes it ("Changed in the PM app")', 'open → expired: expiresAt passes', 'answered → refused: the PM app says no, with a reason the person sees', 'answered → failed: no reply after 24 hours of retries; admins are told']],
-  ['✉️ Invite', [['pending', 'start'], ['accepted', 'They sign in with that email and tap Join']], ['pending → cancelled: an admin cancels it', 'pending → expired: 14 days pass (Resend restarts the timer)']],
-  ['🪪 Membership', [['active', 'start'], ['deactivated', 'Owner or Admin deactivates']], ['Role changes: Owner ↔ sets Admin, Member, Guest; Admins only Member ↔ Guest', 'Ownership moves only through the Siteline team']],
-  ['💬 Message (on the phone)', [['waiting', 'start'], ['sending', 'Signal is back'], ['sent', 'Server saved it']], ['sending → waiting: no signal, too many requests, or a server error; retried with growing pauses', 'sending → not sent: the server refused it for good; Retry or Discard in Unsent items']],
-  ['🏢 Company', [['active', 'start'], ['suspended', 'Siteline team suspends'], ['deleted', 'Data removed after 30 days']], ['suspended → active: the Siteline team makes it active again']],
+  [' Card', [['open', 'start'], ['answered', 'Person taps an answer'], ['delivered to PM app', 'Webhook accepted']], ['open → closed: the PM app closes it ("Changed in the PM app")', 'open → expired: expiresAt passes', 'answered → refused: the PM app says no, with a reason the person sees', 'answered → failed: no reply after 24 hours of retries; admins are told']],
+  [' Invite', [['pending', 'start'], ['accepted', 'They sign in with that email and tap Join']], ['pending → cancelled: an admin cancels it', 'pending → expired: 14 days pass (Resend restarts the timer)']],
+  [' Membership', [['active', 'start'], ['deactivated', 'Owner or Admin deactivates']], ['Role changes: Owner ↔ sets Admin, Member, Guest; Admins only Member ↔ Guest', 'Ownership moves only through the Siteline team']],
+  [' Message (on the phone)', [['waiting', 'start'], ['sending', 'Signal is back'], ['sent', 'Server saved it']], ['sending → waiting: no signal, too many requests, or a server error; retried with growing pauses', 'sending → not sent: the server refused it for good; Retry or Discard in Unsent items']],
+  [' Company', [['active', 'start'], ['suspended', 'Siteline team suspends'], ['deleted', 'Data removed after 30 days']], ['suspended → active: the Siteline team makes it active again']],
 ];
 $('#lifecycles').innerHTML = lifecycles.map(([t, path, other]) => `<div class="card"><b>${esc(t)}</b><div class="lcflow">${path.map(([st, why], i) =>
   (i ? `<span class="ar">→<small>${esc(why)}</small></span>` : '') + `<span class="st ${i === 0 ? 'start' : i === path.length - 1 ? 'end' : ''}">${esc(st)}</span>`).join('')}</div>
@@ -1142,7 +1142,7 @@ function renderRules() {
   $$('#ruleTabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.n === ruleEnt));
   const rows = Object.values(entMap).flatMap((x) => x.r.map((r) => [x, r])).filter(([x, r]) => (ruleEnt === 'All' || x.n === ruleEnt) && (!t || (x.n + ' ' + r).toLowerCase().includes(t)));
   $('#rules').innerHTML = `<tr><th style="width:180px">Applies to</th><th>Rule (${rows.length})</th></tr>` +
-    (rows.map(([x, r]) => `<tr><td><span class="pill">${x.e} ${esc(x.n)}</span></td><td>${esc(r)}</td></tr>`).join('') || '<tr><td colspan="2" class="empty">No rules match.</td></tr>');
+    (rows.map(([x, r]) => `<tr><td><span class="pill">${esc(x.n)}</span></td><td>${esc(r)}</td></tr>`).join('') || '<tr><td colspan="2" class="empty">No rules match.</td></tr>');
 }
 $$('#ruleTabs .chip').forEach((b) => (b.onclick = () => { ruleEnt = b.dataset.n; renderRules(); }));
 $('#rq').oninput = renderRules;
@@ -1151,31 +1151,31 @@ renderRules();
 /* ---------- Architecture ---------- */
 const arch = [
   { z: 'People and outside systems' },
-  { k: 'phone', e: '📱', n: 'Phone app', s: 'Expo / React Native', d: 'What people use. Shows server data, keeps a send queue for bad signal, opens a live connection for updates.', tech: 'Expo SDK 58, React Native 0.88, TypeScript, expo-router, TanStack Query, zustand, FlashList', where: 'frontend/', to: ['api', 'r2', 'push'] },
-  { k: 'pm', e: '📋', n: 'PM app', s: 'The company\'s own software', d: 'Plans projects and tasks (not part of Siteline). Sends cards through the Cards API and receives answers by webhook.', tech: 'Any system that can call an HTTPS API', where: 'docs/CARDS_API.md (its contract)', to: ['api'] },
-  { k: 'team', e: '🛠️', n: 'Siteline team', s: 'Browser', d: 'Creates and manages companies on the platform panel. Can\'t see messages or files.', tech: 'Web pages from the API server (Jinja2)', where: 'backend/app/templates/platform/', to: ['api'] },
-  { k: 'mock', e: '🧪', n: 'Mock PM app', s: 'Built in, for testing', d: 'Stands in for a real PM app in development and staging. Uses the same Cards API code and the same webhook delivery.', tech: 'Python, inside the server', where: 'backend/app/mockpm/', to: ['api'] },
+  { k: 'phone', e: '', n: 'Phone app', s: 'Expo / React Native', d: 'What people use. Shows server data, keeps a send queue for bad signal, opens a live connection for updates.', tech: 'Expo SDK 58, React Native 0.88, TypeScript, expo-router, TanStack Query, zustand, FlashList', where: 'frontend/', to: ['api', 'r2', 'push'] },
+  { k: 'pm', e: '', n: 'PM app', s: 'The company\'s own software', d: 'Plans projects and tasks (not part of Siteline). Sends cards through the Cards API and receives answers by webhook.', tech: 'Any system that can call an HTTPS API', where: 'docs/CARDS_API.md (its contract)', to: ['api'] },
+  { k: 'team', e: '', n: 'Siteline team', s: 'Browser', d: 'Creates and manages companies on the platform panel. Can\'t see messages or files.', tech: 'Web pages from the API server (Jinja2)', where: 'backend/app/templates/platform/', to: ['api'] },
+  { k: 'mock', e: '', n: 'Mock PM app', s: 'Built in, for testing', d: 'Stands in for a real PM app in development and staging. Uses the same Cards API code and the same webhook delivery.', tech: 'Python, inside the server', where: 'backend/app/mockpm/', to: ['api'] },
   { z: 'Siteline servers (Render, Singapore)' },
-  { k: 'api', e: '⚙️', n: 'API server', s: 'FastAPI', d: 'Answers every request: the app API, the Cards API, the platform panel, and live WebSocket updates. Checks sign-in, permissions and rate limits.', tech: 'Python 3.13, FastAPI, Pydantic, uvicorn', where: 'backend/app/main.py, routers/, services/', to: ['db', 'r2', 'phone'] },
-  { k: 'worker', e: '🔁', n: 'Worker', s: 'Background jobs', d: 'Runs one job at a time from the jobs table: emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
-  { k: 'db', e: '🗄️', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 8 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
-  { k: 'r2', e: '🖼️', n: 'File storage', s: 'Cloudflare R2', d: 'Photos, voice notes and files, in a private bucket. Each file is under its company; links are signed and expire.', tech: 'S3 API (boto3)', where: 'backend/app/services/files.py', to: ['api'] },
+  { k: 'api', e: '', n: 'API server', s: 'FastAPI', d: 'Answers every request: the app API, the Cards API, the platform panel, and live WebSocket updates. Checks sign-in, permissions and rate limits.', tech: 'Python 3.13, FastAPI, Pydantic, uvicorn', where: 'backend/app/main.py, routers/, services/', to: ['db', 'r2', 'phone'] },
+  { k: 'worker', e: '', n: 'Worker', s: 'Background jobs', d: 'Runs one job at a time from the jobs table: emails, pushes, webhooks to the PM app, hourly clean-up. Retries with backoff. Sign-in codes and pushes go first.', tech: 'Same Python code, separate process', where: 'backend/app/worker.py, jobs/', to: ['db', 'email', 'push', 'pm'] },
+  { k: 'db', e: '', n: 'Postgres', s: 'The single source of truth', d: 'All data, the job queue and the event log. Row-level security keeps companies apart. LISTEN/NOTIFY tells every API process about new events.', tech: 'Postgres 16, plain SQL via psycopg 3, 8 numbered migrations', where: 'backend/app/db.py, db/migrations/', to: ['api', 'worker'] },
+  { k: 'r2', e: '', n: 'File storage', s: 'Cloudflare R2', d: 'Photos, voice notes and files, in a private bucket. Each file is under its company; links are signed and expire.', tech: 'S3 API (boto3)', where: 'backend/app/services/files.py', to: ['api'] },
   { z: 'Hosted services' },
-  { k: 'email', e: '📨', n: 'Email', s: 'Resend', d: 'Sign-in codes and invites.', tech: 'Resend HTTP API', where: 'backend/app/senders/email.py', to: ['worker'] },
-  { k: 'push', e: '🔔', n: 'Push', s: 'Expo push service', d: 'Notifications to phones for DMs, mentions, thread replies and cards.', tech: 'Expo push API', where: 'backend/app/senders/push.py', to: ['worker', 'phone'] },
-  { k: 'sentry', e: '🚨', n: 'Error tracking', s: 'Sentry', d: 'Collects errors from the app and server, without codes, tokens or message text.', tech: 'Sentry SDK', where: 'backend/app/logs.py', to: ['api', 'worker'] },
-  { k: 'eas', e: '🏗️', n: 'App builds', s: 'Expo EAS', d: 'Builds the app in the cloud for each environment and ships updates over the air. Holds the app\'s public settings.', tech: 'EAS Build and EAS Update', where: 'frontend/eas.json', to: ['phone'] },
+  { k: 'email', e: '', n: 'Email', s: 'Resend', d: 'Sign-in codes and invites.', tech: 'Resend HTTP API', where: 'backend/app/senders/email.py', to: ['worker'] },
+  { k: 'push', e: '', n: 'Push', s: 'Expo push service', d: 'Notifications to phones for DMs, mentions, thread replies and cards.', tech: 'Expo push API', where: 'backend/app/senders/push.py', to: ['worker', 'phone'] },
+  { k: 'sentry', e: '', n: 'Error tracking', s: 'Sentry', d: 'Collects errors from the app and server, without codes, tokens or message text.', tech: 'Sentry SDK', where: 'backend/app/logs.py', to: ['api', 'worker'] },
+  { k: 'eas', e: '', n: 'App builds', s: 'Expo EAS', d: 'Builds the app in the cloud for each environment and ships updates over the air. Holds the app\'s public settings.', tech: 'EAS Build and EAS Update', where: 'frontend/eas.json', to: ['phone'] },
 ];
 function renderArch(k) {
   const items = arch.filter((a) => a.k);
   const sel = items.find((a) => a.k === k);
   const linked = new Set(sel ? [...sel.to, ...items.filter((a) => a.to.includes(k)).map((a) => a.k)] : []);
   $('#arch').innerHTML = arch.map((a) => a.z ? `<div class="zone">${esc(a.z)}</div>` :
-    `<button class="box ${a.k === k ? 'on' : ''} ${sel && a.k !== k ? (linked.has(a.k) ? 'link' : 'dim') : ''}" data-k="${a.k}"><span class="em">${a.e}</span><b>${esc(a.n)}</b><span>${esc(a.s)}</span></button>`).join('');
+    `<button class="box ${a.k === k ? 'on' : ''} ${sel && a.k !== k ? (linked.has(a.k) ? 'link' : 'dim') : ''}" data-k="${a.k}"><b>${esc(a.n)}</b><span>${esc(a.s)}</span></button>`).join('');
   $$('#arch .box').forEach((b) => (b.onclick = () => renderArch(b.dataset.k)));
   $('#archDetail').innerHTML = sel
-    ? `<h3 style="margin:0">${sel.e} ${esc(sel.n)}</h3><p class="muted" style="margin:6px 0 0">${esc(sel.d)}</p><dl><dt>Built with</dt><dd>${esc(sel.tech)}</dd><dt>In the code</dt><dd><code>${esc(sel.where)}</code></dd><dt>Talks to</dt><dd>${[...linked].map((x) => `<span class="pill ok">${esc(items.find((i) => i.k === x).n)}</span>`).join(' ')}</dd></dl>`
-    : '<p class="muted" style="margin:0">👆 Click a box. Green boxes are the ones it talks to.</p>';
+    ? `<h3 style="margin:0">${esc(sel.n)}</h3><p class="muted" style="margin:6px 0 0">${esc(sel.d)}</p><dl><dt>Built with</dt><dd>${esc(sel.tech)}</dd><dt>In the code</dt><dd><code>${esc(sel.where)}</code></dd><dt>Talks to</dt><dd>${[...linked].map((x) => `<span class="pill ok">${esc(items.find((i) => i.k === x).n)}</span>`).join(' ')}</dd></dl>`
+    : '<p class="muted" style="margin:0"> Click a box. Green boxes are the ones it talks to.</p>';
 }
 renderArch('api');
 
@@ -1283,7 +1283,7 @@ const tables = [
 function renderTables(k) {
   $$('#tableTabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.k === k));
   $('#tables').innerHTML = '<tr><th>Table</th><th>Kind</th><th>What it holds</th></tr>' + tables.filter((t) => k === 'all' || t[1] === k)
-    .map(([n, kind, d]) => `<tr><td><code>${esc(n)}</code></td><td>${kind === 'company' ? '<span class="pill ok">🔒 per company</span>' : '<span class="pill">🌐 global</span>'}</td><td>${esc(d)}</td></tr>`).join('');
+    .map(([n, kind, d]) => `<tr><td><code>${esc(n)}</code></td><td>${kind === 'company' ? '<span class="pill ok">per company</span>' : '<span class="pill">global</span>'}</td><td>${esc(d)}</td></tr>`).join('');
 }
 $$('#tableTabs .chip').forEach((b) => (b.onclick = () => renderTables(b.dataset.k)));
 renderTables('all');
@@ -1343,21 +1343,21 @@ renderRoutes();
 
 /* ---------- Security ---------- */
 const sec = [
-  ['Sign-in', '🔑', 'No passwords', 'Sign-in is a 6-digit email code: nothing to guess, reuse or leak. Codes last 10 minutes, die after 5 wrong tries, and are stored only as fingerprints.'],
-  ['Sign-in', '⏱️', 'Limits on sign-in', 'At most 5 codes per email and 20 per network address an hour. The same answer for unknown emails, so nobody can probe who\'s on Siteline.'],
-  ['Sign-in', '📱', 'Tokens kept safe', 'Phone tokens live in encrypted SecureStore. Refresh tokens change on every use; reusing an old one signs that device out. The platform panel uses an httponly cookie.'],
-  ['Separation', '🧱', 'Companies can\'t see each other', 'The company comes from the session. Postgres row-level security returns only that company\'s rows. Another company\'s ids answer "not found". Tested on every route.'],
-  ['Separation', '🎯', 'Permissions on the server', 'Every check runs on the server (rules.py, access.py). Changing the app can\'t unlock anything.'],
-  ['Separation', '📦', 'Only allowed fields saved', 'Requests drop unknown fields. Nobody can make themselves an admin by adding "role" to a request.'],
-  ['Input', '🧪', 'Every input checked', 'Request bodies are validated and size-limited (1 MB; 26 MB for uploads). SQL always uses parameters, never text built from input.'],
-  ['Input', '🖼️', 'Uploads checked by content', 'Only JPEG, PNG, WebP, HEIC and PDF, judged by the file\'s first bytes, not its name. Stored privately under the company; links are signed and expire; nothing uploaded is ever run.'],
-  ['Input', '🧼', 'No HTML injection', 'The app shows text as text. The platform panel\'s templates escape every value automatically.'],
-  ['Abuse', '🚦', 'Rate limits', 'Per person: 120 changes a minute, 30 uploads, 30 searches, 30 invites an hour. Cards API: 120 calls a minute per company. The phone\'s queue waits and retries, so nothing is lost.'],
-  ['Abuse', '✍️', 'Signed webhooks', 'Every webhook to the PM app is signed (HMAC-SHA256) with a timestamp and an id, so the PM app can check it\'s real and drop repeats.'],
-  ['Running', '🚫', 'Safe defaults', 'The server won\'t start without SITELINE_ENV, and refuses weak secrets, the demo code, local file storage or http in production. Dev routes are never mounted in production.'],
-  ['Running', '🙈', 'No secrets in logs', 'Logs and Sentry never contain codes, tokens, API keys or message text. Users see generic errors; details stay in the logs.'],
-  ['Running', '📦', 'Dependencies watched', 'Dependabot weekly; pip-audit and npm audit on every push and every Monday. Currently 0 high or critical warnings.'],
-  ['Running', '🛠️', 'Platform staff can\'t read chats', 'The platform panel never shows messages or files, and every staff action goes to the audit log.'],
+  ['Sign-in', '', 'No passwords', 'Sign-in is a 6-digit email code: nothing to guess, reuse or leak. Codes last 10 minutes, die after 5 wrong tries, and are stored only as fingerprints.'],
+  ['Sign-in', '', 'Limits on sign-in', 'At most 5 codes per email and 20 per network address an hour. The same answer for unknown emails, so nobody can probe who\'s on Siteline.'],
+  ['Sign-in', '', 'Tokens kept safe', 'Phone tokens live in encrypted SecureStore. Refresh tokens change on every use; reusing an old one signs that device out. The platform panel uses an httponly cookie.'],
+  ['Separation', '', 'Companies can\'t see each other', 'The company comes from the session. Postgres row-level security returns only that company\'s rows. Another company\'s ids answer "not found". Tested on every route.'],
+  ['Separation', '', 'Permissions on the server', 'Every check runs on the server (rules.py, access.py). Changing the app can\'t unlock anything.'],
+  ['Separation', '', 'Only allowed fields saved', 'Requests drop unknown fields. Nobody can make themselves an admin by adding "role" to a request.'],
+  ['Input', '', 'Every input checked', 'Request bodies are validated and size-limited (1 MB; 26 MB for uploads). SQL always uses parameters, never text built from input.'],
+  ['Input', '', 'Uploads checked by content', 'Only JPEG, PNG, WebP, HEIC and PDF, judged by the file\'s first bytes, not its name. Stored privately under the company; links are signed and expire; nothing uploaded is ever run.'],
+  ['Input', '', 'No HTML injection', 'The app shows text as text. The platform panel\'s templates escape every value automatically.'],
+  ['Abuse', '', 'Rate limits', 'Per person: 120 changes a minute, 30 uploads, 30 searches, 30 invites an hour. Cards API: 120 calls a minute per company. The phone\'s queue waits and retries, so nothing is lost.'],
+  ['Abuse', '', 'Signed webhooks', 'Every webhook to the PM app is signed (HMAC-SHA256) with a timestamp and an id, so the PM app can check it\'s real and drop repeats.'],
+  ['Running', '', 'Safe defaults', 'The server won\'t start without SITELINE_ENV, and refuses weak secrets, the demo code, local file storage or http in production. Dev routes are never mounted in production.'],
+  ['Running', '', 'No secrets in logs', 'Logs and Sentry never contain codes, tokens, API keys or message text. Users see generic errors; details stay in the logs.'],
+  ['Running', '', 'Dependencies watched', 'Dependabot weekly; pip-audit and npm audit on every push and every Monday. Currently 0 high or critical warnings.'],
+  ['Running', '', 'Platform staff can\'t read chats', 'The platform panel never shows messages or files, and every staff action goes to the audit log.'],
 ];
 const secGroups = ['All', ...new Set(sec.map((s) => s[0]))];
 let secGroup = 'All';
@@ -1365,7 +1365,7 @@ $('#secTabs').innerHTML = secGroups.map((g) => `<button class="chip" data-g="${g
 function renderSec() {
   $$('#secTabs .chip').forEach((b) => b.classList.toggle('on', b.dataset.g === secGroup));
   $('#secList').innerHTML = sec.filter((s) => secGroup === 'All' || s[0] === secGroup)
-    .map(([g, e, t, d]) => `<div class="card"><div style="display:flex;gap:12px"><div class="ico" style="margin:0;flex:none">${e}</div><div><b>${esc(t)}</b> <span class="pill ok" style="margin-left:6px">Built</span><p class="muted small" style="margin:6px 0 0">${esc(d)}</p></div></div></div>`).join('');
+    .map(([g, e, t, d]) => `<div class="card"><div style="display:flex;gap:12px"><div><b>${esc(t)}</b> <span class="pill ok" style="margin-left:6px">Built</span><p class="muted small" style="margin:6px 0 0">${esc(d)}</p></div></div></div>`).join('');
 }
 $$('#secTabs .chip').forEach((b) => (b.onclick = () => { secGroup = b.dataset.g; renderSec(); }));
 renderSec();
@@ -1437,7 +1437,7 @@ function buildIndex() {
   decisions.forEach((d) => idx.push({ id: 'decisions', title: d[1] + ' (decision)', text: d.slice(2).join(' ') }));
   routes.forEach((r) => idx.push({ id: 'api', title: r[2] + ' (route)', text: r[3] }));
   Object.values(entMap).forEach((x) => idx.push({ id: 'domain', title: x.n + ' (domain)', text: x.d + ' ' + x.r.join(' ') }));
-  Object.values(flows).forEach((f) => f.steps.forEach((s) => idx.push({ id: 'flows', title: s[1] + ' (' + f.n.replace(/^\S+\s/, '') + ')', text: s[2] })));
+  Object.values(flows).forEach((f) => f.steps.forEach((s) => idx.push({ id: 'flows', title: s[1] + ' (' + f.n + ')', text: s[2] })));
   return idx;
 }
 let index = null, sel = -1;
