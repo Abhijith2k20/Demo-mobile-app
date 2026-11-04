@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router/js-tabs';
 import { useTranslation } from 'react-i18next';
+import type { ColorValue } from 'react-native';
+import type { IconName } from '@/components/basics';
 import { useUnreadActivityCount } from '@/features/activity/hooks';
 import { useDmList } from '@/features/home/hooks';
 import { useMeSync, useUnreadCounts } from '@/features/shared';
@@ -8,6 +10,13 @@ import { usePushSetup } from '@/features/shared/push';
 import { useSession } from '@/stores/session';
 import { fonts } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
+
+// The tab bar always passes a colour string; React Native 0.88 types it as any colour value, so narrow it for Feather.
+function tabIcon(name: IconName) {
+  return function TabIcon({ color }: { color: ColorValue }) {
+    return <Feather name={name} size={22} color={typeof color === 'string' ? color : undefined} />;
+  };
+}
 
 function TabsForUser() {
   const { c } = useTheme();
@@ -41,7 +50,7 @@ function TabsForUser() {
         name="index"
         options={{
           title: t('tabs.home', 'Home'),
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+          tabBarIcon: tabIcon('home'),
           tabBarBadge: count(totalUnread),
         }}
       />
@@ -49,7 +58,7 @@ function TabsForUser() {
         name="dms"
         options={{
           title: t('tabs.dms', 'DMs'),
-          tabBarIcon: ({ color }) => <Feather name="message-circle" size={22} color={color} />,
+          tabBarIcon: tabIcon('message-circle'),
           tabBarBadge: count(dms.totalUnread),
         }}
       />
@@ -57,7 +66,7 @@ function TabsForUser() {
         name="activity"
         options={{
           title: t('tabs.activity', 'Activity'),
-          tabBarIcon: ({ color }) => <Feather name="bell" size={22} color={color} />,
+          tabBarIcon: tabIcon('bell'),
           tabBarBadge: count(activity),
         }}
       />
@@ -65,7 +74,7 @@ function TabsForUser() {
         name="you"
         options={{
           title: t('tabs.you', 'You'),
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+          tabBarIcon: tabIcon('user'),
         }}
       />
     </Tabs>

@@ -37,9 +37,7 @@ jobs:
         with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
       - name: Known vulnerabilities in packages the app ships
-        # Critical only for now: the remaining highs are in Expo's build tools and in expo-router's query-string,
-        # fixed by the SDK 58 upgrade (DECISIONS.md). Raise this to "high" after that upgrade.
-        run: npm audit --omit=dev --audit-level=critical
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --ci

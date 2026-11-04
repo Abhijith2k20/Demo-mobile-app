@@ -4,8 +4,8 @@
 > entries below are kept as the record of what changed from the first version of the spec and why.
 
 `SITELINE_SPEC.md` (named `SITELINE_DEMO_SPEC.md` until 2026-11-02) is the source of truth. This file records every place where the build
-differs from it, or where the spec left a choice open. Built against **Expo SDK 57**
-(React Native 0.86, React 19.2, Reanimated 4.5).
+differs from it, or where the spec left a choice open. Built against **Expo SDK 58** (upgraded from 57; see the security audit section)
+(React Native 0.88, React 19.3, Reanimated 4.7).
 
 ## Libraries
 
@@ -732,8 +732,10 @@ without a work email can't use Siteline; the company gives them one, or an addre
 - Per-person rate limits (`services/limits.py`, counted in Postgres): changes 120 a minute, uploads 30 a minute, message
   search 30 a minute, invites and resends 30 an hour. Too many answers RATE_LIMITED; the app's send queue waits and retries.
 - Dependencies: vulnerable packages patched; Dependabot weekly; CI runs `pip-audit` and `npm audit` on every push and
-  every Monday. Known and accepted until the SDK 58 upgrade: `query-string` 7 inside expo-router 57 (denial of service on a
-  malformed link, fixed in expo-router 58.0.30) and Expo's build-tool advisories. The npm check fails on critical for
-  now; raise it to high after SDK 58.
+  every Monday; the npm check fails on any high or critical advisory.
+- Upgraded to Expo SDK 58 (React Native 0.88, React 19.3, expo-router 58, gesture-handler 3), which cleared the last
+  high advisories (expo-router 57's `query-string`, Expo build tools). Code changes: text-field refs use
+  `TextInputInstance` (React Native's strict types), tab icons narrow the colour type, `expo-asset` added (expo-audio
+  peer). Expo Go for SDK 58 is needed on test phones; development builds must be rebuilt.
 - `/internal` (dev panel) answers only the seeded demo accounts outside local development, so a real account on staging
   can't wipe it. `/docs` is served only in local development.

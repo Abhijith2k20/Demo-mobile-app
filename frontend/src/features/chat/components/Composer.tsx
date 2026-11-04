@@ -3,7 +3,7 @@ import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, 
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View, type TextInputInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, type IconName } from '@/components/basics';
 import { Sheet } from '@/components/Sheet';
@@ -65,7 +65,7 @@ export function Composer(props: Props) {
   const recorderState = useAudioRecorderState(recorder);
   /** Seconds recorded, or null when not recording. */
   const recording = recorderState.isRecording ? Math.floor(recorderState.durationMillis / 1000) : null;
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const text = draft;
   const hasText = text.trim().length > 0;
   const me = useMe();

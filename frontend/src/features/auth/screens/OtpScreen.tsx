@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View, type TextInputInstance } from 'react-native';
 import { withBoundary } from '@/components/chrome';
 import { T } from '@/components/T';
 import { openCompany, requestCode, verifyCode } from '@/features/auth/api';
@@ -30,7 +30,7 @@ function OtpScreen({ identifier, company }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(30);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const mounted = useRef(true);
 
   useEffect(() => {

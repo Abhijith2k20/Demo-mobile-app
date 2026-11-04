@@ -97,7 +97,7 @@ online at once, 50,000 messages and 5,000 cards a day.
 
 | Concern | Choice |
 |---|---|
-| App | Expo SDK 57, React Native, TypeScript, `expo-router` |
+| App | Expo SDK 58, React Native, TypeScript, `expo-router` |
 | Builds and updates | EAS Build (profiles `development`, `preview` → staging, `production`), EAS Update (channel per profile) |
 | Server data in the app | `@tanstack/react-query`; live events mark queries stale |
 | App-only state | `zustand` |

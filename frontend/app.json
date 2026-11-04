@@ -45,7 +45,9 @@
           "color": "#1667B0",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-asset"
     ],
     "scheme": "siteline",
     "experiments": {
